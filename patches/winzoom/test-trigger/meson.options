@@ -1,0 +1,1 @@
+option('wzvariant', type: 'string', value: 'patched', description: 'which source to build: stock | patched')

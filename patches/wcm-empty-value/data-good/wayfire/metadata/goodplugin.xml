@@ -1,0 +1,24 @@
+<wayfire>
+  <plugin name="goodplugin">
+    <option name="test_opt" type="string">
+      <default>good</default>
+      <desc>
+        <value>good</value>
+        <_name>Good label</_name>
+        <value>other</value>
+        <_name>Other label</_name>
+      </desc>
+    </option>
+    <option name="num_opt" type="int">
+      <default>5</default>
+      <min>1</min>
+      <max>10</max>
+      <desc>
+        <value>1</value>
+        <_name>One</_name>
+        <value>10</value>
+        <_name>Ten</_name>
+      </desc>
+    </option>
+  </plugin>
+</wayfire>

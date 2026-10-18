@@ -1,0 +1,27 @@
+# compat/ shims
+
+## decoration.h
+Verbatim replacement for GNOME libdecoration's `<decoration.h>`: defines
+`decor_extents_t` only (4 ints, same layout as GNOME's definition).
+Included via `-I compat` ahead of the vendored emerald headers.
+
+## libwnck
+`compat/libwnck/libwnck.h` is the ONLY source of the Wnck types — the build
+has no `libwnck-3.0` dependency. It defines the three types the vendored
+`include/emerald.h` uses (`WnckWindow` opaque pointer, `WnckWindowState`,
+`WnckWindowActions`), with the enum values copied VERBATIM from libwnck 3.0's
+`window.h` (the headers this build used to compile against), so the bitmasks
+the bridge writes and the vendored engines read keep the exact same bit
+positions. Resolved via `-I compat` ahead of any system include path.
+
+NOTE (contract for later parts): the installed libwnck 3.0 enum values
+(WNCK_WINDOW_STATE_MAXIMIZED_HORIZONTALLY = 1<<1, ..._VERTICALLY = 1<<2,
+SHADED = 1<<3, STICKY = 1<<6, FULLSCREEN = 1<<8, ABOVE = 1<<11;
+WNCK_WINDOW_ACTION_SHADE = 1<<2, STICK = 1<<3, CLOSE = 1<<7,
+MINIMIZE = 1<<12, MAXIMIZE = 1<<14, FULLSCREEN = 1<<16, ABOVE = 1<<17)
+differ from the libwnck bit values pinned in the overview D4. The
+bridge (`src/emerald-engine.cpp`) therefore performs an explicit
+wayfire EmeraldWindowState/EmeraldWindowActions <-> Wnck bit-value
+mapping (documented next to the cast site) instead of a blind
+`static_cast`; the engines' internal use of Wnck bit values stays
+self-consistent.

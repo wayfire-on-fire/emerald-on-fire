@@ -1,0 +1,13 @@
+# Build trees
+build/
+build-docker/
+
+# Docker build output
+dist/
+
+# Local-only dev notes (not shipped)
+results/
+notes-*.md
+
+# Misc
+*.mp4

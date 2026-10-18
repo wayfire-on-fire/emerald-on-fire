@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Emerald Theme Manager
+GenericName=Theme Editor
+Comment=Emerald window theme editor
+Exec=emerald-theme-manager
+Terminal=false
+Type=Application
+Categories=Utility;Settings;
+Keywords=emerald;wayfire;theme;decorations;
+Icon=emerald-theme-manager

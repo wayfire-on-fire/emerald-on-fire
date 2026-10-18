@@ -1,0 +1,13 @@
+#pragma once
+/*
+ * Fixture paths for the emeraldwf test suite (review R2).
+ *
+ * Generated from test-paths.in by tests/meson.build (configure_file).
+ * The engine dir is where MESON put the built engine .so's — in <builddir>/
+ * engines, which the old /proc/self/exe three-hops-up heuristic only found
+ * for in-tree builds (<srcroot>/build/engines). The source-root fixtures
+ * (vendored defaults, WCM metadata, goldens) come from the source tree.
+ */
+#define EMERALDWF_TEST_SOURCE_ROOT "@SOURCE_ROOT@"
+#define EMERALDWF_TEST_ENGINE_DIR "@ENGINE_DIR@"
+#define EMERALDWF_TEST_METADATA_DIR "@METADATA_DIR@"

@@ -1,0 +1,11 @@
+This directory contains a vendored, unmodified copy of emerald, the Compiz
+window decorator.
+
+  Upstream:   https://gitlab.com/compiz/emerald
+  Pinned rev: 826408b829d57b35480e3f53573cf1f1180a4779 (see VENDOR_SHA)
+  License:    GNU General Public License v2.0 (GPLv2)
+
+emerald is Copyright (C) 2006 Novell, Inc. and its contributors (see upstream
+for the full author list). It is licensed under GPLv2. This project is licensed
+under GPL-2.0-or-later (the top-level LICENSE), which is compatible with and
+covers this vendored code.

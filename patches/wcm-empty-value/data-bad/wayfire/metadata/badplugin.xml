@@ -1,0 +1,13 @@
+<wayfire>
+  <plugin name="badplugin">
+    <option name="test_opt" type="string">
+      <default>good</default>
+      <desc>
+        <value>good</value>
+        <_name>Good label</_name>
+        <value></value>
+        <_name>Empty value entry</_name>
+      </desc>
+    </option>
+  </plugin>
+</wayfire>

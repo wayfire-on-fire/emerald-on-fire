@@ -1,0 +1,11 @@
+II 2026-10-10 10:52:18.739 - [wf-config-0.11.0/src/file.cpp:623] Loaded XML configuration options from 1 files in /projects/contrib/emerald-wf/patches/wcm-empty-value/data-bad/wayfire/metadata:
+II 2026-10-10 10:52:18.739 - [wf-config-0.11.0/src/file.cpp:636] badplugin.xml
+II 2026-10-10 10:52:18.742 - [wf-config-0.11.0/src/file.cpp:623] Loaded XML configuration options from 72 files in /usr/share/wayfire/metadata:
+II 2026-10-10 10:52:18.742 - [wf-config-0.11.0/src/file.cpp:636] simple-tile.xml, command.xml, wrot.xml, emeraldwf.xml, pixdecor.xml, workspace-names.xml, invert.xml, wm-actions.xml, water.xml, ipc-rules.xml, autostart.xml, window-zoom.xml, keycolor.xml, expo.xml, join-views.xml, alpha.xml, extra-animations.xml, scale.xml, oswitch.xml, blur.xml, obs.xml, security-context-v1.xml, hide-cursor.xml, showrepaint.xml, wayfire-shell.xml, shortcuts-inhibit.xml, move.xml, fast-switcher.xml, input.xml, session-lock.xml, kde-appmenu.xml, crosshair.xml, bench.xml, gtk-shell.xml, ext-toplevel.xml, ipc.xml, fisheye.xml, focus-steal-prevent.xml, annotate.xml, wobbly.xml, ghost.xml, scale-title-filter.xml, showtouch.xml, animate.xml, pin-view.xml, preserve-output.xml, vswipe.xml, focus-change.xml, input-method-v1.xml, extra-gestures.xml, view-shot.xml, window-rules.xml, cube.xml, foreign-toplevel.xml, zoom.xml, grid.xml, input-device.xml, mag.xml, wsets.xml, vswitch.xml, autorotate-iio.xml, place.xml, resize.xml, output.xml, switcher.xml, decoration.xml, force-fullscreen.xml, core.xml, follow-focus.xml, xdg-activation.xml, workarounds.xml, idle.xml
+Loading wayfire plugin: alpha
+Loading wayfire plugin: animate
+Loading wayfire plugin: annotate
+Loading wayfire plugin: autorotate-iio
+Loading wayfire plugin: autostart
+Loading wayfire plugin: badplugin
+ERROR: [badplugin] empty <value> element in option 'test_opt' description; fix the plugin metadata

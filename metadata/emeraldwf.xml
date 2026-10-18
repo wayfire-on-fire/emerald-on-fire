@@ -1,0 +1,222 @@
+<?xml version="1.0"?>
+<wayfire>
+	<plugin name="emeraldwf">
+		<_short>Emerald Decoration</_short>
+		<_long>Brings Emerald themes and engines to Wayfire. Edit themes in the Emerald Theme Manager app.</_long>
+		<category>Effects</category>
+		<group>
+			<_short>General</_short>
+			<option name="engine" type="string">
+				<_short>Engine Override</_short>
+				<_long>Overrides the engine used to render window frames. The default uses the engine defined in the active theme. If the override differs from the theme's engine, that engine is rendered with the default emerald theme, since theme assets are engine-specific.</_long>
+				<default>no_override</default>
+				<desc>
+					<value>no_override</value>
+					<_name>- No Override -</_name>
+				</desc>
+				<desc>
+					<value>legacy</value>
+					<_name>Legacy</_name>
+				</desc>
+				<desc>
+					<value>truglass</value>
+					<_name>Truglass</_name>
+				</desc>
+				<desc>
+					<value>vrunner</value>
+					<_name>VRunner</_name>
+				</desc>
+				<desc>
+					<value>oxygen</value>
+					<_name>Oxygen</_name>
+				</desc>
+				<desc>
+					<value>zootreeves</value>
+					<_name>ZooTreeves</_name>
+				</desc>
+				<desc>
+					<value>pixmap</value>
+					<_name>Pixmap</_name>
+				</desc>
+				<desc>
+					<value>line</value>
+					<_name>Line</_name>
+				</desc>
+			</option>
+			<option name="theme_dir" type="string">
+				<_short>Theme Directory</_short>
+				<_long>Path to the emerald theme directory (theme.ini + PNGs). Defaults to ~/.emerald/theme. Core settings live in ~/.emerald/settings.ini.</_long>
+				<default>~/.emerald/theme</default>
+				<hint>directory</hint>
+			</option>
+			<option name="maximized_borders" type="bool">
+				<_short>Draw borders on maximized windows</_short>
+				<_long>Whether or not to render side and bottom decorations on maximized (tiled) windows. When true, the emerald look is preserved (shadow inside the extents).</_long>
+				<default>true</default>
+			</option>
+			<option name="maximized_shadows" type="bool">
+				<_short>Draw shadows on maximized windows</_short>
+				<_long>Whether or not to allocate space for shadows on maximized (tiled) windows.</_long>
+				<default>true</default>
+			</option>
+			<option name="ignore_views" type="string">
+				<_short>Decoration disabled for specified window types</_short>
+				<_long>Disables window decoration for windows matching the specified criteria (view matcher).</_long>
+				<default>none</default>
+			</option>
+			<option name="always_decorate" type="string">
+				<_short>Decoration applied for specified window types</_short>
+				<_long>Forces window decoration for windows matching the specified criteria (view matcher). Use this to decorate CSD (self-decorating) windows with a double chrome.</_long>
+				<default>none</default>
+			</option>
+			<option name="use_decoration_cropping" type="bool">
+				<_short>Use Decoration Cropping</_short>
+				<_long>Maximized windows keep only the titlebar strip: the side and bottom decorations are cropped away. Takes precedence over the maximized border and shadow options while enabled.</_long>
+				<default>false</default>
+			</option>
+		</group>
+		<group>
+			<_short>Titlebar</_short>
+			<option name="double_click_action" type="string">
+				<_short>Double-click Action</_short>
+				<_long>Action performed on a double-click of the titlebar.</_long>
+				<default>shade</default>
+				<desc>
+					<value>shade</value>
+					<_name>Shade</_name>
+				</desc>
+				<desc>
+					<value>maximize</value>
+					<_name>Maximize</_name>
+				</desc>
+				<desc>
+					<value>minimize</value>
+					<_name>Minimize</_name>
+				</desc>
+				<desc>
+					<value>send_to_back</value>
+					<_name>Send to back</_name>
+				</desc>
+				<desc>
+					<value>close</value>
+					<_name>Close</_name>
+				</desc>
+				<desc>
+					<value>none</value>
+					<_name>None</_name>
+				</desc>
+			</option>
+			<option name="middle_click_action" type="string">
+				<_short>Middle-click Action</_short>
+				<_long>Action performed on a middle-click of the titlebar.</_long>
+				<default>send_to_back</default>
+				<desc>
+					<value>shade</value>
+					<_name>Shade</_name>
+				</desc>
+				<desc>
+					<value>maximize</value>
+					<_name>Maximize</_name>
+				</desc>
+				<desc>
+					<value>minimize</value>
+					<_name>Minimize</_name>
+				</desc>
+				<desc>
+					<value>send_to_back</value>
+					<_name>Send to back</_name>
+				</desc>
+				<desc>
+					<value>close</value>
+					<_name>Close</_name>
+				</desc>
+				<desc>
+					<value>none</value>
+					<_name>None</_name>
+				</desc>
+			</option>
+		</group>
+		<group>
+			<_short>Shade</_short>
+			<option name="enable_shade" type="bool">
+				<_short>Enable Shade</_short>
+				<_long>Enables emerald's scroll-to-shade (and the shade/unshade button). Scroll on a titlebar, hold the shade modifier and scroll, or use the IPC binding to fold a window into its titlebar.</_long>
+				<default>true</default>
+			</option>
+			<option name="shade_modifier" type="key">
+				<_short>Shade Modifier</_short>
+				<_long>When the shade modifier key is held down, you can scroll up and down to shade and unshade the window under the cursor.</_long>
+				<default>&lt;super&gt; &lt;ctrl&gt;</default>
+			</option>
+			<option name="shade_toggle" type="activator">
+				<_short>Toggle Window Shade</_short>
+				<_long>Toggles shade for the active window (bindable via wcm).</_long>
+				<default></default>
+			</option>
+			<option name="shade_duration" type="animation">
+				<_short>Shade Duration</_short>
+				<_long>The duration of the shade animation.</_long>
+				<default>1000ms sigmoid</default>
+				<min>0</min>
+			</option>
+			<option name="csd_titlebar_height" type="int">
+				<_short>CSD Titlebar Height</_short>
+				<_long>Because there is no way to know the client surface titlebar height for CSD windows, this is an option to adjust the shade strip height for them.</_long>
+				<default>32</default>
+				<min>0</min>
+			</option>
+			<option name="shadow_pad" type="int">
+				<_short>Shadow Pad (CSD)</_short>
+				<_long>Non-zero shadow thickness exported for CSD (self-decorating) windows via the wf-decoration-shadow-margin custom data, so a standalone shadow plugin can shadow them. 0 = no pad.</_long>
+				<default>0</default>
+				<min>0</min>
+			</option>
+			<option name="no_scroll_shade" type="bool">
+				<_short>No Shade on Titlebar Scroll</_short>
+				<_long>Prevents scrolling over the titlebar from shading or unshading the window.</_long>
+				<default>false</default>
+			</option>
+		</group>
+		<group>
+			<_short>Button Fade</_short>
+			<option name="use_button_fade" type="bool">
+				<_short>Use Button Fade</_short>
+				<_long>Fades the titlebar button highlight in and out over the fade duration, instead of switching it instantly on hover.</_long>
+				<default>true</default>
+			</option>
+			<option name="use_button_fade_pulse" type="bool">
+				<_short>Use Button Fade Pulse</_short>
+				<_long>While a titlebar button is hovered, its highlight keeps breathing between full opacity and the pulse minimum opacity.</_long>
+				<default>true</default>
+			</option>
+			<option name="button_fade_total_duration" type="int">
+				<_short>Button Fade Total Duration</_short>
+				<_long>How long the button highlight takes to fade in or out, in milliseconds.</_long>
+				<default>250</default>
+				<min>1</min>
+				<max>4000</max>
+			</option>
+			<option name="button_fade_step_duration" type="int">
+				<_short>Button Fade Step Duration</_short>
+				<_long>The duration of one fade step, in milliseconds. The total duration is split into steps of this size.</_long>
+				<default>50</default>
+				<min>1</min>
+				<max>2000</max>
+			</option>
+			<option name="button_fade_pulse_wait_duration" type="int">
+				<_short>Button Pulse Wait Duration</_short>
+				<_long>How long the pulse holds at full highlight between breaths, in milliseconds.</_long>
+				<default>0</default>
+				<min>0</min>
+				<max>4000</max>
+			</option>
+			<option name="button_fade_pulse_min_opacity" type="int">
+				<_short>Button Pulse Minimum Opacity</_short>
+				<_long>The lowest highlight opacity the pulse reaches, as a percentage of full opacity.</_long>
+				<default>0</default>
+				<min>0</min>
+				<max>100</max>
+			</option>
+		</group>
+	</plugin>
+</wayfire>

@@ -1,0 +1,7 @@
+# Project options.
+#
+# tests: the gtest suite. WPM's default flow passes -Dtests=false (see
+# wayfire-plugin.json) so a machine without gtest can still install the
+# plugin; plain `meson setup` keeps building the tests.
+option('tests', type: 'boolean', value: true,
+       description: 'Build the test suite (needs gtest)')

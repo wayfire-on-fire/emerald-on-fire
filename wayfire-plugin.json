@@ -1,0 +1,7 @@
+{
+  "name": "emeraldwf",
+  "build_commands": {
+    "setup": "meson setup %builddir% %sourcedir% --prefix %prefix% -Dtests=false"
+  },
+  "setup": "Add 'emeraldwf' to the plugins list in [core] of your wayfire config, then restart wayfire (or toggle the plugin off/on in WCM). Configure in WCM (Plugins > Emerald Decoration). The theme editor (emerald-theme-manager) is built in the manager build dir; ./install.sh installs the full layout (plugin + engines + editor + WCM metadata) with a safe user-dir fallback."
+}

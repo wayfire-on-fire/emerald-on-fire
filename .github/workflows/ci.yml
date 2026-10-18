@@ -1,0 +1,85 @@
+name: CI
+
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  # Flagship accessible path: Docker toolchain build + test (zero host deps).
+  docker:
+    name: docker build + test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build toolchain image + plugin
+        run: make binary
+      - name: Run test suite in the toolchain container
+        run: make test
+      - name: Verify artifacts
+        run: |
+          test -f dist/wayfire/libemeraldwf.so
+          ls -R dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: emeraldwf
+          path: dist/
+
+  # Matches WayfireWM/wayfire CI: build wayfire from source on a standard
+  # glibc toolchain and build the plugin against it. Catches anything the
+  # Docker image might mask.
+  native:
+    name: native (wayfire from source) + test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config meson ninja-build git \
+            libgtk-3.0-dev libpangocairo-1.0-dev libgdk-pixbuf-2.0-dev \
+            libcairo2-dev libglib2.0-dev libx11-dev libgtest-dev \
+            wayland-dev libwayland-dev wayland-protocols libinput-dev \
+            libevdev-dev libxkbcommon-dev libpixman-1-dev libglm-dev \
+            libdrm-dev libgbm-dev libseat-dev libdisplay-info-dev \
+            hwdata libxml2-dev libpango1.0-dev
+      - name: Build + install wayfire from source (v0.11.0)
+        run: |
+          git clone --recursive --depth 1 --branch v0.11.0 \
+            https://github.com/WayfireWM/wayfire /tmp/wayfire
+          cd /tmp/wayfire
+          meson setup build --prefix=/usr
+          ninja -C build
+          ninja -C build install
+      - name: Configure
+        run: meson setup build --buildtype=release
+      - name: Build
+        run: ninja -C build
+      - name: Test
+        run: meson test -C build --print-errorlogs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: emeraldwf-native
+          path: build/src/libemeraldwf.so
+
+  # Wayfire enforces a shared uncrustify config; match it. Project C++ only —
+  # the vendored third_party/emerald tree is excluded (kept unmodified).
+  code_style:
+    name: code style (uncrustify)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build tools
+        run: sudo apt-get update && sudo apt-get install -y git cmake gcc make
+      - name: Fetch uncrustify
+        uses: actions/checkout@v4
+        with:
+          repository: ammen99/uncrustify
+          path: uncrustify
+      - name: Compile uncrustify
+        run: cd uncrustify && mkdir build && cd build && cmake .. && make
+      - name: Fetch wayfire's uncrustify.ini
+        run: wget -q https://raw.githubusercontent.com/WayfireWM/wayfire/master/uncrustify.ini
+      - name: Check formatting
+        run: |
+          git ls-files | grep -vE '^third_party/' | grep -E '\.(cpp|hpp)$' \
+            | xargs ../uncrustify/build/uncrustify -c uncrustify.ini --no-backup --replace
+          git diff --exit-code

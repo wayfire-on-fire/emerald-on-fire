@@ -1,0 +1,13 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@
+
+Name: emeraldengine
+Description: Library for Emerald Engines
+Version: @VERSION@
+
+Requires.private: @EMERALD_REQUIRES@
+Libs: -L${libdir} -lemeraldengine
+Libs.private: @EMERALD_LIBS@
+Cflags: @EMERALD_CFLAGS@ -I${includedir}/emerald
