@@ -14,6 +14,16 @@ emerald does. The only backend difference vs emerald is the surface: emerald
 drew into X pixmaps, `emeraldwf` renders a per-toplevel cairo `ARGB32` image
 surface that the scene node uploads as a texture.
 
+**The Emerald Theme Manager** — theme list, live preview, and per-engine
+tabs; edits apply live, no wayfire restart:
+
+![Emerald Theme Manager](media/emerald-themer.gif)
+
+**In the wayfire config manager (WCM)** — every option is editable here, and
+the plugin live-reloads on change:
+
+![emeraldwf in the wayfire config manager (WCM)](media/emerald-wcm.gif)
+
 ## Build
 
 Three ways to get the plugin — pick by what's on the box:
@@ -245,11 +255,6 @@ loaded from
 `~/.emerald/engines/` first, then the installed
 `$(libdir)/emeraldwf/engines/`.
 
-The Emerald Theme Manager (`emerald-theme-manager`) — theme list, live
-preview, and per-engine tabs; edits apply live, no wayfire restart:
-
-![Emerald Theme Manager](media/emerald-themer.gif)
-
 ### Downloading emerald themes
 
 Emerald's theme collection lives at
@@ -299,11 +304,6 @@ tar -xof emerald-themes/themes/$name.emerald -C ~/.emerald/theme
 `.emerald` file and unpacks it for you.)
 
 ## Options (wcm: `emeraldwf`)
-
-The `emeraldwf` page in the wayfire config manager (WCM) — every option in
-the table below is editable here, and the plugin live-reloads on change:
-
-![emeraldwf in the wayfire config manager (WCM)](media/emerald-wcm.gif)
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
