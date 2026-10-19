@@ -14,31 +14,32 @@ namespace wf
 {
 namespace emeraldwf
 {
-
 // ── State mapping (D4) ─────────────────────────────────────────────────────
 // Maps wayfire toplevel view state → emerald's WnckWindowState bits.
 //
-//   fullscreen              → EWS_FULLSCREEN
-//   tiled_edges == ALL      → EWS_MAXIMIZED_HORIZONTALLY | EWS_MAXIMIZED_VERTICALLY
-//   view->sticky            → EWS_STICKY
+// fullscreen              → EWS_FULLSCREEN
+// tiled_edges == ALL      → EWS_MAXIMIZED_HORIZONTALLY | EWS_MAXIMIZED_VERTICALLY
+// view->sticky            → EWS_STICKY
 //
 // EWS_ABOVE / EWS_SHADED are not derivable from the wayfire state struct
 // alone (Part 05 sets EWS_SHADED when shade animation runs).
 //
 // Takes (state, sticky) so it is testable without a live view: the plugin
 // passes view->toplevel()->pending() and view->sticky.
-EmeraldWindowState emerald_state_from_view(const wf::toplevel_state_t &state,
-                                           bool sticky)
+EmeraldWindowState emerald_state_from_view(const wf::toplevel_state_t & state,
+    bool sticky)
 {
     uint32_t s = 0;
     if (state.fullscreen)
     {
         s |= EWS_FULLSCREEN;
     }
+
     if (state.tiled_edges == TILED_EDGES_ALL)
     {
         s |= EWS_MAXIMIZED_HORIZONTALLY | EWS_MAXIMIZED_VERTICALLY;
     }
+
     if (sticky)
     {
         s |= EWS_STICKY;
@@ -50,13 +51,13 @@ EmeraldWindowState emerald_state_from_view(const wf::toplevel_state_t &state,
 // ── Pure margin math (D8) ──────────────────────────────────────────────────
 // Ported semantics (not code) from emerald + pixdecor:
 //
-//   CSD (view not decorated)          → {0,0,0,0}
-//   fullscreen                        → {0,0,0,0}
-//   t   = *_space + extra_extents.X   (per side; *_space = border + shadow)
-//   top = top_space + extra_top + titlebar_height
-//   maximized && !maximized_borders → {0, 0, 0, top}
-//   else                             → {t, t, t, top}
-wf::decoration_margins_t emerald_decorator_t::margins_for(const MarginsInput &in)
+// CSD (view not decorated)          → {0,0,0,0}
+// fullscreen                        → {0,0,0,0}
+// t   = *_space + extra_extents.X   (per side; *_space = border + shadow)
+// top = top_space + extra_top + titlebar_height
+// maximized && !maximized_borders → {0, 0, 0, top}
+// else                             → {t, t, t, top}
+wf::decoration_margins_t emerald_decorator_t::margins_for(const MarginsInput & in)
 {
     if (in.csd || in.fullscreen)
     {
@@ -72,15 +73,15 @@ wf::decoration_margins_t emerald_decorator_t::margins_for(const MarginsInput &in
     // (border + shadow), NOT win_extents alone — with win_extents the
     // frame is too small, the title bar/borders land outside the client
     // area (gap below the window) and the title text is clipped.
-    //   left   = left_space   + extra_left
-    //   right  = right_space  + extra_right
-    //   bottom = bottom_space + extra_bottom
-    //   top    = top_space    + extra_top + titlebar_height
+    // left   = left_space   + extra_left
+    // right  = right_space  + extra_right
+    // bottom = bottom_space + extra_bottom
+    // top    = top_space    + extra_top + titlebar_height
     const double t     = static_cast<double>(in.left_space + in.extra_left);
     const double right = static_cast<double>(in.right_space + in.extra_right);
     const double bot   = static_cast<double>(in.bottom_space + in.extra_bottom);
     const double top   = static_cast<double>(in.top_space + in.extra_top) +
-                         static_cast<double>(in.titlebar_height);
+        static_cast<double>(in.titlebar_height);
 
     const bool maximized = (in.tiled_edges == TILED_EDGES_ALL);
     if (maximized)
@@ -96,26 +97,26 @@ wf::decoration_margins_t emerald_decorator_t::margins_for(const MarginsInput &in
         // Review F2 (-Wshadow): `left`, not `t` — the outer non-maximized
         // margin above is also named `t`.
         const double left = (in.left_space + in.extra_left) -
-                           maximized_crop_side(in.left_space, in.win_ext_left,
-                                               in.extra_left,
-                                               in.maximized_borders,
-                                               in.maximized_shadows);
-        const double r    = (in.right_space + in.extra_right) -
-                           maximized_crop_side(in.right_space, in.win_ext_right,
-                                               in.extra_right,
-                                               in.maximized_borders,
-                                               in.maximized_shadows);
-        const double b    = (in.bottom_space + in.extra_bottom) -
-                           maximized_crop_side(in.bottom_space, in.win_ext_bottom,
-                                               in.extra_bottom,
-                                               in.maximized_borders,
-                                               in.maximized_shadows);
-        const double tp   = (in.top_space + in.extra_top) -
-                           maximized_crop_side(in.top_space, in.win_ext_top,
-                                               in.extra_top,
-                                               in.maximized_borders,
-                                               in.maximized_shadows) +
-                           static_cast<double>(in.titlebar_height);
+            maximized_crop_side(in.left_space, in.win_ext_left,
+            in.extra_left,
+            in.maximized_borders,
+            in.maximized_shadows);
+        const double r = (in.right_space + in.extra_right) -
+            maximized_crop_side(in.right_space, in.win_ext_right,
+            in.extra_right,
+            in.maximized_borders,
+            in.maximized_shadows);
+        const double b = (in.bottom_space + in.extra_bottom) -
+            maximized_crop_side(in.bottom_space, in.win_ext_bottom,
+            in.extra_bottom,
+            in.maximized_borders,
+            in.maximized_shadows);
+        const double tp = (in.top_space + in.extra_top) -
+            maximized_crop_side(in.top_space, in.win_ext_top,
+            in.extra_top,
+            in.maximized_borders,
+            in.maximized_shadows) +
+            static_cast<double>(in.titlebar_height);
         return {left, r, b, tp};
     }
 
@@ -150,21 +151,21 @@ wf::decoration_margins_t emerald_decorator_t::margins_for(const MarginsInput &in
 // Review F2 (-Wshadow): parameters named `view_arg`/`theme_arg` — bare
 // `view`/`theme` shadow the members of the same name.
 emerald_decorator_t::emerald_decorator_t(::wayfire_toplevel_view view_arg,
-                                         std::shared_ptr<const ThemeSettings> theme_arg)
-    : view(view_arg)
+    std::shared_ptr<const ThemeSettings> theme_arg) :
+    view(view_arg)
     // The BASE shared_from_this() (view_interface_t is the
     // enable_shared_from_this base): the toplevel's own shared_from_this()
     // would hide it and drag in a dynamic_pointer_cast whose typeinfo
     // lives in libwayfire. Base liveness == toplevel liveness (same object).
-    , weak_view(view_arg ? view_arg->view_interface_t::shared_from_this()
-                         : std::weak_ptr<wf::view_interface_t>())
+    , weak_view(view_arg ? view_arg->view_interface_t::shared_from_this() :
+        std::weak_ptr<wf::view_interface_t>())
     , theme(std::move(theme_arg))
 {
     ctx().active = view_arg ? view_arg->activated : false;
     if (view_arg)
     {
         ctx().state = emerald_state_from_view(view_arg->toplevel()->pending(),
-                                              view_arg->sticky);
+            view_arg->sticky);
     }
 
     // For SSD windows the title bar height is the theme's (the engine draws
@@ -174,7 +175,7 @@ emerald_decorator_t::emerald_decorator_t(::wayfire_toplevel_view view_arg,
     // initializer list already did `theme(std::move(theme_arg))`, so
     // `theme_arg` is a moved-from (null) shared_ptr here and `theme_arg &&`
     // would always be false (the titlebar height would never be seeded).
-    if (!is_csd() && theme && theme->valid() && theme->ws() != nullptr)
+    if (!is_csd() && theme && theme->valid() && (theme->ws() != nullptr))
     {
         titlebar_height = theme->ws()->titlebar_height;
     }
@@ -215,9 +216,16 @@ bool emerald_decorator_t::maximized_borders() const
     // while it is off, per the single-owner rule).
     // Review F2 (-Wshadow): `th` — `theme` is a member of this class.
     if (auto th = theme_ref())
+    {
         if (auto ws = th->ws())
+        {
             if (ws->use_decoration_cropping)
+            {
                 return false;
+            }
+        }
+    }
+
     return maximized_borders_;
 }
 
@@ -225,9 +233,16 @@ bool emerald_decorator_t::maximized_shadows() const
 {
     // Review F2 (-Wshadow): `th` — `theme` is a member of this class.
     if (auto th = theme_ref())
+    {
         if (auto ws = th->ws())
+        {
             if (ws->use_decoration_cropping)
+            {
                 return false;
+            }
+        }
+    }
+
     return maximized_shadows_;
 }
 
@@ -236,7 +251,7 @@ bool emerald_decorator_t::is_csd() const
     return view != nullptr && !view->should_be_decorated();
 }
 
-DecorContext &emerald_decorator_t::ctx()
+DecorContext& emerald_decorator_t::ctx()
 {
     return this->decor_ctx;
 }
@@ -262,10 +277,11 @@ bool emerald_decorator_t::detach_should_remove_child(
     {
         return nullptr;
     }
+
     return this->view;
 }
 
-emerald_node_t *emerald_decorator_t::node_for_hit_test() const
+emerald_node_t*emerald_decorator_t::node_for_hit_test() const
 {
     return node ? node.get() : nullptr;
 }
@@ -284,11 +300,13 @@ void emerald_decorator_t::set_theme(std::shared_ptr<const ThemeSettings> new_the
     // a stale pointer into the destroyed ThemeSettings crashed wayfire on
     // the first hover after a live reload).
     if (this->theme)
+    {
         decor_ctx_set_theme(decor_ctx, *this->theme, decor_ctx.active);
+    }
 }
 
-std::shared_ptr<wf::config::option_t<wf::animation_description_t>>
-emerald_decorator_t::shade_duration_opt() const
+std::shared_ptr<wf::config::option_t<wf::animation_description_t>> emerald_decorator_t::shade_duration_opt()
+const
 {
     return shade_duration_opt_;
 }
@@ -325,12 +343,14 @@ void emerald_decorator_t::set_enable_shade(bool enabled)
 int emerald_decorator_t::unshaded_client_h() const
 {
     if (view == nullptr)
+    {
         return 0;
+    }
 
-    const auto &pending = view->toplevel()->pending();
+    const auto & pending = view->toplevel()->pending();
     const int top = static_cast<int>(pending.margins.top);
-    int bottom = 6;  // MarginsInput's default bottom_space
-    if (theme && theme->valid() && theme->ws() != nullptr)
+    int bottom    = 6;  // MarginsInput's default bottom_space
+    if (theme && theme->valid() && (theme->ws() != nullptr))
     {
         const auto *ws = theme->ws();
         bottom = ws->bottom_space + ws->extra_extents.bottom;
@@ -340,12 +360,12 @@ int emerald_decorator_t::unshaded_client_h() const
     return client > 0 ? client : 0;
 }
 
-MarginsInput emerald_decorator_t::make_margins_input(const wf::toplevel_state_t &state) const
+MarginsInput emerald_decorator_t::make_margins_input(const wf::toplevel_state_t & state) const
 {
     MarginsInput in;
     in.fullscreen  = state.fullscreen;
     in.tiled_edges = state.tiled_edges;
-    in.csd         = is_csd();
+    in.csd = is_csd();
 
     if (theme && theme->valid())
     {
@@ -356,20 +376,21 @@ MarginsInput emerald_decorator_t::make_margins_input(const wf::toplevel_state_t 
         const auto *ws = theme->ws();
         if (ws != nullptr)
         {
-            in.left_space   = ws->left_space;
-            in.right_space  = ws->right_space;
-            in.top_space    = ws->top_space;
-            in.bottom_space = ws->bottom_space;
-            in.extra_left   = ws->extra_extents.left;
-            in.extra_right  = ws->extra_extents.right;
-            in.extra_top    = ws->extra_extents.top;
-            in.extra_bottom = ws->extra_extents.bottom;
-            in.win_ext_left   = ws->win_extents.left;
-            in.win_ext_right  = ws->win_extents.right;
-            in.win_ext_top    = ws->win_extents.top;
+            in.left_space    = ws->left_space;
+            in.right_space   = ws->right_space;
+            in.top_space     = ws->top_space;
+            in.bottom_space  = ws->bottom_space;
+            in.extra_left    = ws->extra_extents.left;
+            in.extra_right   = ws->extra_extents.right;
+            in.extra_top     = ws->extra_extents.top;
+            in.extra_bottom  = ws->extra_extents.bottom;
+            in.win_ext_left  = ws->win_extents.left;
+            in.win_ext_right = ws->win_extents.right;
+            in.win_ext_top   = ws->win_extents.top;
             in.win_ext_bottom = ws->win_extents.bottom;
         }
     }
+
     // The margin must reserve the SAME titlebar height the engine draws with,
     // or the drawn titlebar overflows the reserved space and overlaps the
     // client (text descenders get clipped — the "cut from the bottom" bug).
@@ -380,12 +401,14 @@ MarginsInput emerald_decorator_t::make_margins_input(const wf::toplevel_state_t 
     if (!is_csd() && theme && theme->valid())
     {
         if (const auto *wsl = theme->ws())
+        {
             in.titlebar_height = wsl->titlebar_height;
-    }
-    else
+        }
+    } else
     {
         in.titlebar_height = titlebar_height;
     }
+
     // Accessors (not the raw members): use_decoration_cropping (finding 45)
     // overrides both to false, and the render path uses the same accessors.
     in.maximized_borders = maximized_borders();
@@ -393,7 +416,7 @@ MarginsInput emerald_decorator_t::make_margins_input(const wf::toplevel_state_t 
     return in;
 }
 
-wf::decoration_margins_t emerald_decorator_t::get_margins(const wf::toplevel_state_t &state) const
+wf::decoration_margins_t emerald_decorator_t::get_margins(const wf::toplevel_state_t & state) const
 {
     return margins_for(make_margins_input(state));
 }
@@ -402,6 +425,5 @@ wf::decoration_margins_t emerald_decorator_t::get_margins(const wf::toplevel_sta
 // Part 05's shade hooks in emerald-decorator-shade.cpp, so the headless
 // margins test (which compiles only this file) does not link against the
 // scene node / view transformer (which need wayfire scene symbols).
-
 } // namespace emeraldwf
 } // namespace wf

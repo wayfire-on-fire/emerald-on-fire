@@ -9,47 +9,56 @@ namespace wf
 {
 namespace emeraldwf
 {
-
 namespace
 {
 // Parse one ini key into a typed option and push it into the in-memory
 // config manager when the value differs. Returns true if the option changed.
-template <typename T>
+template<typename T>
 bool sync_one(GKeyFile *kf, const char *key,
-    std::shared_ptr<wf::config::option_t<T>> &opt)
+    std::shared_ptr<wf::config::option_t<T>> & opt)
 {
     if (opt == nullptr)
+    {
         return false;
+    }
+
     gchar *val = g_key_file_get_string(kf, "emeraldwf", key, nullptr);
     if (val == nullptr)
     {
         return false; // key absent — leave the in-memory value alone
     }
+
     const std::string str(val);
     g_free(val);
 
     std::optional<T> parsed = wf::option_type::from_string<T>(str);
     if (!parsed)
+    {
         return false; // unparseable — leave the in-memory value alone
+    }
 
     if (!(opt->get_value() == *parsed))
     {
         opt->set_value(*parsed);
         return true;
     }
+
     return false;
 }
 } // namespace
 
-bool sync_emeraldwf_options_from_config(const std::string &ini_path,
-    emerald_config_options_t &opts)
+bool sync_emeraldwf_options_from_config(const std::string & ini_path,
+    emerald_config_options_t & opts)
 {
     GKeyFile *kf = g_key_file_new();
-    GError *err = nullptr;
+    GError *err  = nullptr;
     if (!g_key_file_load_from_file(kf, ini_path.c_str(), G_KEY_FILE_NONE, &err))
     {
         if (err != nullptr)
+        {
             g_error_free(err);
+        }
+
         g_key_file_free(kf);
         return false;
     }
@@ -86,6 +95,5 @@ bool sync_emeraldwf_options_from_config(const std::string &ini_path,
     g_key_file_free(kf);
     return changed;
 }
-
 }
 }

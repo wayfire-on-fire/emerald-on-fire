@@ -18,11 +18,13 @@ namespace wf
 {
 namespace emeraldwf
 {
-
 std::shared_ptr<emerald_shade_t> emerald_decorator_t::shade() const
 {
     if (view == nullptr)
+    {
         return nullptr;
+    }
+
     auto tmgr = view->get_transformed_node();
     return tmgr->get_transformer<emerald_shade_t>(SHADE_TRANSFORMER_NAME);
 }
@@ -30,17 +32,21 @@ std::shared_ptr<emerald_shade_t> emerald_decorator_t::shade() const
 void emerald_decorator_t::on_shade_progress(double progress)
 {
     if (view == nullptr)
+    {
         return;
+    }
 
     auto toplevel = view->toplevel();
     if (toplevel == nullptr)
+    {
         return;
+    }
 
     // Update the toplevel's pending margins for the current shade progress
     // (spec 05 §3: `get_margins()` takes the progression into account so a
     // mid-animation transaction stays consistent). The tx manager is
     // idle-coalesced: scheduling repeatedly is cheap.
-    auto &pending = toplevel->pending();
+    auto & pending = toplevel->pending();
     pending.margins = get_margins(pending);
 
     // Finding 54: observe the app's real floor. `current()` is what wayfire
@@ -57,20 +63,23 @@ void emerald_decorator_t::on_shade_progress(double progress)
     // progress is FALLING (adopted > requested) is not a floor — recording
     // it would permanently cap the collapse depth to the grown size.
     {
-        const auto &cur = toplevel->current();
+        const auto & cur  = toplevel->current();
         const int adopted = cur.geometry.height -
-                            (int)cur.margins.top - (int)cur.margins.bottom;
+            (int)cur.margins.top - (int)cur.margins.bottom;
         const bool heading_to_shade = (progress >= last_shade_progress_);
         last_shade_progress_ = progress;
         if (heading_to_shade)
+        {
             live_min_client_h_ =
                 update_observed_min(live_min_client_h_, adopted,
-                                    last_requested_client_h_);
+                    last_requested_client_h_);
+        }
+
         last_requested_client_h_ = pending.geometry.height -
-                                   (int)pending.margins.top -
-                                   (int)pending.margins.bottom;
-        if (progress < SHADE_SETTLE_EPSILON && has_shade_ref_ &&
-            !pending.fullscreen && pending.tiled_edges == 0)
+            (int)pending.margins.top -
+            (int)pending.margins.bottom;
+        if ((progress < SHADE_SETTLE_EPSILON) && has_shade_ref_ &&
+            !pending.fullscreen && (pending.tiled_edges == 0))
         {
             // Finding 54: the unshade settled — restore the pre-shade
             // frame geometry. During the shade the app may have committed
@@ -100,14 +109,14 @@ void emerald_decorator_t::on_shade_progress(double progress)
             // an on_shade_progress(0.0) reset). Cleared now so a later
             // reset cannot restore a stale reference.
             pending.geometry = shade_ref_geom_;
-            has_shade_ref_ = false;
+            has_shade_ref_   = false;
         }
     }
 
     // Export the shadow margins (D12) for a standalone shadow plugin.
     // Finding 52: the formula takes the UNSHADED client height, not the
     // frame height (see emerald-decorator.cpp).
-    const int client_h = unshaded_client_h();
+    const int client_h  = unshaded_client_h();
     const int thickness =
         (theme && theme->valid() && theme->ws() != nullptr) ?
         theme->ws()->win_extents.left : 6;
@@ -118,14 +127,18 @@ void emerald_decorator_t::on_shade_progress(double progress)
     {
         strip = (int)get_margins(toplevel->pending()).top;
     }
+
     export_shadow_margins(view, client_h, thickness, strip, progress,
-                          effective_min_client_h(toplevel->get_min_size().height,
-                                                 live_min_client_h_));
+        effective_min_client_h(toplevel->get_min_size().height,
+            live_min_client_h_));
 
     // Damage the emerald frame node (its bounding box shrinks with the
     // margin change) and schedule the toplevel in the tx manager.
     if (node != nullptr)
+    {
         node->resize();
+    }
+
     view->damage();
     wf::get_core().tx_manager->schedule_object(toplevel);
 }
@@ -136,7 +149,10 @@ void emerald_decorator_t::toggle_shade()
     // paths too (titlebar double/middle-click with action=shade), not just
     // the IPC + global wheel binding the plugin checks itself.
     if (!enable_shade_)
+    {
         return;
+    }
+
     // part 06 finding 17: flip the current state (no transformer ==
     // unshaded, so flip = shade).
     auto tr = shade();
@@ -148,22 +164,40 @@ void emerald_decorator_t::scroll_shade(double delta)
     // Finding 23: same enable_shade gate as toggle_shade() — plain
     // titlebar scrolling must not shade when the option is off.
     if (!enable_shade_)
+    {
         return;
+    }
+
     if (view == nullptr)
+    {
         return;
+    }
+
     if (view->toplevel() == nullptr)
+    {
         return;
+    }
+
     if (view->toplevel()->pending().fullscreen)
+    {
         return;
+    }
+
     auto ts = theme_ref();
     if (ts && ts->valid())
     {
         auto ws = ts->ws();
         if (ws && ws->titlebar_no_scroll_shade)
+        {
             return;
+        }
     }
+
     if (delta == 0.0)
+    {
         return;
+    }
+
     // part 06 finding 17: wheel UP = shade, wheel DOWN = unshade (the
     // roll-up convention, same as pixdecor). Direction-based, NOT
     // toggle: a slow scroll produces many small deltas; with a toggle
@@ -174,21 +208,30 @@ void emerald_decorator_t::scroll_shade(double delta)
     // reverses it — responsive, as expected.)
     const bool to_shade = scroll_shades(delta);
     auto tr = shade();
-    if (tr == nullptr && !to_shade)
+    if ((tr == nullptr) && !to_shade)
     {
         return; // no transformer == unshaded; nothing to unshade
     }
+
     toggle_shade(to_shade);
 }
 
 void emerald_decorator_t::toggle_shade(bool shade)
 {
     if (view == nullptr)
+    {
         return;
+    }
+
     if (view->toplevel() == nullptr)
+    {
         return;
+    }
+
     if (view->toplevel()->pending().fullscreen)
+    {
         return;
+    }
 
     // The shade strip is the top of the view's BOUNDING BOX (finding 15):
     // for a decorated view that is the whole TOP MARGIN — shadow + border +
@@ -220,9 +263,14 @@ void emerald_decorator_t::toggle_shade(bool shade)
         // band is a pure glow, strongest right under the titlebar, fading
         // down to the desktop.
         int shadow_only = (int)m.bottom;
-        if (auto ts = theme_ref(); ts && ts->valid())
+        if (auto ts = theme_ref();ts && ts->valid())
+        {
             if (const auto *wsl = ts->ws())
+            {
                 shadow_only -= wsl->win_extents.bottom;
+            }
+        }
+
         bottom_strip = std::max(0, shadow_only);
     }
 
@@ -243,15 +291,15 @@ void emerald_decorator_t::toggle_shade(bool shade)
     // SHADE_SETTLE_EPSILON) — an asymptotic easing would never hit the
     // exact terminal value and this guard would stop capturing references.
     const bool fully_unshaded = (tr == nullptr) ||
-                                (!tr->get_direction() &&
-                                 tr->get_progression() < SHADE_SETTLE_EPSILON);
+        (!tr->get_direction() &&
+            tr->get_progression() < SHADE_SETTLE_EPSILON);
     if (tr == nullptr)
     {
         // Finding 22: wire emeraldwf/shade_duration into the animation —
         // without this the transition ran with a null (instant) duration
         // and the option was a no-op.
         tr = std::make_shared<emerald_shade_t>(view, strip,
-                                               shade_duration_opt_);
+            shade_duration_opt_);
         tmgr->add_transformer(tr, wf::TRANSFORMER_2D, SHADE_TRANSFORMER_NAME);
     }
 
@@ -278,25 +326,24 @@ void emerald_decorator_t::toggle_shade(bool shade)
     if (shade && fully_unshaded)
     {
         shade_ref_geom_ = view->toplevel()->pending().geometry;
-        has_shade_ref_ = true;
+        has_shade_ref_  = true;
     }
 
     // Initial margins + shadow export for the new direction (the animation
     // hook will keep them in sync as progress advances).
-    auto &pending = view->toplevel()->pending();
+    auto & pending = view->toplevel()->pending();
     pending.margins = get_margins(pending);
     // Finding 52: unshaded client height, not the frame height (see
     // emerald-decorator.cpp).
-    const int client_h = unshaded_client_h();
+    const int client_h  = unshaded_client_h();
     const int thickness =
         (theme && theme->valid() && theme->ws() != nullptr) ?
         theme->ws()->win_extents.left : 6;
     export_shadow_margins(view, client_h, thickness, strip,
-                          tr->get_progression(),
-                          effective_min_client_h(view->toplevel()->get_min_size().height,
-                                                 live_min_client_h_));
+        tr->get_progression(),
+        effective_min_client_h(view->toplevel()->get_min_size().height,
+            live_min_client_h_));
     wf::get_core().tx_manager->schedule_object(view->toplevel());
 }
-
 } // namespace emeraldwf
 } // namespace wf

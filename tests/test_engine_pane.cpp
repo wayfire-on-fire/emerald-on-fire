@@ -15,11 +15,11 @@
 // libengine/emeraldengine.pc.in: Libs: -lemeraldengine): one SettingList,
 // one global_theme_file, one apply flag per process. This test pins that
 // invariant:
-//   1. after init_engine_list(), libemeraldengine.so is mapped and the
-//      single SettingList holds the engines' registrations;
-//   2. toggling a registered engine checkbox survives (no SEGV) and
-//      reaches the write path: theme.ini in a sandboxed HOME carries the
-//      new value after the 500 ms debounce.
+// 1. after init_engine_list(), libemeraldengine.so is mapped and the
+// single SettingList holds the engines' registrations;
+// 2. toggling a registered engine checkbox survives (no SEGV) and
+// reaches the write path: theme.ini in a sandboxed HOME carries the
+// new value after the 500 ms debounce.
 //
 // On the buggy static-vendored build: (1) fails — the engine modules are
 // dlclose-unmapped and each re-dlopen yields a fresh empty registry — and
@@ -59,34 +59,41 @@ extern "C" {
 // wayfire, file writes ARE the live reload (the plugin's mtime poller);
 // do not shell out to killall from a test.
 void send_reload_signal()
+{}
+
+namespace
 {
-}
-
-namespace {
-
 std::filesystem::path g_home;
 GtkWidget *g_nvbox = nullptr;
 
-SettingItem * find_item(const char *section, const char *key)
+SettingItem *find_item(const char *section, const char *key)
 {
     for (GSList *l = get_setting_list(); l; l = l->next)
     {
-        SettingItem *s = static_cast<SettingItem *>(l->data);
+        SettingItem *s = static_cast<SettingItem*>(l->data);
         if (s->section && s->key &&
-            g_strcmp0(s->section, section) == 0 &&
-            g_strcmp0(s->key, key) == 0)
+            (g_strcmp0(s->section, section) == 0) &&
+            (g_strcmp0(s->key, key) == 0))
+        {
             return s;
+        }
     }
+
     return nullptr;
 }
 
-bool module_mapped(const std::string &needle)
+bool module_mapped(const std::string & needle)
 {
     std::ifstream maps("/proc/self/maps");
     std::string line;
     while (std::getline(maps, line))
+    {
         if (line.find(needle) != std::string::npos)
+        {
             return true;
+        }
+    }
+
     return false;
 }
 
@@ -123,17 +130,18 @@ class EnginePaneEnv : public ::testing::Environment
             std::error_code ec;
             if (std::filesystem::is_directory(engine_dir, ec))
             {
-                for (const auto &entry :
+                for (const auto & entry :
                      std::filesystem::directory_iterator(engine_dir))
                 {
-                    const auto &p = entry.path();
+                    const auto & p = entry.path();
                     // Review F2: `name` shadows the ostringstream above.
                     const std::string so_name = p.filename().string();
-                    if (so_name.rfind("lib", 0) != 0 ||
-                            p.extension().string() != ".so")
+                    if ((so_name.rfind("lib", 0) != 0) ||
+                        (p.extension().string() != ".so"))
                     {
                         continue;
                     }
+
                     std::filesystem::create_symlink(
                         p, g_home / ".emerald" / "engines" / so_name, ec);
                 }
@@ -142,15 +150,15 @@ class EnginePaneEnv : public ::testing::Environment
         {
             std::ofstream out(g_home / ".emerald" / "theme" / "theme.ini");
             out <<
-                  "[theme]\n"
-                  "name=regress\n"
-                  "version=0.8\n"
-                  "\n"
-                  "[engine]\n"
-                  "engine=vrunner\n"
-                  "\n"
-                  "[vrunner_settings]\n"
-                  "round_top_left=false\n";
+                "[theme]\n"
+                "name=regress\n"
+                "version=0.8\n"
+                "\n"
+                "[engine]\n"
+                "engine=vrunner\n"
+                "\n"
+                "[vrunner_settings]\n"
+                "round_top_left=false\n";
         }
         setenv("HOME", g_home.c_str(), 1);
         EXPECT_STREQ(g_get_home_dir(), g_home.c_str());
@@ -164,17 +172,22 @@ class EnginePaneEnv : public ::testing::Environment
         init_key_files();
         g_nvbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
         layout_engine_list(g_nvbox);
-        init_engine_list();   // dlopens the installed engines
-        init_settings();      // theme.ini -> shared global_theme_file
-        set_apply(TRUE);      // state after a theme was selected
+        init_engine_list(); // dlopens the installed engines
+        init_settings(); // theme.ini -> shared global_theme_file
+        set_apply(TRUE); // state after a theme was selected
     }
 
     void TearDown() override
     {
         if (g_nvbox)
+        {
             gtk_widget_destroy(g_nvbox);
+        }
+
         if (std::filesystem::exists(g_home))
+        {
             std::filesystem::remove_all(g_home);
+        }
     }
 };
 
@@ -186,23 +199,26 @@ struct EnginePaneEnvRegistrar
         ::testing::AddGlobalTestEnvironment(new EnginePaneEnv);
     }
 };
-static const EnginePaneEnvRegistrar env_registrar;
 
-}   // namespace
+static const EnginePaneEnvRegistrar env_registrar;
+} // namespace
 
 // Finding 46: the settings machinery must be one shared, live instance.
 TEST(EnginePane, SharedRegistrySurvivesEngineScan)
 {
     if (g_no_display)
+    {
         GTEST_SKIP() << "no display available";
-    ASSERT_TRUE(module_mapped("libemeraldengine.so"))
-        << "libemeraldengine must be a loaded shared library";
+    }
+
+    ASSERT_TRUE(module_mapped("libemeraldengine.so")) <<
+        "libemeraldengine must be a loaded shared library";
 
     SettingItem *round = find_item("vrunner_settings", "round_top_left");
-    ASSERT_NE(round, nullptr)
-        << "the engine scan must register the engine pane settings in the "
-           "single shared SettingList (they are not in any dead per-.so "
-           "copy)";
+    ASSERT_NE(round, nullptr) <<
+        "the engine scan must register the engine pane settings in the "
+        "single shared SettingList (they are not in any dead per-.so "
+        "copy)";
     // cppcheck-suppress dangerousTypeCast
     // GTK_IS_TOGGLE_BUTTON is a GTK type-check macro (safe idiom); cppcheck
     // can't see through the macro and flags the cast in its expansion.
@@ -211,7 +227,10 @@ TEST(EnginePane, SharedRegistrySurvivesEngineScan)
     // 7 installed engines x dozens of settings + the themer's own items.
     int n = 0;
     for (GSList *l = get_setting_list(); l; l = l->next)
+    {
         n++;
+    }
+
     EXPECT_GE(n, 100) << "expected the full multi-engine registry";
 }
 
@@ -220,7 +239,10 @@ TEST(EnginePane, SharedRegistrySurvivesEngineScan)
 TEST(EnginePane, EnginePaneTogglePersistsToThemeIni)
 {
     if (g_no_display)
+    {
         GTEST_SKIP() << "no display available";
+    }
+
     SettingItem *round = find_item("vrunner_settings", "round_top_left");
     ASSERT_NE(round, nullptr);
     // cppcheck-suppress dangerousTypeCast
@@ -240,11 +262,12 @@ TEST(EnginePane, EnginePaneTogglePersistsToThemeIni)
     // Run the loop past the 500 ms apply debounce.
     GMainLoop *loop = g_main_loop_new(nullptr, FALSE);
     g_timeout_add(700,
-                  +[](gpointer p) -> gboolean {
-                      g_main_loop_quit(static_cast<GMainLoop *>(p));
-                      return G_SOURCE_REMOVE;
-                  },
-                  loop);
+        +[] (gpointer p)->gboolean
+    {
+        g_main_loop_quit(static_cast<GMainLoop*>(p));
+        return G_SOURCE_REMOVE;
+    },
+        loop);
     g_main_loop_run(loop);
     g_main_loop_unref(loop);
 
@@ -254,6 +277,6 @@ TEST(EnginePane, EnginePaneTogglePersistsToThemeIni)
     ASSERT_TRUE(ini.good()) << "apply_settings must have written theme.ini";
     std::stringstream ss;
     ss << ini.rdbuf();
-    EXPECT_NE(ss.str().find("round_top_left=true"), std::string::npos)
-        << "engine-pane edits must be persisted to theme.ini";
+    EXPECT_NE(ss.str().find("round_top_left=true"), std::string::npos) <<
+        "engine-pane edits must be persisted to theme.ini";
 }

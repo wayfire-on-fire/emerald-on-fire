@@ -28,17 +28,14 @@
 
 namespace wf
 {
-
 // Test stub: the headless test never connects signals, so the (libwayfire)
 // disconnect() that connection_base_t's destructor calls is a no-op here.
 // (Finding 28 added a connection_t member to emerald_decorator_t, which
 // needs this symbol at link time.)
 void signal::connection_base_t::disconnect()
-{
-}
+{}
 
-const std::shared_ptr<toplevel_t>&
-toplevel_view_interface_t::toplevel() const
+const std::shared_ptr<toplevel_t>& toplevel_view_interface_t::toplevel() const
 {
     static std::shared_ptr<toplevel_t> dummy;
     return dummy;
@@ -61,7 +58,7 @@ bool object_base_t::has_data(std::string)
 void object_base_t::erase_data(std::string)
 {}
 
-custom_data_t *object_base_t::_fetch_data(std::string)
+custom_data_t*object_base_t::_fetch_data(std::string)
 {
     return nullptr;
 }
@@ -71,7 +68,6 @@ void object_base_t::_store_data(std::unique_ptr<custom_data_t>, std::string)
 
 namespace emeraldwf
 {
-
 void emerald_decorator_t::attach_node()
 {}
 
@@ -99,6 +95,5 @@ std::shared_ptr<emerald_shade_t> emerald_decorator_t::shade() const
 {
     return nullptr;
 }
-
 } // namespace emeraldwf
 } // namespace wf

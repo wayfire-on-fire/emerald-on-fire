@@ -21,22 +21,26 @@ namespace wf::emeraldwf
 // [A-Za-z0-9_-]+ — every shipped engine matches it, and the characters
 // cannot form a path component. Pure (no wayfire symbols) so it is
 // testable headlessly (tests/test_settings.cpp).
-inline bool is_valid_engine_name(const std::string &name)
+inline bool is_valid_engine_name(const std::string & name)
 {
     if (name.empty())
+    {
         return false;
+    }
+
     return std::all_of(name.begin(), name.end(),
-                       [](char c) {
-                           return c == '_' || c == '-' ||
-                                  (c >= 'a' && c <= 'z') ||
-                                  (c >= 'A' && c <= 'Z') ||
-                                  (c >= '0' && c <= '9');
-                       });
+        [] (char c)
+    {
+        return c == '_' || c == '-' ||
+        (c >= 'a' && c <= 'z') ||
+        (c >= 'A' && c <= 'Z') ||
+        (c >= '0' && c <= '9');
+    });
 }
 
 // dlopen bridge (port of src/engine_loader.c:32-84): searches
 // ~/.emerald/engines/lib<name>.so then <install>/lib/emeraldwf/engines/.
-bool emerald_engine_load(const std::string &name, const std::string &system_dir);
+bool emerald_engine_load(const std::string & name, const std::string & system_dir);
 void emerald_engine_unload();
 
 // Calls the loaded engine's init_engine(window_settings*) so the engine
@@ -54,8 +58,8 @@ void emerald_engine_fini_engine(const window_settings *ws);
 // Caller destroys the returned surface.
 // Port of draw_window_decoration_real() + draw_shadow_background()
 // (emerald main.c:1768-2050) with X pixmap -> image surface.
-cairo_surface_t *emeraldwf_render_frame(const ThemeSettings &ts,
-                                        const DecorContext &ctx);
+cairo_surface_t *emeraldwf_render_frame(const ThemeSettings & ts,
+    const DecorContext & ctx);
 }
 
 #endif

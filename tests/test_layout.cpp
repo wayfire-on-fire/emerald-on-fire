@@ -16,7 +16,6 @@ using namespace wf::emeraldwf;
 
 namespace
 {
-
 EmeraldLayout layout;
 
 // main.c:2825-2861 (get_title_object_type), exposed for tests
@@ -24,22 +23,49 @@ int tobj_type(char obj)
 {
     switch (obj)
     {
-        case ':': return -1;
-        case 'C': return TBT_CLOSE;
-        case 'N': return TBT_MINIMIZE;
-        case 'X':
-        case 'R': return TBT_MAXIMIZE;
-        case 'F': return TBT_SUPERMAXIMIZE;
-        case 'H': return TBT_HELP;
-        case 'M': return TBT_MENU;
-        case 'T': return TBT_TITLE;
-        case 'I': return TBT_ICON;
-        case 'S': return TBT_SHADE;
-        case 'U':
-        case 'A': return TBT_ONTOP;
-        case 'D': return TBT_ONBOTTOM;
-        case 'Y': return TBT_STICKY;
-        default: return -2;
+      case ':':
+        return -1;
+
+      case 'C':
+        return TBT_CLOSE;
+
+      case 'N':
+        return TBT_MINIMIZE;
+
+      case 'X':
+      case 'R':
+        return TBT_MAXIMIZE;
+
+      case 'F':
+        return TBT_SUPERMAXIMIZE;
+
+      case 'H':
+        return TBT_HELP;
+
+      case 'M':
+        return TBT_MENU;
+
+      case 'T':
+        return TBT_TITLE;
+
+      case 'I':
+        return TBT_ICON;
+
+      case 'S':
+        return TBT_SHADE;
+
+      case 'U':
+      case 'A':
+        return TBT_ONTOP;
+
+      case 'D':
+        return TBT_ONBOTTOM;
+
+      case 'Y':
+        return TBT_STICKY;
+
+      default:
+        return -2;
     }
 }
 
@@ -48,49 +74,49 @@ int tobj_type(char obj)
 
 struct LayoutFixture : testing::Test
 {
-    window_settings *ws = nullptr;   // heap-owned (engine_ws etc. not needed)
+    window_settings *ws    = nullptr;   // heap-owned (engine_ws etc. not needed)
     frame_settings *fs_act = nullptr;
     frame_settings *fs_inact = nullptr;
     char layout_str[64];
     char *layout_ptr = nullptr;
-    std::vector<cairo_surface_t *> surfaces; // non-owning; nullptr entries
+    std::vector<cairo_surface_t*> surfaces; // non-owning; nullptr entries
 
     void SetUp() override
     {
-        ws = static_cast<window_settings *>(std::calloc(1, sizeof(window_settings)));
+        ws = static_cast<window_settings*>(std::calloc(1, sizeof(window_settings)));
 
         // defaults matching emerald main.c (init defaults) +
         // third_party/emerald/defaults/settings.ini
-        ws->win_extents.left = 6;
-        ws->win_extents.right = 6;
-        ws->win_extents.top = 4;
+        ws->win_extents.left   = 6;
+        ws->win_extents.right  = 6;
+        ws->win_extents.top    = 4;
         ws->win_extents.bottom = 6;
         ws->extra_extents = {0, 0, 0, 0};
-        ws->left_space = 6;
-        ws->right_space = 6;
-        ws->top_space = 4;
-        ws->bottom_space = 6;
-        ws->titlebar_height = 17;
+        ws->left_space    = 6;
+        ws->right_space   = 6;
+        ws->top_space     = 4;
+        ws->bottom_space  = 6;
+        ws->titlebar_height     = 17;
         ws->min_titlebar_height = 17;
-        ws->button_offset = 1;
+        ws->button_offset  = 1;
         ws->button_hoffset = 1;
-        ws->stretch_sides = true;
+        ws->stretch_sides  = true;
         ws->normal_top_corner_space = 0;
-        ws->bottom_corner_space = 0;
+        ws->bottom_corner_space     = 0;
         ws->text_height = 12;
         ws->use_pixmap_buttons = false;
-        ws->use_button_glow = false;
+        ws->use_button_glow    = false;
         ws->use_button_inactive_glow = false;
-        ws->use_decoration_cropping = true;
-        ws->use_button_fade = false;
-        ws->double_click_action = 0;   // settings.ini [titlebars]
-        ws->middle_click_action = 3;   // settings.ini [titlebars]
+        ws->use_decoration_cropping  = true;
+        ws->use_button_fade     = false;
+        ws->double_click_action = 0; // settings.ini [titlebars]
+        ws->middle_click_action = 3; // settings.ini [titlebars]
 
-        fs_act = new frame_settings();
+        fs_act     = new frame_settings();
         fs_act->ws = ws;
-        fs_inact = new frame_settings();
+        fs_inact   = new frame_settings();
         fs_inact->ws = ws;
-        ws->fs_act = fs_act;
+        ws->fs_act   = fs_act;
         ws->fs_inact = fs_inact;
 
         std::strncpy(layout_str, "IT::HNXC", sizeof(layout_str));
@@ -110,32 +136,36 @@ struct LayoutFixture : testing::Test
     {
         return ws->left_space + std::max(client_w, 1) + ws->right_space;
     }
+
     int frame_h(int client_w, int client_h) const
     {
         (void)client_w;
         if (ws->stretch_sides)
+        {
             return ws->top_space + ws->bottom_space + ws->titlebar_height +
                    ws->normal_top_corner_space + ws->bottom_corner_space + 2;
+        }
+
         return ws->top_space + ws->bottom_space + ws->titlebar_height +
                std::max(client_h, 1);
     }
 
     DecorContext make_ctx(int client_w, int client_h, int title_width = 0,
-                          uint32_t actions =
-                              EWA_CLOSE | EWA_MAXIMIZE |
-                              EWA_MINIMIZE | EWA_SHADE |
-                              EWA_STICK | EWA_FULLSCREEN | (1 << 20),
-                          uint32_t state = 0) const
+        uint32_t actions =
+        EWA_CLOSE | EWA_MAXIMIZE |
+        EWA_MINIMIZE | EWA_SHADE |
+        EWA_STICK | EWA_FULLSCREEN | (1 << 20),
+        uint32_t state = 0) const
     {
         layout.title_text_width_ = title_width;
         DecorContext ctx;
-        ctx.client_width = client_w;
+        ctx.client_width  = client_w;
         ctx.client_height = client_h;
-        ctx.width = frame_w(client_w);
-        ctx.height = frame_h(client_w, client_h);
-        ctx.state = state;
+        ctx.width   = frame_w(client_w);
+        ctx.height  = frame_h(client_w, client_h);
+        ctx.state   = state;
         ctx.actions = actions;
-        ctx.active = true;
+        ctx.active  = true;
         ctx.fs = fs_act;
         return ctx;
     }
@@ -151,11 +181,11 @@ TEST_F(LayoutFixture, button_actions_ewa_consistency)
 {
     // Each core action maps to its own EWA bit, so a ctx.actions that grants
     // that action makes the button visible.
-    EXPECT_EQ(emerald_button_actions[B_T_CLOSE],    EWA_CLOSE);
-    EXPECT_EQ(emerald_button_actions[B_T_MAXIMIZE],  EWA_MAXIMIZE);
-    EXPECT_EQ(emerald_button_actions[B_T_MINIMIZE],  EWA_MINIMIZE);
-    EXPECT_EQ(emerald_button_actions[B_T_SHADE],     EWA_SHADE);
-    EXPECT_EQ(emerald_button_actions[B_T_STICKY],    EWA_STICK);
+    EXPECT_EQ(emerald_button_actions[B_T_CLOSE], EWA_CLOSE);
+    EXPECT_EQ(emerald_button_actions[B_T_MAXIMIZE], EWA_MAXIMIZE);
+    EXPECT_EQ(emerald_button_actions[B_T_MINIMIZE], EWA_MINIMIZE);
+    EXPECT_EQ(emerald_button_actions[B_T_SHADE], EWA_SHADE);
+    EXPECT_EQ(emerald_button_actions[B_T_STICKY], EWA_STICK);
     EXPECT_EQ(emerald_button_actions[B_T_SUPERMAXIMIZE], EWA_FULLSCREEN);
 
     // Menu is NOT the "any action matches" sentinel: emerald opens a window
@@ -183,18 +213,18 @@ TEST_F(LayoutFixture, button_actions_ewa_consistency)
     DecorContext ctx;
     ctx.actions = EWA_CLOSE | EWA_MAXIMIZE | EWA_MINIMIZE;
     const int state[B_T_COUNT] = {
-        2,  // B_T_CLOSE
-        2,  // B_T_MAXIMIZE
-        2,  // B_T_MINIMIZE
-        2,  // B_T_HELP
+        2, // B_T_CLOSE
+        2, // B_T_MAXIMIZE
+        2, // B_T_MINIMIZE
+        2, // B_T_HELP
         3, 3, 3, 3, 3,
     };
     for (int b_t = 0; b_t < B_T_COUNT; ++b_t)
     {
         bool visible = state[b_t] != 3 &&
-                       (ctx.actions & emerald_button_actions[b_t]) != 0;
-        bool expect  = (b_t == B_T_CLOSE || b_t == B_T_MAXIMIZE ||
-                        b_t == B_T_MINIMIZE);
+            (ctx.actions & emerald_button_actions[b_t]) != 0;
+        bool expect = (b_t == B_T_CLOSE || b_t == B_T_MAXIMIZE ||
+            b_t == B_T_MINIMIZE);
         EXPECT_EQ(visible, expect) << "button " << b_t;
     }
 }
@@ -314,9 +344,9 @@ TEST_F(LayoutFixture, centering_formula)
 
     EXPECT_EQ(ctx.tobj_item_state[TBT_TITLE], 1);
     int expected = std::max((ctx.tobj_pos[2] + ctx.tobj_size[0] -
-                             ctx.tobj_size[1]) / 2,
-                            0) +
-                   ctx.tobj_pos[0];
+        ctx.tobj_size[1]) / 2,
+        0) +
+        ctx.tobj_pos[0];
     EXPECT_EQ(ctx.tobj_pos[1], expected);
 
     // title wider than the window, in zone 0: centering formula gives
@@ -334,7 +364,7 @@ TEST_F(LayoutFixture, DISABLED_actions_mask_hides_buttons)
     // no MINIMIZE action → button region hidden (base_x1=-100)
     std::strncpy(layout_str, "IT::HNXC", sizeof(layout_str));
     DecorContext ctx = make_ctx(400, 300, 100,
-                                EWA_CLOSE | EWA_MAXIMIZE | (1 << 20));
+        EWA_CLOSE | EWA_MAXIMIZE | (1 << 20));
     layout.build(ws, ctx);
 
     // MINIMIZE is in the layout but not in actions → button region is
@@ -383,7 +413,7 @@ TEST_F(LayoutFixture, no_op_menu_button_hidden_without_touching_theme)
     // menu bit (the menu bit is granted only once a menu is implemented).
     std::strncpy(layout_str, "IT::MNCX", sizeof(layout_str));
     DecorContext ctx = make_ctx(400, 300, 100,
-                                EWA_CLOSE | EWA_MAXIMIZE | EWA_MINIMIZE);
+        EWA_CLOSE | EWA_MAXIMIZE | EWA_MINIMIZE);
     layout.build(ws, ctx);
 
     // The theme's menu object IS parsed (state set, not 3)…
@@ -397,7 +427,7 @@ TEST_F(LayoutFixture, no_op_menu_button_hidden_without_touching_theme)
     // first slot at x = width - right_space - size[2] + (-hoffset).
     EXPECT_EQ(ctx.tobj_size[2], 3 * 18);
     const int first_slot_x = ctx.width - ws->right_space -
-                             ctx.tobj_size[2] - ws->button_hoffset;
+        ctx.tobj_size[2] - ws->button_hoffset;
     EXPECT_EQ(ctx.button_region[TBT_MINIMIZE].base_x1, first_slot_x);
 
     // The menu's slot is not hit-tested as a menu button.
@@ -410,15 +440,15 @@ TEST_F(LayoutFixture, no_op_menu_button_hidden_without_touching_theme)
     // menu's width).
     DecorContext ctx_menu =
         make_ctx(400, 300, 100,
-                 EWA_CLOSE | EWA_MAXIMIZE | EWA_MINIMIZE | EWA_MENU);
+            EWA_CLOSE | EWA_MAXIMIZE | EWA_MINIMIZE | EWA_MENU);
     layout.build(ws, ctx_menu);
     EXPECT_EQ(ctx_menu.tobj_size[2], 4 * 18);
     const int menu_slot_x = ctx_menu.width - ws->right_space -
-                            ctx_menu.tobj_size[2] - ws->button_hoffset;
+        ctx_menu.tobj_size[2] - ws->button_hoffset;
     EXPECT_NE(ctx_menu.button_region[B_T_MENU].base_x1, -100);
     EXPECT_EQ(ctx_menu.button_region[B_T_MENU].base_x1, menu_slot_x);
     EXPECT_EQ(layout.hit_button(ctx_menu, menu_slot_x + 2, 2, true),
-              B_T_MENU);
+        B_T_MENU);
 }
 
 // Regression (finding 50): adjacent glowing buttons (SlateHorn: 19px
@@ -430,12 +460,12 @@ TEST_F(LayoutFixture, no_op_menu_button_hidden_without_touching_theme)
 TEST_F(LayoutFixture, hit_button_glow_overlap_nearest_core_wins)
 {
     ws->use_pixmap_buttons = true;
-    ws->c_icon_size[B_T_SHADE].w = 19;
-    ws->c_icon_size[B_T_SHADE].h = 15;
+    ws->c_icon_size[B_T_SHADE].w    = 19;
+    ws->c_icon_size[B_T_SHADE].h    = 15;
     ws->c_icon_size[B_T_MINIMIZE].w = 19;
     ws->c_icon_size[B_T_MINIMIZE].h = 15;
-    ws->c_glow_size.w = 38;
-    ws->c_glow_size.h = 30;
+    ws->c_glow_size.w   = 38;
+    ws->c_glow_size.h   = 30;
     ws->use_button_glow = true;
     ws->use_button_inactive_glow = false;
     std::strncpy(layout_str, "SN", sizeof(layout_str));
@@ -455,9 +485,9 @@ TEST_F(LayoutFixture, hit_button_glow_overlap_nearest_core_wins)
     EXPECT_EQ(layout.hit_button(ctx, s->base_x2 - 2, cy, true), B_T_SHADE);
     // and the minimize core, likewise
     EXPECT_EQ(layout.hit_button(ctx, n->base_x1 + 2, cy, true),
-              B_T_MINIMIZE);
+        B_T_MINIMIZE);
     EXPECT_EQ(layout.hit_button(ctx, n->base_x2 - 2, cy, true),
-              B_T_MINIMIZE);
+        B_T_MINIMIZE);
 
     // glow-only band (above the cores): nearest core wins — the overlap
     // splits at the midpoint between the two cores
@@ -480,13 +510,13 @@ TEST_F(LayoutFixture, working_buttons_granted_no_op_buttons_stay_hidden)
     // Layout carrying every button kind: zone 0 = shade/above/menu,
     // zone 2 = sticky/supermax/close.
     std::strncpy(layout_str, "SAM:YFC", sizeof(layout_str));
-    DecorContext ctx;  // default (production) actions
-    ctx.client_width = 400;
+    DecorContext ctx; // default (production) actions
+    ctx.client_width  = 400;
     ctx.client_height = 300;
-    ctx.width = frame_w(400);
+    ctx.width  = frame_w(400);
     ctx.height = frame_h(400, 300);
     ctx.active = true;
-    ctx.fs = fs_act;
+    ctx.fs     = fs_act;
     layout.build(ws, ctx);
 
     // Working: granted by the default and laid out (regions set).
@@ -498,9 +528,9 @@ TEST_F(LayoutFixture, working_buttons_granted_no_op_buttons_stay_hidden)
     EXPECT_NE(ctx.button_region[B_T_SUPERMAXIMIZE].base_x1, -100);
     // Hit-testable in the zone they are laid out in.
     EXPECT_EQ(layout.hit_button(ctx,
-                                ctx.button_region[B_T_STICKY].base_x1 + 2, 2,
-                                true),
-              B_T_STICKY);
+        ctx.button_region[B_T_STICKY].base_x1 + 2, 2,
+        true),
+        B_T_STICKY);
 
     // No-op: NOT granted, so hidden (zero width, no region) — even though
     // the theme layout carries them.
@@ -521,11 +551,11 @@ TEST_F(LayoutFixture, hit_button_base)
     const button_region_t *close = &ctx.button_region[B_T_CLOSE];
     // inside close base rect
     EXPECT_EQ(layout.hit_button(ctx, close->base_x1 + 1, close->base_y1 + 1,
-                                true),
-              B_T_CLOSE);
+        true),
+        B_T_CLOSE);
     // just outside
     EXPECT_EQ(layout.hit_button(ctx, close->base_x1 - 1, close->base_y1, true),
-              -1);
+        -1);
     // on the title → -1
     int tx = ws->left_space + 50;
     int ty = ws->top_space + ws->titlebar_height / 2;
@@ -536,12 +566,12 @@ TEST_F(LayoutFixture, hit_button_glow)
 {
     // pixmap buttons with glow: glow rect answers the pointer
     ws->use_pixmap_buttons = true;
-    ws->c_icon_size[B_T_CLOSE].w = 22;
-    ws->c_icon_size[B_T_CLOSE].h = 22;
+    ws->c_icon_size[B_T_CLOSE].w    = 22;
+    ws->c_icon_size[B_T_CLOSE].h    = 22;
     ws->c_icon_size[B_T_MAXIMIZE].w = 22;
     ws->c_icon_size[B_T_MAXIMIZE].h = 22;
-    ws->c_glow_size.w = 30;
-    ws->c_glow_size.h = 30;
+    ws->c_glow_size.w   = 30;
+    ws->c_glow_size.h   = 30;
     ws->use_button_glow = true;
     ws->use_button_inactive_glow = false;
 
@@ -575,13 +605,16 @@ TEST_F(LayoutFixture, hit_button_inactive_set)
     for (int b_t = 0; b_t < B_T_COUNT; b_t++)
     {
         if (ctx.tobj_item_state[b_t] == 3)
+        {
             continue;
+        }
+
         EXPECT_EQ(ctx.button_region_inact[b_t].base_x1,
-                  ctx.button_region[b_t].base_x1);
+            ctx.button_region[b_t].base_x1);
         EXPECT_EQ(ctx.button_region_inact[b_t].base_x2,
-                  ctx.button_region[b_t].base_x2);
+            ctx.button_region[b_t].base_x2);
         EXPECT_EQ(ctx.button_region_inact[b_t].base_y1,
-                  ctx.button_region[b_t].base_y1);
+            ctx.button_region[b_t].base_y1);
     }
 }
 
@@ -598,7 +631,7 @@ TEST_F(LayoutFixture, DISABLED_resize_edges_bands)
     EXPECT_EQ(layout.resize_edges(ctx, 200, 6), EMERALDWF_EDGE_TOP);
     // Left+top corner
     EXPECT_EQ(layout.resize_edges(ctx, 8, 6),
-              EMERALDWF_EDGE_LEFT | EMERALDWF_EDGE_TOP);
+        EMERALDWF_EDGE_LEFT | EMERALDWF_EDGE_TOP);
     // Right band: frame x in [l_ext+w, l_ext+w+r_ext) = [406,412)
     EXPECT_EQ(layout.resize_edges(ctx, 408, 30), EMERALDWF_EDGE_RIGHT);
     // Bottom band: frame y in [t_ext_nott+t_ext+h, ...) = [325, ...)
@@ -613,19 +646,19 @@ TEST_F(LayoutFixture, DISABLED_resize_edges_maximized)
 {
     // maximized: left/right bands collapse, top/bottom bands remain
     DecorContext ctx = make_ctx(400, 300, 100,
-                                EWA_CLOSE | EWA_MAXIMIZE |
-                                    EWA_MINIMIZE | EWA_SHADE |
-                                    EWA_STICK | EWA_FULLSCREEN,
-                                EWS_MAXIMIZED_HORIZONTALLY |
-                                    EWS_MAXIMIZED_VERTICALLY);
+        EWA_CLOSE | EWA_MAXIMIZE |
+        EWA_MINIMIZE | EWA_SHADE |
+        EWA_STICK | EWA_FULLSCREEN,
+        EWS_MAXIMIZED_HORIZONTALLY |
+        EWS_MAXIMIZED_VERTICALLY);
     layout.build(ws, ctx);
 
     EXPECT_EQ(layout.resize_edges(ctx, 2, 25), EMERALDWF_EDGE_TOP);
     EXPECT_EQ(layout.resize_edges(ctx, ctx.width - 2, 25), EMERALDWF_EDGE_TOP);
     EXPECT_EQ(layout.resize_edges(ctx, 2, 21 + 3),
-              EMERALDWF_EDGE_BOTTOM);
+        EMERALDWF_EDGE_BOTTOM);
     EXPECT_EQ(layout.resize_edges(ctx, ctx.width - 2, 21 + 3),
-              EMERALDWF_EDGE_BOTTOM);
+        EMERALDWF_EDGE_BOTTOM);
     // no horizontal edges at all
     EXPECT_EQ(layout.resize_edges(ctx, 2, 100), 0);
 }
@@ -639,15 +672,15 @@ TEST_F(LayoutFixture, DISABLED_cursor_region_grid)
 
     int w = ctx.client_width;
 
-    EXPECT_EQ(layout.cursor_region(ctx, 2, 2), 0);            // top-left
-    EXPECT_EQ(layout.cursor_region(ctx, 200, 2), 1);          // top
-    EXPECT_EQ(layout.cursor_region(ctx, w + 2, 2), 2);        // top-right
-    EXPECT_EQ(layout.cursor_region(ctx, 2, 10), 3);           // left (titlebar row)
-    EXPECT_EQ(layout.cursor_region(ctx, 200, 10), 4);         // titlebar (middle)
-    EXPECT_EQ(layout.cursor_region(ctx, w + 2, 10), 5);       // right
-    EXPECT_EQ(layout.cursor_region(ctx, 2, 100), 6);          // bottom-left area
-    EXPECT_EQ(layout.cursor_region(ctx, 200, 21 + 3), 7);     // bottom
-    EXPECT_EQ(layout.cursor_region(ctx, w + 2, 21 + 3), 8);   // bottom-right
+    EXPECT_EQ(layout.cursor_region(ctx, 2, 2), 0); // top-left
+    EXPECT_EQ(layout.cursor_region(ctx, 200, 2), 1); // top
+    EXPECT_EQ(layout.cursor_region(ctx, w + 2, 2), 2); // top-right
+    EXPECT_EQ(layout.cursor_region(ctx, 2, 10), 3); // left (titlebar row)
+    EXPECT_EQ(layout.cursor_region(ctx, 200, 10), 4); // titlebar (middle)
+    EXPECT_EQ(layout.cursor_region(ctx, w + 2, 10), 5); // right
+    EXPECT_EQ(layout.cursor_region(ctx, 2, 100), 6); // bottom-left area
+    EXPECT_EQ(layout.cursor_region(ctx, 200, 21 + 3), 7); // bottom
+    EXPECT_EQ(layout.cursor_region(ctx, w + 2, 21 + 3), 8); // bottom-right
 }
 
 TEST_F(LayoutFixture, in_titlebar)
@@ -655,9 +688,9 @@ TEST_F(LayoutFixture, in_titlebar)
     DecorContext ctx = make_ctx(400, 300, 100);
     layout.build(ws, ctx);
 
-    EXPECT_TRUE(layout.in_titlebar(ctx, 200, 5));   // in band [4, 21)
+    EXPECT_TRUE(layout.in_titlebar(ctx, 200, 5)); // in band [4, 21)
     EXPECT_TRUE(layout.in_titlebar(ctx, 200, 20));
-    EXPECT_FALSE(layout.in_titlebar(ctx, 200, 2));  // above band
+    EXPECT_FALSE(layout.in_titlebar(ctx, 200, 2)); // above band
     EXPECT_FALSE(layout.in_titlebar(ctx, 200, 21)); // below band (client)
 }
 
@@ -719,17 +752,19 @@ TEST_F(LayoutFixture, determinism)
         EXPECT_EQ(a.tobj_pos[i], b.tobj_pos[i]);
         EXPECT_EQ(a.tobj_size[i], b.tobj_size[i]);
     }
+
     for (int i = 0; i < TBT_COUNT; i++)
     {
         EXPECT_EQ(a.tobj_item_pos[i], b.tobj_item_pos[i]);
         EXPECT_EQ(a.tobj_item_state[i], b.tobj_item_state[i]);
     }
+
     for (int i = 0; i < B_T_COUNT; i++)
     {
         EXPECT_EQ(a.button_region[i].base_x1, b.button_region[i].base_x1);
         EXPECT_EQ(a.button_region[i].base_x2, b.button_region[i].base_x2);
         EXPECT_EQ(a.button_region_inact[i].glow_x1,
-                  b.button_region_inact[i].glow_x1);
+            b.button_region_inact[i].glow_x1);
     }
 }
 
@@ -750,17 +785,21 @@ TEST_F(LayoutFixture, LeftRightTopBottomBandsSitOnBordersNotClient)
 {
     // The user's live theme geometry: borders L5 T4 R5 B5, shadow spread 12
     // (shadow_radius 11.5) on every side, titlebar 18.
-    ws->win_extents.left   = 5;  ws->left_space   = 17;
-    ws->win_extents.right  = 5;  ws->right_space  = 17;
-    ws->win_extents.top    = 4;  ws->top_space    = 16;
-    ws->win_extents.bottom = 5;  ws->bottom_space = 17;
-    ws->titlebar_height    = 18;
+    ws->win_extents.left = 5;
+    ws->left_space = 17;
+    ws->win_extents.right = 5;
+    ws->right_space     = 17;
+    ws->win_extents.top = 4;
+    ws->top_space = 16;
+    ws->win_extents.bottom = 5;
+    ws->bottom_space    = 17;
+    ws->titlebar_height = 18;
 
     // client 900x600. Port-frame layout:
-    //   x: [0,12) shadow | [12,17) left border | [17,917) client | [917,922)
-    //       right border | [922,934) shadow
-    //   y: [0,12) shadow | [12,16) top border | [16,34) titlebar |
-    //       [34,634) client | [634,639) bottom border | [639,651) shadow
+    // x: [0,12) shadow | [12,17) left border | [17,917) client | [917,922)
+    // right border | [922,934) shadow
+    // y: [0,12) shadow | [12,16) top border | [16,34) titlebar |
+    // [34,634) client | [634,639) bottom border | [639,651) shadow
     auto ctx = make_ctx(900, 600);
 
     // Left border band: port-frame x[12,17), full client height.
@@ -791,7 +830,7 @@ TEST_F(LayoutFixture, LeftRightTopBottomBandsSitOnBordersNotClient)
     // Corners combine: top-left corner band is port-frame x[12,17) x
     // y[12,34) → TOP|LEFT.
     EXPECT_EQ(layout.resize_edges(ctx, 14, 25),
-              EMERALDWF_EDGE_TOP | EMERALDWF_EDGE_LEFT);
+        EMERALDWF_EDGE_TOP | EMERALDWF_EDGE_LEFT);
 }
 
 TEST_F(LayoutFixture, ShadedWindowHasNoResizeBands)
@@ -812,28 +851,27 @@ TEST_F(LayoutFixture, ShadedWindowHasNoResizeBands)
     // client 200x100 → y: [0,4) top border, [4,21) titlebar,
     // [21,121) client, [121,127) bottom border.
     auto ctx = make_ctx(200, 100, 0,
-                        EWA_CLOSE | EWA_MAXIMIZE | EWA_MINIMIZE |
-                            EWA_SHADE | EWA_STICK | EWA_FULLSCREEN |
-                            (1 << 20),
-                        EWS_SHADED);
-    EXPECT_EQ(layout.resize_edges(ctx, 100, 2),   0u); // top border
-    EXPECT_EQ(layout.resize_edges(ctx, 3, 50),    0u); // left band
-    EXPECT_EQ(layout.resize_edges(ctx, 208, 50),  0u); // right band
+        EWA_CLOSE | EWA_MAXIMIZE | EWA_MINIMIZE |
+        EWA_SHADE | EWA_STICK | EWA_FULLSCREEN |
+        (1 << 20),
+        EWS_SHADED);
+    EXPECT_EQ(layout.resize_edges(ctx, 100, 2), 0u); // top border
+    EXPECT_EQ(layout.resize_edges(ctx, 3, 50), 0u); // left band
+    EXPECT_EQ(layout.resize_edges(ctx, 208, 50), 0u); // right band
     EXPECT_EQ(layout.resize_edges(ctx, 100, 123), 0u); // bottom band
-    EXPECT_EQ(layout.resize_edges(ctx, 3, 2),     0u); // top-left corner
+    EXPECT_EQ(layout.resize_edges(ctx, 3, 2), 0u); // top-left corner
 
     // Control: the SAME geometry unshaded has all four bands.
     auto ctx_plain = make_ctx(200, 100, 0,
-                              EWA_CLOSE | EWA_MAXIMIZE | EWA_MINIMIZE |
-                                  EWA_SHADE | EWA_STICK | EWA_FULLSCREEN |
-                                  (1 << 20),
-                              0);
-    EXPECT_EQ(layout.resize_edges(ctx_plain, 100, 2),   EMERALDWF_EDGE_TOP);
-    EXPECT_EQ(layout.resize_edges(ctx_plain, 3, 50),    EMERALDWF_EDGE_LEFT);
-    EXPECT_EQ(layout.resize_edges(ctx_plain, 208, 50),  EMERALDWF_EDGE_RIGHT);
+        EWA_CLOSE | EWA_MAXIMIZE | EWA_MINIMIZE |
+        EWA_SHADE | EWA_STICK | EWA_FULLSCREEN |
+        (1 << 20),
+        0);
+    EXPECT_EQ(layout.resize_edges(ctx_plain, 100, 2), EMERALDWF_EDGE_TOP);
+    EXPECT_EQ(layout.resize_edges(ctx_plain, 3, 50), EMERALDWF_EDGE_LEFT);
+    EXPECT_EQ(layout.resize_edges(ctx_plain, 208, 50), EMERALDWF_EDGE_RIGHT);
     EXPECT_EQ(layout.resize_edges(ctx_plain, 100, 123), EMERALDWF_EDGE_BOTTOM);
 }
-
 } // namespace
 
 int main(int argc, char **argv)

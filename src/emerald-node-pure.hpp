@@ -12,7 +12,6 @@ namespace wf
 {
 namespace emeraldwf
 {
-
 // Cache state of the node (kept plain so the invalidation predicate can be
 // tested headlessly — see `needs_rebuild()` below).
 struct node_cache_t
@@ -66,15 +65,15 @@ struct texture_pick_t
     bool must_create = false;
 };
 
-texture_pick_t pick_frame_texture(const node_cache_t &cache,
-                                  const cairo_surface_t *surface);
+texture_pick_t pick_frame_texture(const node_cache_t & cache,
+    const cairo_surface_t *surface);
 
 // Pure invalidation predicate (spec 04 Tests): returns true if the node must
 // re-render the frame next render pass. Extracted from the render instance so
 // it can be tested directly without GL or wayfire.
-bool needs_rebuild(const node_cache_t &cache, bool active,
-                   const std::string &title, int frame_w, int frame_h,
-                   double scale, int hover_button);
+bool needs_rebuild(const node_cache_t & cache, bool active,
+    const std::string & title, int frame_w, int frame_h,
+    double scale, int hover_button);
 
 // ── Frame-bounding-box math (extracted for the headless regression test) ────
 //
@@ -96,12 +95,14 @@ struct frame_box_input_t
     int client_w = 0, client_h = 0; // client size
     int m_left = 0, m_right = 0, m_bottom = 0, m_top = 0;
 };
+
 struct frame_box_out_t
 {
-    int x = 0, y = 0;       // node offset (parent coords)
-    int w = 0, h = 0;       // full frame size (D7)
+    int x = 0, y = 0; // node offset (parent coords)
+    int w = 0, h = 0; // full frame size (D7)
 };
-frame_box_out_t frame_box_for(const frame_box_input_t &in);
+
+frame_box_out_t frame_box_for(const frame_box_input_t & in);
 
 // ── Frame box from the pending geometry (part 06: live-map SEGV regression) ─
 //
@@ -118,7 +119,8 @@ struct pending_box_input_t
     int frame_w = 0, frame_h = 0; // pending().geometry.width/height (frame)
     int m_left = 0, m_right = 0, m_bottom = 0, m_top = 0; // pending().margins
 };
-frame_box_out_t frame_box_from_pending(const pending_box_input_t &in);
+
+frame_box_out_t frame_box_from_pending(const pending_box_input_t & in);
 
 // ── Render guard (finding 27) ────────────────────────────────────────────────
 //
@@ -137,7 +139,7 @@ inline bool frame_should_render(bool fullscreen, int frame_w, int frame_h)
 // Parent (surface-root) coords have the client's top-left at (0,0); the frame
 // origin is at {box.x, box.y} = {-margins.left, -margins.top} (see
 // frame_box_for). Frame-local coords have the frame's top-left at (0,0):
-//   local = parent - origin.
+// local = parent - origin.
 // This is the pure core of emerald_node_t::to_local(). The sign of the
 // origin is the part that regressed in part 06 (a positive offset shifted
 // every input coordinate above/left of the frame, so titlebar drags and
@@ -146,8 +148,9 @@ struct frame_local_out_t
 {
     int x = 0, y = 0;
 };
+
 frame_local_out_t frame_local_for(int parent_x, int parent_y,
-                                  const frame_box_out_t &box);
+    const frame_box_out_t & box);
 
 // ── Titlebar double-click detection (extracted for regression, finding 19) ──
 //
@@ -162,8 +165,9 @@ struct double_click_state_t
 {
     uint32_t last_press_ms = 0;
 };
-bool is_double_click(double_click_state_t &state, uint32_t now_ms,
-                     uint32_t timeout_ms = 400);
+
+bool is_double_click(double_click_state_t & state, uint32_t now_ms,
+    uint32_t timeout_ms = 400);
 
 // ── Titlebar press/move state machine (finding 20) ─────────────────────────
 //
@@ -183,31 +187,31 @@ bool is_double_click(double_click_state_t &state, uint32_t now_ms,
 // the state machine stays wayfire-free.
 struct titlebar_input_state_t
 {
-    double_click_state_t dbl;  // finding-19 timing
+    double_click_state_t dbl; // finding-19 timing
     bool pending_move = false; // a press is armed, awaiting commit/cancel
-    double press_x = 0;        // global pointer position at the armed press
-    double press_y = 0;
+    double press_x    = 0;        // global pointer position at the armed press
+    double press_y    = 0;
 };
 
 enum class titlebar_press_result
 {
     DOUBLE_CLICK, // caller fires double_click_action
-    ARM_MOVE,     // caller arms a pending move (NO immediate move_request)
+    ARM_MOVE, // caller arms a pending move (NO immediate move_request)
 };
 
-titlebar_press_result on_titlebar_press(titlebar_input_state_t &state,
+titlebar_press_result on_titlebar_press(titlebar_input_state_t & state,
     double global_x, double global_y, uint32_t now_ms,
     uint32_t timeout_ms = 400);
 
 // True exactly once when the armed pending move crosses the commit
 // threshold; false while below it and when nothing is armed.
-bool on_titlebar_motion(titlebar_input_state_t &state,
+bool on_titlebar_motion(titlebar_input_state_t & state,
     double global_x, double global_y, double commit_px = 4.0);
 
 // Left release: drops a never-committed pending move (a click, not a
 // drag). Double-click timing deliberately survives the release —
 // press-release-press within the window is exactly a double-click.
-void on_button_release(titlebar_input_state_t &state);
+void on_button_release(titlebar_input_state_t & state);
 
 // ── Titlebar action → WM request mapping (finding 21) ─────────────────────
 //
@@ -227,6 +231,5 @@ enum class titlebar_action_request
 };
 
 titlebar_action_request map_titlebar_action(int emerald_action);
-
 } // namespace emeraldwf
 } // namespace wf

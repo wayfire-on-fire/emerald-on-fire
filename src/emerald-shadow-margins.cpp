@@ -9,15 +9,14 @@ namespace wf
 {
 namespace emeraldwf
 {
-
 wf::decoration_margins_t shadow_margins_for(int client_h, int thickness,
-                                            int titlebar, double progress,
-                                            int min_client_h)
+    int titlebar, double progress,
+    int min_client_h)
 {
     const double t = static_cast<double>(thickness);
-    double        bottom = t;
+    double bottom  = t;
 
-    if (progress > 0.0 && client_h > 0)
+    if ((progress > 0.0) && (client_h > 0))
     {
         const double collapse =
             static_cast<double>(client_h) - t - static_cast<double>(titlebar);
@@ -30,9 +29,14 @@ wf::decoration_margins_t shadow_margins_for(int client_h, int thickness,
             const double max_delta =
                 static_cast<double>(client_h) - min_client_h;
             if (max_delta < delta)
+            {
                 delta = max_delta;
+            }
+
             if (delta > 0.0)
+            {
                 bottom = t + delta;
+            }
         }
     }
 
@@ -45,26 +49,26 @@ wf::decoration_margins_t shadow_margins_for(int client_h, int thickness,
 }
 
 void export_shadow_margins(wayfire_view view, int client_h, int thickness,
-                           int titlebar, double progress, int min_client_h)
+    int titlebar, double progress, int min_client_h)
 {
     if (view == nullptr)
+    {
         return;
+    }
 
     auto margins = shadow_margins_for(client_h, thickness, titlebar, progress,
-                                      min_client_h);
+        min_client_h);
     if (view->has_data(SHADOW_MARGIN_DATA_KEY))
     {
         view->get_data<wf_shadow_margin_t>(SHADOW_MARGIN_DATA_KEY)
-            ->set_margins(margins);
-    }
-    else
+        ->set_margins(margins);
+    } else
     {
         view->store_data(std::make_unique<wf_shadow_margin_t>(),
-                         SHADOW_MARGIN_DATA_KEY);
+            SHADOW_MARGIN_DATA_KEY);
         view->get_data<wf_shadow_margin_t>(SHADOW_MARGIN_DATA_KEY)
-            ->set_margins(margins);
+        ->set_margins(margins);
     }
 }
-
 } // namespace emeraldwf
 } // namespace wf

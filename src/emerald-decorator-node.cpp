@@ -19,11 +19,13 @@ namespace wf
 {
 namespace emeraldwf
 {
-
 void emerald_decorator_t::attach_node()
 {
     if (view == nullptr)
+    {
         return;
+    }
+
     if (is_csd())
     {
         static bool logged_csd = false;
@@ -33,6 +35,7 @@ void emerald_decorator_t::attach_node()
                  "(use always_decorate to force one)");
             logged_csd = true;
         }
+
         return; // CSD: no emerald frame (D6)
     }
 
@@ -41,7 +44,7 @@ void emerald_decorator_t::attach_node()
         // A non-owning shared_ptr: the decorator outlives the node (the
         // toplevel owns the decorator; the node is destroyed on detach).
         node = std::make_shared<emerald_node_t>(
-            std::shared_ptr<emerald_decorator_t>(this, [](emerald_decorator_t *) {}));
+            std::shared_ptr<emerald_decorator_t>(this, [] (emerald_decorator_t*) {}));
         // Offset {-thickness, -titlebar_top} = {-margins.left, -margins.top}
         // (emerald's shadow lives INSIDE the extents, so the node's bounding
         // box sits at that offset — spec 04 §1, contrast pixdecor). The
@@ -56,7 +59,7 @@ void emerald_decorator_t::attach_node()
         node->resize();
         // Finding 28: watch the view's activation state so the titlebar's
         // active/inactive colors update on focus changes (pixdecor parity).
-        on_view_activated = [this] (wf::view_activated_state_signal *)
+        on_view_activated = [this] (wf::view_activated_state_signal*)
         {
             on_activated_changed();
         };
@@ -67,8 +70,8 @@ void emerald_decorator_t::attach_node()
             auto m = get_margins(view->toplevel()->pending());
             LOGI("emeraldwf: attached scene node to '%s' (margins "
                  "%d,%d,%d,%d, theme engine '%s')",
-                 view->get_title().c_str(), m.left, m.right, m.bottom, m.top,
-                 theme_ref() ? theme_ref()->engine().c_str() : "?");
+                view->get_title().c_str(), m.left, m.right, m.bottom, m.top,
+                theme_ref() ? theme_ref()->engine().c_str() : "?");
             logged_attach = true;
         }
     }
@@ -91,15 +94,20 @@ void emerald_decorator_t::detach_node()
         {
             wf::scene::remove_child(node);
         }
+
         node.reset();
     }
+
     sroot.reset();
 }
 
 void emerald_decorator_t::on_geometry_changed()
 {
     if (node == nullptr)
+    {
         return;
+    }
+
     // Margins may change with the new geometry (tiled/fullscreen). The node
     // derives its bounding-box offset from get_margins() on demand, so just
     // mark the size dirty and re-render.
@@ -109,7 +117,10 @@ void emerald_decorator_t::on_geometry_changed()
 void emerald_decorator_t::on_activated_changed()
 {
     if (node == nullptr)
+    {
         return;
+    }
+
     ctx().active = view ? view->activated : false;
     node->set_active(ctx().active);
 }
@@ -117,9 +128,11 @@ void emerald_decorator_t::on_activated_changed()
 void emerald_decorator_t::on_theme_changed()
 {
     if (node == nullptr)
+    {
         return;
+    }
+
     node->set_theme_dirty();
 }
-
 } // namespace emeraldwf
 } // namespace wf

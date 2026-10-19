@@ -27,7 +27,6 @@ namespace wf
 {
 namespace emeraldwf
 {
-
 // Every emeraldwf/* option the poller keeps in sync with the ini. A null
 // entry is skipped, so tests can register a subset.
 struct emerald_config_options_t
@@ -45,7 +44,7 @@ struct emerald_config_options_t
     std::shared_ptr<wf::config::option_t<int>> shadow_pad;
     std::shared_ptr<wf::config::option_t<wf::keybinding_t>> shade_modifier;
     std::shared_ptr<wf::config::option_t<wf::animation_description_t>>
-        shade_duration;
+    shade_duration;
     // Part 08: the WCM-owned global emerald settings (moved off the theme
     // manager's Emerald Settings tab).
     std::shared_ptr<wf::config::option_t<bool>> no_scroll_shade;
@@ -63,8 +62,7 @@ struct emerald_config_options_t
 // left alone; unparseable values are ignored (the in-memory value stays).
 // Returns true if any option value actually changed (i.e. the theme reload
 // should be armed).
-bool sync_emeraldwf_options_from_config(const std::string &ini_path,
-    emerald_config_options_t &opts);
-
+bool sync_emeraldwf_options_from_config(const std::string & ini_path,
+    emerald_config_options_t & opts);
 }
 }

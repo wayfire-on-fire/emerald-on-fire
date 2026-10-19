@@ -40,7 +40,7 @@
 // (regression: Metadata.NoEmptyValueElements), so the "- No Override -"
 // entry of the Engine Override combo carries the marker "no_override".
 // Map it to an empty override (the theme's own engine).
-static std::string engine_override_value(const std::string &v)
+static std::string engine_override_value(const std::string & v)
 {
     return v == "no_override" ? std::string() : v;
 }
@@ -72,27 +72,27 @@ std::string find_wayfire_config_file()
         std::string arg, prev;
         while (std::getline(cf, arg, '\0'))
         {
-            if (prev == "-c" && !arg.empty())
+            if ((prev == "-c") && !arg.empty())
             {
                 return arg;
             }
+
             prev = arg;
         }
     }
-    const char *xdg = std::getenv("XDG_CONFIG_HOME");
+
+    const char *xdg  = std::getenv("XDG_CONFIG_HOME");
     std::string base =
         (xdg != nullptr && *xdg != '\0') ? std::string(xdg) :
         std::string(g_get_home_dir()) + "/.config";
     return base + "/wayfire.ini";
 }
-
 } // namespace
 
 namespace wf
 {
 namespace emeraldwf
 {
-
 class emeraldwf_plugin : public wf::plugin_interface_t
 {
   public:
@@ -149,10 +149,10 @@ class emeraldwf_plugin : public wf::plugin_interface_t
     // g_object_unref on unload) crashed wayfire on plugin fini. wf::wl_timer
     // integrates with the Wayland event loop, fires on the main thread, and is
     // safe to disconnect on fini.
-    wf::wl_timer<true>  poll_timer;   // 500 ms mtime poller (repeatable)
+    wf::wl_timer<true> poll_timer; // 500 ms mtime poller (repeatable)
     wf::wl_timer<false> reload_timer; // 250 ms reload debounce (one-shot)
     std::map<std::string, std::uint64_t> last_stamp; // file stamps (ns; finding 44)
-    std::string wayfire_config_file;          // active wayfire ini (poller-watched)
+    std::string wayfire_config_file; // active wayfire ini (poller-watched)
 
     wf::axis_callback shade_axis_cb;
 
@@ -191,7 +191,7 @@ class emeraldwf_plugin : public wf::plugin_interface_t
     void publish_shade_duration(wayfire_view view);
 
     // Part 06 (spec 06): live settings reload (mtime polling).
-    void emerald_watched_paths(std::vector<std::string> &out);
+    void emerald_watched_paths(std::vector<std::string> & out);
     void start_poller();
     void stop_poller();
     // wf::wl_timer<true> callback. Polls the watched files' mtimes; on change,
@@ -199,19 +199,19 @@ class emeraldwf_plugin : public wf::plugin_interface_t
     bool poll_tick();
     // wf::wl_timer<false> callback. Runs the debounced reload once.
     void reload_debounced();
-    void reload_theme();   // rebuild ThemeSettings, swap engine, re-render all
+    void reload_theme(); // rebuild ThemeSettings, swap engine, re-render all
     // Part 06 (product): apply the WCM titlebar click-action options to a
     // freshly loaded theme. The option DEFINES the action (a global emerald
     // setting — WCM is its editor, not an override over settings.ini; the
     // settings.ini keys are no longer consulted for click actions).
     // Unparseable value → emerald's own default.
-    void apply_titlebar_action_options(const ThemeSettings &ts);
+    void apply_titlebar_action_options(const ThemeSettings & ts);
     // Part 08: apply the WCM-owned global emerald settings (no_scroll_shade,
     // use_decoration_cropping, the button fade/pulse set) to a freshly
     // loaded theme's window_settings. Called after every theme load so the
     // WCM values always stand (the loader no longer reads these keys from
     // settings.ini).
-    void apply_emerald_global_options(const ThemeSettings &ts);
+    void apply_emerald_global_options(const ThemeSettings & ts);
 
     // Last in-effect config (used by the reload path, mirrors init()).
     std::string last_settings_path;
@@ -230,10 +230,13 @@ class emeraldwf_plugin : public wf::plugin_interface_t
 // this for option values, so `theme_dir = "~/.emerald/theme"` would otherwise
 // be treated as a literal path (a dir named "~" under $PWD) and the theme
 // would never be found.
-std::string expand_home(const std::string &path)
+std::string expand_home(const std::string & path)
 {
     if (path.empty())
+    {
         return path;
+    }
+
     // Only expand a leading "~" (avoids touching absolute/relative paths).
     // Handles "~" and "~/..." (the common cases). "~user" is left as-is —
     // it is not a valid theme_dir in practice.
@@ -241,12 +244,21 @@ std::string expand_home(const std::string &path)
     {
         std::string home = g_get_home_dir();
         if (home.empty())
+        {
             return path;
+        }
+
         if (path.size() == 1)
-            return home;                       // "~"
+        {
+            return home; // "~"
+        }
+
         if (path[1] == '/')
-            return home + path.substr(1);      // "~/..."
+        {
+            return home + path.substr(1); // "~/..."
+        }
     }
+
     return path;
 }
 
@@ -257,6 +269,7 @@ bool emeraldwf_plugin::should_decorate_view(::wayfire_toplevel_view view)
     {
         return false;
     }
+
     return (view->should_be_decorated() && !ignore_views.matches(view)) ||
            always_decorate.matches(view);
 }
@@ -272,7 +285,7 @@ void emeraldwf_plugin::adjust_new_decorations(::wayfire_toplevel_view view)
             std::make_unique<emerald_decorator_t>(view, theme));
     }
 
-    auto deco     = toplevel->get_data<emerald_decorator_t>();
+    auto deco = toplevel->get_data<emerald_decorator_t>();
 
     // Attach the scene node FIRST. get_margins() derives from the live
     // toplevel state (client size, titlebar, tiled edges); on a freshly
@@ -283,7 +296,7 @@ void emeraldwf_plugin::adjust_new_decorations(::wayfire_toplevel_view view)
     // contract: attach_node() is implemented by part 04
     deco->attach_node();
 
-    auto &pending = toplevel->pending();
+    auto & pending = toplevel->pending();
     pending.margins = deco->get_margins(pending);
 
     if (!pending.fullscreen && (pending.tiled_edges == 0))
@@ -331,10 +344,11 @@ void emeraldwf_plugin::remove_decoration(::wayfire_toplevel_view view)
     {
         auto tmgr = view->get_transformed_node();
         if (auto tr = tmgr->get_transformer<wf::emeraldwf::emerald_shade_t>(
-                wf::emeraldwf::SHADE_TRANSFORMER_NAME))
+            wf::emeraldwf::SHADE_TRANSFORMER_NAME))
         {
             tmgr->rem_transformer<wf::emeraldwf::emerald_shade_t>(tr);
         }
+
         deco->on_shade_progress(0.0);
         // contract: detach_node() is implemented by part 04
         deco->detach_node();
@@ -350,7 +364,7 @@ void emeraldwf_plugin::remove_decoration(::wayfire_toplevel_view view)
     view->erase_data(
         std::string(wf::emeraldwf::SHADOW_MARGIN_DATA_KEY));
 
-    auto &pending = toplevel->pending();
+    auto & pending = toplevel->pending();
     if (!pending.fullscreen && (pending.tiled_edges == 0))
     {
         pending.geometry =
@@ -371,7 +385,7 @@ void emeraldwf_plugin::update_view_decoration(wayfire_view view)
         // decorator and re-run adjust_new_decorations() on every signal
         // (title change, geometry change), re-expanding the geometry each
         // time (the "window grows on every title change" bug).
-        auto &t = *toplevel->toplevel();
+        auto & t = *toplevel->toplevel();
         bool has_deco = (bool)t.get_data<emerald_decorator_t>();
         bool should   = should_decorate_view(toplevel);
         if (has_deco && !should)
@@ -395,7 +409,7 @@ void emeraldwf_plugin::update_view_decoration(wayfire_view view)
 // ── Option change: recreate decorations (part 04 stubs the real work) ──────
 void emeraldwf_plugin::recreate()
 {
-    for (const auto &view : wf::get_core().get_all_views())
+    for (const auto & view : wf::get_core().get_all_views())
     {
         auto toplevel = wf::toplevel_cast(view);
         if (!toplevel)
@@ -411,27 +425,33 @@ void emeraldwf_plugin::recreate()
 
 void emeraldwf_plugin::toggle_shade(wayfire_view view)
 {
-    if (!bool(enable_shade) || view == nullptr)
+    if (!bool(enable_shade) || (view == nullptr))
+    {
         return;
+    }
+
     auto toplevel = wf::toplevel_cast(view);
     if (toplevel == nullptr)
+    {
         return;
+    }
+
     if (auto deco = toplevel->toplevel()->get_data<emerald_decorator_t>())
+    {
         deco->toggle_shade();
-    else if (toplevel->is_mapped())
+    } else if (toplevel->is_mapped())
     {
         // CSD view: no decorator, but shade still works (spec 05 §5) —
         // the transformer is attached directly to the client surface with
         // the `csd_titlebar_height` option.
         auto tmgr = view->get_transformed_node();
-        auto tr = tmgr->get_transformer<wf::emeraldwf::emerald_shade_t>(
+        auto tr   = tmgr->get_transformer<wf::emeraldwf::emerald_shade_t>(
             wf::emeraldwf::SHADE_TRANSFORMER_NAME);
         if (tr)
         {
             tr->set_strip_h(int(csd_titlebar_height));
             tr->init_animation(!tr->get_direction());
-        }
-        else
+        } else
         {
             // Finding 22: wire emeraldwf/shade_duration into the animation.
             auto new_tr = std::make_shared<wf::emeraldwf::emerald_shade_t>(
@@ -444,9 +464,10 @@ void emeraldwf_plugin::toggle_shade(wayfire_view view)
             new_tr->set_shadow_update(
                 [this, view] { export_csd_shadow_margins(view); });
             tmgr->add_transformer(new_tr, wf::TRANSFORMER_2D,
-                                  wf::emeraldwf::SHADE_TRANSFORMER_NAME);
+                wf::emeraldwf::SHADE_TRANSFORMER_NAME);
             new_tr->init_animation(true);
         }
+
         export_csd_shadow_margins(view);
     }
 }
@@ -457,16 +478,23 @@ void emeraldwf_plugin::toggle_shade(wayfire_view view)
 // treatment with the transformer attached directly to the client surface.
 void emeraldwf_plugin::scroll_shade(wayfire_view view, double delta)
 {
-    if (!bool(enable_shade) || view == nullptr)
+    if (!bool(enable_shade) || (view == nullptr))
+    {
         return;
+    }
+
     auto toplevel = wf::toplevel_cast(view);
     if (toplevel == nullptr)
+    {
         return;
+    }
+
     if (auto deco = toplevel->toplevel()->get_data<emerald_decorator_t>())
     {
         deco->scroll_shade(delta);
         return;
     }
+
     if (toplevel->is_mapped())
     {
         // CSD view: no decorator — the transformer goes directly on the
@@ -475,20 +503,21 @@ void emeraldwf_plugin::scroll_shade(wayfire_view view, double delta)
         {
             return;
         }
+
         const bool to_shade = scroll_shades(delta);
         auto tmgr = view->get_transformed_node();
-        auto tr = tmgr->get_transformer<wf::emeraldwf::emerald_shade_t>(
+        auto tr   = tmgr->get_transformer<wf::emeraldwf::emerald_shade_t>(
             wf::emeraldwf::SHADE_TRANSFORMER_NAME);
-        if (tr == nullptr && !to_shade)
+        if ((tr == nullptr) && !to_shade)
         {
             return; // unshaded; nothing to unshade
         }
+
         if (tr)
         {
             tr->set_strip_h(int(csd_titlebar_height));
             tr->init_animation(to_shade);
-        }
-        else
+        } else
         {
             // Finding 22: wire emeraldwf/shade_duration into the animation.
             auto new_tr = std::make_shared<wf::emeraldwf::emerald_shade_t>(
@@ -501,9 +530,10 @@ void emeraldwf_plugin::scroll_shade(wayfire_view view, double delta)
             new_tr->set_shadow_update(
                 [this, view] { export_csd_shadow_margins(view); });
             tmgr->add_transformer(new_tr, wf::TRANSFORMER_2D,
-                                  wf::emeraldwf::SHADE_TRANSFORMER_NAME);
+                wf::emeraldwf::SHADE_TRANSFORMER_NAME);
             new_tr->init_animation(to_shade);
         }
+
         export_csd_shadow_margins(view);
     }
 }
@@ -516,18 +546,25 @@ void emeraldwf_plugin::export_csd_shadow_margins(wayfire_view view)
 {
     auto toplevel = wf::toplevel_cast(view);
     if (toplevel == nullptr)
+    {
         return;
-    const auto &pending = toplevel->toplevel()->pending();
+    }
+
+    const auto & pending = toplevel->toplevel()->pending();
     if (pending.fullscreen)
+    {
         return;
-    int client_h = toplevel->get_geometry().height;
+    }
+
+    int client_h    = toplevel->get_geometry().height;
     double progress = 0.0;
     auto tmgr = view->get_transformed_node();
     if (auto tr = tmgr->get_transformer<wf::emeraldwf::emerald_shade_t>(
-            wf::emeraldwf::SHADE_TRANSFORMER_NAME))
+        wf::emeraldwf::SHADE_TRANSFORMER_NAME))
     {
         progress = tr->get_progression();
     }
+
     wf::emeraldwf::export_shadow_margins(
         view, client_h, int(shadow_pad), int(csd_titlebar_height), progress,
         toplevel->toplevel()->get_min_size().height);
@@ -542,7 +579,10 @@ void emeraldwf_plugin::publish_shade_duration(wayfire_view view)
 {
     auto toplevel = wf::toplevel_cast(view);
     if (!toplevel)
+    {
         return;
+    }
+
     auto deco = toplevel->toplevel()->get_data<emerald_decorator_t>();
     if (deco)
     {
@@ -552,10 +592,10 @@ void emeraldwf_plugin::publish_shade_duration(wayfire_view view)
 }
 
 // ── Part 06: live settings reload ─────────────────────────────────────────
-void emeraldwf_plugin::emerald_watched_paths(std::vector<std::string> &out)
+void emeraldwf_plugin::emerald_watched_paths(std::vector<std::string> & out)
 {
     out = {last_settings_path, last_theme_dir + "/theme.ini",
-           last_theme_dir};
+        last_theme_dir};
     // The active wayfire config file too: WCM writes it (and never notifies
     // the running wayfire), so its emeraldwf/* values are synced on mtime
     // change — this is what makes WCM engine switches live (part 06).
@@ -571,19 +611,18 @@ bool emeraldwf_plugin::poll_tick()
     emerald_watched_paths(paths);
 
     bool emerald_changed = false;
-    bool config_changed = false;
-    for (auto &p : paths)
+    bool config_changed  = false;
+    for (auto & p : paths)
     {
         std::uint64_t m = emwf_file_stamp(p);
         auto it = last_stamp.find(p);
-        if (it == last_stamp.end() || it->second != m)
+        if ((it == last_stamp.end()) || (it->second != m))
         {
             last_stamp[p] = m;
             if (p == wayfire_config_file)
             {
                 config_changed = true;
-            }
-            else
+            } else
             {
                 emerald_changed = true;
             }
@@ -615,10 +654,12 @@ bool emeraldwf_plugin::poll_tick()
             arm_reload();
         }
     }
+
     if (emerald_changed)
     {
         arm_reload();
     }
+
     return true; // keep the poller repeating
 }
 
@@ -628,13 +669,15 @@ void emeraldwf_plugin::start_poller()
     {
         return;
     }
+
     // Prime the stamp cache so the first poll does not trigger a spurious reload.
     std::vector<std::string> paths;
     emerald_watched_paths(paths);
-    for (const auto &p : paths)
+    for (const auto & p : paths)
     {
         last_stamp[p] = emwf_file_stamp(p);
     }
+
     // cppcheck-suppress knownConditionTrueFalse
     // poll_tick() intentionally always returns true: it is a periodic poller
     // (repeat every 500 ms), so the timer's "keep repeating" flag is true.
@@ -658,29 +701,30 @@ void emeraldwf_plugin::arm_reload()
         // Already armed — the pending timeout covers this change too.
         return;
     }
+
     reload_timer.set_timeout(250, [this] { this->reload_debounced(); });
 }
 
-void emeraldwf_plugin::apply_titlebar_action_options(const ThemeSettings &ts)
+void emeraldwf_plugin::apply_titlebar_action_options(const ThemeSettings & ts)
 {
     // The WCM option defines the click action (global emerald setting;
     // WCM is the editor, not an override). Unparseable value → emerald's
     // own default.
     ts.ws()->double_click_action =
         resolve_titlebar_action(std::string(double_click_action),
-                                DOUBLE_CLICK_SHADE);
+            DOUBLE_CLICK_SHADE);
     ts.ws()->middle_click_action =
         resolve_titlebar_action(std::string(middle_click_action),
-                                DOUBLE_CLICK_SEND_TO_BACK);
+            DOUBLE_CLICK_SEND_TO_BACK);
 }
 
-void emeraldwf_plugin::apply_emerald_global_options(const ThemeSettings &ts)
+void emeraldwf_plugin::apply_emerald_global_options(const ThemeSettings & ts)
 {
     // Part 08: WCM defines these global emerald settings; the loader no
     // longer reads them from settings.ini, so they must be applied here on
     // every theme load (init + reload) or the WCM values would be lost.
     ts.ws()->titlebar_no_scroll_shade = no_scroll_shade;
-    ts.ws()->use_decoration_cropping = use_decoration_cropping;
+    ts.ws()->use_decoration_cropping  = use_decoration_cropping;
     emeraldwf_apply_button_fade(ts.ws(),
         use_button_fade, use_button_fade_pulse,
         button_fade_total_duration, button_fade_step_duration,
@@ -689,7 +733,7 @@ void emeraldwf_plugin::apply_emerald_global_options(const ThemeSettings &ts)
 
 void emeraldwf_plugin::reload_theme()
 {
-    std::string settings_ini = last_settings_path;
+    std::string settings_ini  = last_settings_path;
     std::string theme_dir_opt = last_theme_dir;
 
     auto new_theme = std::make_shared<ThemeSettings>();
@@ -710,19 +754,20 @@ void emeraldwf_plugin::reload_theme()
     if (new_theme->engine() != ov)
     {
         LOGI("emeraldwf: engine changed %s → %s", ov,
-             new_theme->engine());
+            new_theme->engine());
     }
 
     theme = std::move(new_theme);
 
     // Re-render every existing decorator with the new theme.
-    for (const auto &view : wf::get_core().get_all_views())
+    for (const auto & view : wf::get_core().get_all_views())
     {
         auto toplevel = wf::toplevel_cast(view);
         if (!toplevel)
         {
             continue;
         }
+
         // decorator lives on the toplevel_t, not the view (see
         // update_view_decoration)
         if (auto deco = toplevel->toplevel()->get_data<emerald_decorator_t>())
@@ -737,23 +782,22 @@ void emeraldwf_plugin::reload_theme()
             // next frame when marked dirty.
             deco->on_theme_changed();
             // Margins can change with the theme (spaces/titlebar).
-            auto &pending = toplevel->toplevel()->pending();
+            auto & pending = toplevel->toplevel()->pending();
             pending.margins = deco->get_margins(pending);
         }
+
         wf::get_core().tx_manager->schedule_object(toplevel->toplevel());
     }
 
     LOGI("emeraldwf: theme reloaded (engine=%s)",
-         theme->engine().c_str());
+        theme->engine().c_str());
 }
 
 emeraldwf_plugin::emeraldwf_plugin()
-{
-}
+{}
 
 void emeraldwf_plugin::init()
 {
-
     // ── Theme: load (part 02 loader) + live reload monitors (part 06) ───────
     // D10: core settings live in ~/.emerald/settings.ini; the theme (engine
     // sections + PNGs) in <theme_dir>/ (default ~/.emerald/theme). The
@@ -771,34 +815,35 @@ void emeraldwf_plugin::init()
     {
         // ThemeSettings::load is non-const (part 02 owns it); drop const for
         // the one-time init, then publish via shared_ptr<const>.
-        auto &ts = *const_cast<ThemeSettings *>(theme.get());
+        auto & ts = *const_cast<ThemeSettings*>(theme.get());
         // Review R3: load() reports failure (engine dlopen failed, legacy
         // fallback included). A failed load leaves valid() == false — the
         // decorators and nodes check it before rendering, so the plugin
         // runs frameless instead of with a silently dead theme.
         const bool theme_ok = ts.load(last_settings_path, last_theme_dir,
-                engine_override_value(std::string(engine)));
+            engine_override_value(std::string(engine)));
         if (!theme_ok)
         {
             LOGW("emeraldwf: theme load failed (dir=%s) — no engine could "
                  "be loaded; windows will be undecorated",
-                 last_theme_dir.c_str());
+                last_theme_dir.c_str());
         }
+
         // The WCM option defines the click actions (settings.ini values are
         // superseded here).
         apply_titlebar_action_options(ts);
         apply_emerald_global_options(ts);
     }
     const std::string ov_init = engine_override_value(std::string(engine));
-    if (!ov_init.empty() && theme->engine() != ov_init)
+    if (!ov_init.empty() && (theme->engine() != ov_init))
     {
         LOGI("emeraldwf: engine override '%s' — theme engine '%s' does not "
              "match; the engine runs on the default theme", ov_init,
-             theme->engine());
+            theme->engine());
     }
-    LOGI("emeraldwf: theme loaded (engine=%s, dir=%s)",
-         theme->engine().c_str(), last_theme_dir);
 
+    LOGI("emeraldwf: theme loaded (engine=%s, dir=%s)",
+        theme->engine().c_str(), last_theme_dir);
 
     // Part 06: live reload — poll the mtimes of settings.ini, theme.ini, and
     // the theme dir (engine PNG/dir changes). emerald-theme-manager edits both
@@ -807,9 +852,8 @@ void emeraldwf_plugin::init()
     // the engine) are synced into the in-memory options and reloaded live.
     wayfire_config_file = find_wayfire_config_file();
     LOGI("emeraldwf: watching config file %s for live option changes",
-         wayfire_config_file.c_str());
+        wayfire_config_file.c_str());
     start_poller();
-
 
     // CSD windows use the csd_titlebar_height option (pixdecor parity).
     theme_dir.set_callback([=]
@@ -838,7 +882,7 @@ void emeraldwf_plugin::init()
         {
             theme->ws()->double_click_action =
                 resolve_titlebar_action(std::string(double_click_action),
-                                        DOUBLE_CLICK_SHADE);
+                    DOUBLE_CLICK_SHADE);
         }
     });
     middle_click_action.set_callback([=]
@@ -847,7 +891,7 @@ void emeraldwf_plugin::init()
         {
             theme->ws()->middle_click_action =
                 resolve_titlebar_action(std::string(middle_click_action),
-                                        DOUBLE_CLICK_SEND_TO_BACK);
+                    DOUBLE_CLICK_SEND_TO_BACK);
         }
     });
 
@@ -874,14 +918,14 @@ void emeraldwf_plugin::init()
     maximized_shadows.set_callback([=] { recreate(); });
     ignore_views_string.set_callback([=]
     {
-        for (const auto &view : wf::get_core().get_all_views())
+        for (const auto & view : wf::get_core().get_all_views())
         {
             update_view_decoration(view);
         }
     });
     always_decorate_string.set_callback([=]
     {
-        for (const auto &view : wf::get_core().get_all_views())
+        for (const auto & view : wf::get_core().get_all_views())
         {
             update_view_decoration(view);
         }
@@ -890,7 +934,7 @@ void emeraldwf_plugin::init()
     // ── Signal wiring ──────────────────────────────────────────────────────
     on_new_tx = [this] (wf::txn::new_transaction_signal *ev)
     {
-        for (const auto &obj : ev->tx->get_objects())
+        for (const auto & obj : ev->tx->get_objects())
         {
             auto toplevel = std::dynamic_pointer_cast<wf::toplevel_t>(obj);
             if (toplevel == nullptr)
@@ -901,7 +945,7 @@ void emeraldwf_plugin::init()
             // Already decorated → update margins (part 04 adds redraw).
             if (auto deco = toplevel->get_data<emerald_decorator_t>())
             {
-                auto &pending = toplevel->pending();
+                auto & pending = toplevel->pending();
                 pending.margins = deco->get_margins(pending);
                 continue;
             }
@@ -962,11 +1006,12 @@ void emeraldwf_plugin::init()
         {
             return;
         }
+
         // decorator lives on the toplevel_t, not the view
         auto deco = toplevel->toplevel()->get_data<emerald_decorator_t>();
         if (deco)
         {
-            auto &pending = toplevel->toplevel()->pending();
+            auto & pending = toplevel->toplevel()->pending();
             pending.margins = deco->get_margins(pending);
             // contract: on_geometry_changed() implemented by part 04 —
             // marks the node size dirty so it re-renders at the new size.
@@ -982,7 +1027,7 @@ void emeraldwf_plugin::init()
     wf::get_core().connect(&on_geometry_changed);
 
     // ── Existing views ─────────────────────────────────────────────────────
-    for (const auto &view : wf::get_core().get_all_views())
+    for (const auto & view : wf::get_core().get_all_views())
     {
         update_view_decoration(view);
     }
@@ -990,7 +1035,7 @@ void emeraldwf_plugin::init()
     // ── Part 05: shade (spec 05 §2) ─────────────────────────────────────────
     // Publish the shade_duration option to every decorator (so the
     // transformer picks it up) and register the global axis binding + IPC.
-    for (const auto &view : wf::get_core().get_all_views())
+    for (const auto & view : wf::get_core().get_all_views())
     {
         publish_shade_duration(view);
         export_csd_shadow_margins(view);
@@ -1023,22 +1068,28 @@ void emeraldwf_plugin::init()
                     scroll_shade(v, ev->delta);
                     return true;
                 }
+
                 return true;
             }
+
             return false;
         };
         wf::get_core().bindings->add_axis(shade_modifier, &shade_axis_cb);
     }
 
-    emeraldwf_shade_toggle.set_handler([=] (wf::output_t *, wayfire_view view)
+    emeraldwf_shade_toggle.set_handler([=] (wf::output_t*, wayfire_view view)
     {
         if (!bool(enable_shade))
+        {
             return false;
+        }
+
         if (view != nullptr)
         {
             toggle_shade(view);
             return true;
         }
+
         return false;
     });
 
@@ -1066,19 +1117,24 @@ void emeraldwf_plugin::init()
         // (toplevel->toplevel()), NOT on the view — a view-based get_data()
         // always missed it, so the publish (and the on_shade_progress reset
         // below) never reached any decorator.
-        for (const auto &view : wf::get_core().get_all_views())
+        for (const auto & view : wf::get_core().get_all_views())
         {
             auto toplevel = wf::toplevel_cast(view);
             if (toplevel == nullptr)
+            {
                 continue;
+            }
+
             if (auto deco = toplevel->toplevel()->get_data<emerald_decorator_t>())
+            {
                 deco->set_enable_shade(bool(enable_shade));
+            }
         }
+
         if (bool(enable_shade))
         {
             wf::get_core().bindings->add_axis(shade_modifier, &shade_axis_cb);
-        }
-        else
+        } else
         {
             wf::get_core().bindings->rem_binding(&shade_axis_cb);
             // Unchecking `enable_shade` (e.g. in WCM) must unshade every
@@ -1087,17 +1143,21 @@ void emeraldwf_plugin::init()
             // direction — with the binding gone that can never happen, so a
             // shaded window would stay collapsed into its titlebar strip
             // forever (part-06 finding 12).
-            for (const auto &view : wf::get_core().get_all_views())
+            for (const auto & view : wf::get_core().get_all_views())
             {
                 auto toplevel = wf::toplevel_cast(view);
                 if (toplevel == nullptr)
+                {
                     continue;
+                }
+
                 auto tmgr = view->get_transformed_node();
                 if (auto tr = tmgr->get_transformer<wf::emeraldwf::emerald_shade_t>(
-                        wf::emeraldwf::SHADE_TRANSFORMER_NAME))
+                    wf::emeraldwf::SHADE_TRANSFORMER_NAME))
                 {
                     tmgr->rem_transformer<wf::emeraldwf::emerald_shade_t>(tr);
                 }
+
                 // Finding 25: toplevel_t data map (see the publish loop
                 // above) — the view-based lookup always missed the decorator,
                 // so a disabled shade left stale (shaded) margins on SSD
@@ -1107,8 +1167,7 @@ void emeraldwf_plugin::init()
                     // Reset margins/shadow-custom-data/node to the
                     // unshaded state (progress 0).
                     deco->on_shade_progress(0.0);
-                }
-                else if (toplevel->is_mapped())
+                } else if (toplevel->is_mapped())
                 {
                     // CSD view: re-export shadow margins (progress is 0 now
                     // that the transformer is gone).
@@ -1122,49 +1181,53 @@ void emeraldwf_plugin::init()
 
     csd_titlebar_height.set_callback([=]
     {
-        for (const auto &view : wf::get_core().get_all_views())
+        for (const auto & view : wf::get_core().get_all_views())
         {
             auto toplevel = wf::toplevel_cast(view);
             if (!toplevel)
+            {
                 continue;
+            }
+
             auto deco = toplevel->toplevel()->get_data<emerald_decorator_t>();
             if (deco && deco->is_csd())
             {
                 deco->set_titlebar_height(int(csd_titlebar_height));
             }
+
             if (auto tr = view->get_transformed_node()
-                             ->get_transformer<wf::emeraldwf::emerald_shade_t>(
-                                 wf::emeraldwf::SHADE_TRANSFORMER_NAME))
+                    ->get_transformer<wf::emeraldwf::emerald_shade_t>(
+                    wf::emeraldwf::SHADE_TRANSFORMER_NAME))
             {
                 if (!deco)
+                {
                     tr->set_strip_h(int(csd_titlebar_height));
+                }
             }
+
             export_csd_shadow_margins(view);
         }
     });
 
     shadow_pad.set_callback([=]
     {
-        for (const auto &view : wf::get_core().get_all_views())
+        for (const auto & view : wf::get_core().get_all_views())
         {
             export_csd_shadow_margins(view);
         }
     });
-
-
 }
 
 void emeraldwf_plugin::fini()
 {
-
     // 1. Stop the mtime poller and cancel the reload debounce. Both are
-    //    wf::wl_timer sources on the Wayland event loop; if left armed they
-    //    would fire on a destroyed plugin (use-after-free).
+    // wf::wl_timer sources on the Wayland event loop; if left armed they
+    // would fire on a destroyed plugin (use-after-free).
     stop_poller();
     reload_timer.disconnect();
 
     // 2. Disconnect signals BEFORE removing decorations, so no handler
-    //    re-enters (on_new_tx would otherwise re-create decorators mid-fin).
+    // re-enters (on_new_tx would otherwise re-create decorators mid-fin).
     on_new_tx.disconnect();
     on_decoration_state_changed.disconnect();
     on_view_tiled.disconnect();
@@ -1173,18 +1236,17 @@ void emeraldwf_plugin::fini()
     on_geometry_changed.disconnect();
     wf::get_core().bindings->rem_binding(&shade_axis_cb);
 
-
     // 3. Remove the shade transformers (they reference plugin state) and the
-    //    scene nodes; erase the per-toplevel decorators — via
-    //    remove_decoration() (review N4: never erase_data the decorator
-    //    directly, detach_node() must run first).
-    for (const auto &view : wf::get_core().get_all_views())
+    // scene nodes; erase the per-toplevel decorators — via
+    // remove_decoration() (review N4: never erase_data the decorator
+    // directly, detach_node() must run first).
+    for (const auto & view : wf::get_core().get_all_views())
     {
         if (auto toplevel = wf::toplevel_cast(view))
         {
             auto tmgr = view->get_transformed_node();
             if (auto tr = tmgr->get_transformer<wf::emeraldwf::emerald_shade_t>(
-                    wf::emeraldwf::SHADE_TRANSFORMER_NAME))
+                wf::emeraldwf::SHADE_TRANSFORMER_NAME))
             {
                 tmgr->rem_transformer<wf::emeraldwf::emerald_shade_t>(tr);
             }
@@ -1192,13 +1254,9 @@ void emeraldwf_plugin::fini()
             remove_decoration(toplevel);
 
             wf::get_core().tx_manager->schedule_object(toplevel->toplevel());
-
         }
     }
-
-
 }
-
 } // namespace emeraldwf
 } // namespace wf
 

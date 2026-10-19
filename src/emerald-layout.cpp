@@ -17,7 +17,6 @@ namespace wf
 {
 namespace emeraldwf
 {
-
 // Part 02's emerald-settings.cpp ships the real ThemeSettings::ws()
 // (it is under development and is not linked into the part-03 test).
 // Provide the definition here so test_layout is self-contained; part 02's
@@ -27,7 +26,7 @@ namespace emeraldwf
 // alongside emerald-settings.cpp (which defines the strong ws()), the real
 // definition wins and there is no "multiple definition" link error. test_layout
 // (which links only this file) still resolves to the weak copy.
-__attribute__((weak)) window_settings *ThemeSettings::ws() const
+__attribute__((weak)) window_settings*ThemeSettings::ws() const
 {
     return ws_;
 }
@@ -40,74 +39,110 @@ int EmeraldLayout::title_object_type(char obj)
     // port of get_title_object_type (main.c:2825)
     switch (obj)
     {
-        case ':': return -1;  // state separator
-        case 'C': return TBT_CLOSE;
-        case 'N': return TBT_MINIMIZE;
-        case 'X':
-        case 'R': return TBT_MAXIMIZE;
-        case 'F': return TBT_SUPERMAXIMIZE;
-        case 'H': return TBT_HELP;
-        case 'M': return TBT_MENU;
-        case 'T': return TBT_TITLE;
-        case 'I': return TBT_ICON;
-        case 'S': return TBT_SHADE;
-        case 'U':
-        case 'A': return TBT_ONTOP;
-        case 'D': return TBT_ONBOTTOM;
-        case 'Y': return TBT_STICKY;
-        default: return -2;
+      case ':':
+        return -1; // state separator
+
+      case 'C':
+        return TBT_CLOSE;
+
+      case 'N':
+        return TBT_MINIMIZE;
+
+      case 'X':
+      case 'R':
+        return TBT_MAXIMIZE;
+
+      case 'F':
+        return TBT_SUPERMAXIMIZE;
+
+      case 'H':
+        return TBT_HELP;
+
+      case 'M':
+        return TBT_MENU;
+
+      case 'T':
+        return TBT_TITLE;
+
+      case 'I':
+        return TBT_ICON;
+
+      case 'S':
+        return TBT_SHADE;
+
+      case 'U':
+      case 'A':
+        return TBT_ONTOP;
+
+      case 'D':
+        return TBT_ONBOTTOM;
+
+      case 'Y':
+        return TBT_STICKY;
+
+      default:
+        return -2;
     }
 }
 
 int EmeraldLayout::title_object_width(const window_settings *ws,
-                                      const DecorContext &ctx, char obj) const
+    const DecorContext & ctx, char obj) const
 {
     // port of get_title_object_width (main.c:2863)
     int i = title_object_type(obj);
     switch (i)
     {
-        case -1:
-            return -1;
-        case TBT_TITLE:
-            // emerald: pango_layout_get_pixel_size + 2; we take the
-            // Pango-measured width from title_text_width_ (set by part 04
-            // / tests before build(); separate from ctx.tobj_item_width,
-            // main.c:2991).
-            return title_text_width_ + 2;
-        case TBT_ICON:
-            return 18;
-        default:
-            if (i >= 0 && i < B_T_COUNT)
-                return (ctx.actions & emerald_button_actions[i]) ?
-                           (ws->use_pixmap_buttons ? ws->c_icon_size[i].w : 18) :
-                           0;
-            else
-                return 0;
+      case -1:
+        return -1;
+
+      case TBT_TITLE:
+        // emerald: pango_layout_get_pixel_size + 2; we take the
+        // Pango-measured width from title_text_width_ (set by part 04
+        /// tests before build(); separate from ctx.tobj_item_width,
+        // main.c:2991).
+        return title_text_width_ + 2;
+
+      case TBT_ICON:
+        return 18;
+
+      default:
+        if ((i >= 0) && (i < B_T_COUNT))
+        {
+            return (ctx.actions & emerald_button_actions[i]) ?
+                   (ws->use_pixmap_buttons ? ws->c_icon_size[i].w : 18) :
+                   0;
+        } else
+        {
+            return 0;
+        }
     }
 }
 
 int EmeraldLayout::real_pos(const window_settings *ws,
-                            const DecorContext &ctx, int tobj) const
+    const DecorContext & ctx, int tobj) const
 {
     // port of get_real_pos (main.c:291)
     switch (ctx.tobj_item_state[tobj])
     {
-        case 1:
-            return ((ctx.width + ws->left_space - ws->right_space +
-                     ctx.tobj_size[0] - ctx.tobj_size[1] - ctx.tobj_size[2]) / 2 +
-                    ctx.tobj_item_pos[tobj]);
-        case 2:
-            return (ctx.width - ws->right_space - ctx.tobj_size[2] +
-                    ctx.tobj_item_pos[tobj]);
-        case 3:
-            return -1;
-        default:
-            return (ws->left_space + ctx.tobj_item_pos[tobj]);
+      case 1:
+        return ((ctx.width + ws->left_space - ws->right_space +
+            ctx.tobj_size[0] - ctx.tobj_size[1] - ctx.tobj_size[2]) / 2 +
+            ctx.tobj_item_pos[tobj]);
+
+      case 2:
+        return (ctx.width - ws->right_space - ctx.tobj_size[2] +
+            ctx.tobj_item_pos[tobj]);
+
+      case 3:
+        return -1;
+
+      default:
+        return (ws->left_space + ctx.tobj_item_pos[tobj]);
     }
 }
 
 void EmeraldLayout::place_objects(const window_settings *ws,
-                                  DecorContext &ctx) const
+    DecorContext & ctx) const
 {
     // port of layout_title_objects (main.c:2954) — width accumulation pass
     // and object positioning pass. The X11 bits of position_title_object
@@ -119,7 +154,7 @@ void EmeraldLayout::place_objects(const window_settings *ws,
     ctx.tobj_size[0] = 0;
     ctx.tobj_size[1] = 0;
     ctx.tobj_size[2] = 0;
-    int zone_width[3] = {0};   // (main.c:2991) per-zone last-object width
+    int zone_width[3] = {0}; // (main.c:2991) per-zone last-object width
     int state = 0;
     for (size_t i = 0; i < strlen(layout); i++)
     {
@@ -128,20 +163,25 @@ void EmeraldLayout::place_objects(const window_settings *ws,
             i++;
             ctx.tobj_size[state] += strtol(&layout[i], nullptr, 0);
             while (layout[i] && isdigit((unsigned char)layout[i]))
+            {
                 i++;
+            }
+
             continue;
         }
+
         int owidth = title_object_width(ws, ctx, layout[i]);
         if (owidth == -1)
         {
             state++;
             if (state > 2)
+            {
                 break;
-        }
-        else
+            }
+        } else
         {
             ctx.tobj_size[state] += owidth;
-            zone_width[state] = owidth;  // (main.c:2991)
+            zone_width[state]     = owidth;  // (main.c:2991)
         }
     }
 
@@ -151,8 +191,8 @@ void EmeraldLayout::place_objects(const window_settings *ws,
     ctx.tobj_pos[0] = ws->left_space + ws->extra_extents.left;
     ctx.tobj_pos[2] = ctx.client_width - ctx.tobj_size[2] + ctx.tobj_pos[0];
     ctx.tobj_pos[1] = std::max((ctx.tobj_pos[2] + ctx.tobj_size[0] -
-                                ctx.tobj_size[1]) / 2,
-                               0) + ctx.tobj_pos[0];
+        ctx.tobj_size[1]) / 2,
+        0) + ctx.tobj_pos[0];
 
     // ── pass 2: object placement ────────────────────────────────────────
     // (main.c:3000-3031) — note: emerald's original code uses wnck client
@@ -161,7 +201,9 @@ void EmeraldLayout::place_objects(const window_settings *ws,
     state = 0;
     int x = ctx.tobj_pos[0] + ws->button_hoffset;
     for (int i = 0; i < TBT_COUNT; i++)
+    {
         ctx.tobj_item_state[i] = 3;
+    }
 
     bool removed = false;
     for (size_t i = 0; i < strlen(layout); i++)
@@ -171,24 +213,31 @@ void EmeraldLayout::place_objects(const window_settings *ws,
             i++;
             x += strtol(&layout[i], nullptr, 0);
             while (layout[i] && isdigit((unsigned char)layout[i]))
+            {
                 i++;
+            }
+
             continue;
         }
+
         if (title_object_type(layout[i]) == -1)
         {
             state++;
             if (state > 2)
+            {
                 break;
-            else
+            } else
+            {
                 x = ctx.tobj_pos[state];
-        }
-        else
+            }
+        } else
         {
-            if (state == 2 && !removed)
+            if ((state == 2) && !removed)
             {
                 x -= ws->button_hoffset;
                 removed = true;
             }
+
             int w = title_object_width(ws, ctx, layout[i]);
             // (main.c:2991) per-zone last-object width — use the value
             // computed in pass 1, which is authoritative.
@@ -202,13 +251,14 @@ void EmeraldLayout::place_objects(const window_settings *ws,
 }
 
 void EmeraldLayout::update_button_regions(const window_settings *ws,
-                                          DecorContext &ctx) const
+    DecorContext & ctx) const
 {
     // port of update_button_regions (main.c:1653). bg_surface / fade parts
     // are part 02/04 concerns and are left at their defaults.
     int y1 = ws->top_space - ws->win_extents.top;
 
-    auto not_visible = [&](int b_t) -> bool {
+    auto not_visible = [&] (int b_t) -> bool
+    {
         return ctx.tobj_item_state[b_t] == 3 ||
                !(ctx.actions & emerald_button_actions[b_t]);
     };
@@ -220,12 +270,15 @@ void EmeraldLayout::update_button_regions(const window_settings *ws,
     for (int b_t = 0; b_t < B_T_COUNT; ++b_t)
     {
         for (button_region_t *r : {&ctx.button_region[b_t],
-                                   &ctx.button_region_inact[b_t]})
+             &ctx.button_region_inact[b_t]})
         {
             r->base_x1 = r->base_y1 = r->base_x2 = r->base_y2 = -100;
             r->glow_x1 = r->glow_y1 = r->glow_x2 = r->glow_y2 = -100;
             for (int b_t2 = 0; b_t2 < B_T_COUNT; ++b_t2)
+            {
                 r->overlap_buttons[b_t2] = false;
+            }
+
             r->bg_surface = nullptr;
         }
     }
@@ -236,7 +289,10 @@ void EmeraldLayout::update_button_regions(const window_settings *ws,
         double x = 0.0, y = 0.0;
 
         if (not_visible(b_t))
+        {
             continue;
+        }
+
         // port of get_button_pos (main.c:1093)
         y = (double)y1 + ws->button_offset;
         x = (double)real_pos(ws, ctx, b_t);
@@ -249,7 +305,7 @@ void EmeraldLayout::update_button_regions(const window_settings *ws,
             button_region->base_x2 = (gint)(x + ws->c_icon_size[b_t].w);
             button_region->base_y2 =
                 std::min((gint)(y + ws->c_icon_size[b_t].h),
-                         (gint)(ws->top_space + ws->titlebar_height));
+                    (gint)(ws->top_space + ws->titlebar_height));
 
             if ((ctx.active && ws->use_button_glow) ||
                 (!ctx.active && ws->use_button_inactive_glow))
@@ -263,17 +319,15 @@ void EmeraldLayout::update_button_regions(const window_settings *ws,
                 button_region->glow_x2 = glow_x + ws->c_glow_size.w;
                 button_region->glow_y2 =
                     std::min(glow_y + ws->c_glow_size.h,
-                             (gint)(ws->top_space + ws->titlebar_height));
-            }
-            else
+                        (gint)(ws->top_space + ws->titlebar_height));
+            } else
             {
                 button_region->glow_x1 = button_region->base_x1;
                 button_region->glow_y1 = button_region->base_y1;
                 button_region->glow_x2 = button_region->base_x2;
                 button_region->glow_y2 = button_region->base_y2;
             }
-        }
-        else
+        } else
         {
             button_region->base_x2 = (gint)(x + 16);
             button_region->base_y2 = (gint)(y + 16);
@@ -285,7 +339,10 @@ void EmeraldLayout::update_button_regions(const window_settings *ws,
     {
         button_region_t *button_region = &ctx.button_region[b_t];
         if (not_visible(b_t))
+        {
             continue;
+        }
+
         if (ws->use_pixmap_buttons &&
             ((ctx.active && ws->use_button_glow) ||
              (!ctx.active && ws->use_button_inactive_glow)))
@@ -293,15 +350,17 @@ void EmeraldLayout::update_button_regions(const window_settings *ws,
             for (int b_t2 = 0; b_t2 < B_T_COUNT; ++b_t2)
             {
                 if (not_visible(b_t2))
+                {
                     continue;
-                if ((button_region->base_x1 > ctx.button_region[b_t2].base_x1 &&
-                     button_region->glow_x1 <= ctx.button_region[b_t2].base_x2) ||
-                    (button_region->base_x1 < ctx.button_region[b_t2].base_x1 &&
-                     button_region->glow_x2 >= ctx.button_region[b_t2].base_x1))
+                }
+
+                if (((button_region->base_x1 > ctx.button_region[b_t2].base_x1) &&
+                     (button_region->glow_x1 <= ctx.button_region[b_t2].base_x2)) ||
+                    ((button_region->base_x1 < ctx.button_region[b_t2].base_x1) &&
+                     (button_region->glow_x2 >= ctx.button_region[b_t2].base_x1)))
                 {
                     button_region->overlap_buttons[b_t2] = true;
-                }
-                else
+                } else
                 {
                     button_region->overlap_buttons[b_t2] = false;
                 }
@@ -314,28 +373,33 @@ void EmeraldLayout::update_button_regions(const window_settings *ws,
     for (int b_t = 0; b_t < B_T_COUNT; ++b_t)
     {
         if (not_visible(b_t))
+        {
             continue;
+        }
+
         ctx.button_region_inact[b_t] = ctx.button_region[b_t];
         ctx.button_region_inact[b_t].bg_surface = nullptr;
     }
 }
 
-void EmeraldLayout::build(const window_settings *ws, DecorContext &ctx)
+void EmeraldLayout::build(const window_settings *ws, DecorContext & ctx)
 {
     if (!ws)
+    {
         return;
+    }
 
     place_objects(ws, ctx);
     update_button_regions(ws, ctx);
 }
 
-void EmeraldLayout::build(const ThemeSettings &ts, DecorContext &ctx)
+void EmeraldLayout::build(const ThemeSettings & ts, DecorContext & ctx)
 {
     build(ts.ws(), ctx);
 }
 
-int EmeraldLayout::hit_button(const DecorContext &ctx, int x, int y,
-                              bool active) const
+int EmeraldLayout::hit_button(const DecorContext & ctx, int x, int y,
+    bool active) const
 {
     // port of the hit-test used by emerald's button event windows and
     // draw pass (main.c:1861-1881 / 1629-1650): the *glow* rect answers
@@ -354,25 +418,29 @@ int EmeraldLayout::hit_button(const DecorContext &ctx, int x, int y,
         active ? ctx.button_region : ctx.button_region_inact;
     const window_settings *ws = ctx.fs ? ctx.fs->ws : nullptr;
     if (!ws)
+    {
         return -1;
+    }
 
     int glow_winner = -1;
     int glow_winner_dist2 = std::numeric_limits<int>::max();
 
     for (int b_t = 0; b_t < B_T_COUNT; b_t++)
     {
-        if (ctx.tobj_item_state[b_t] == 3 ||
+        if ((ctx.tobj_item_state[b_t] == 3) ||
             !(ctx.actions & emerald_button_actions[b_t]))
+        {
             continue;
+        }
 
         const button_region_t *br = &regions[b_t];
         int bw = br->base_x2 - br->base_x1;
         int bh = br->base_y2 - br->base_y1;
 
         // pass 1: the button core (no overlap between cores)
-        if (br->base_x1 != -100 &&
-            x >= br->base_x1 && x < br->base_x1 + bw &&
-            y >= br->base_y1 && y < br->base_y1 + bh)
+        if ((br->base_x1 != -100) &&
+            (x >= br->base_x1) && (x < br->base_x1 + bw) &&
+            (y >= br->base_y1) && (y < br->base_y1 + bh))
         {
             return b_t;
         }
@@ -382,18 +450,18 @@ int EmeraldLayout::hit_button(const DecorContext &ctx, int x, int y,
         if (ws->use_pixmap_buttons &&
             ((ws->use_button_glow && active) ||
              (ws->use_button_inactive_glow && !active)) &&
-            br->glow_x1 != -100)
+            (br->glow_x1 != -100))
         {
             int gw = br->glow_x2 - br->glow_x1;
             int gh = br->glow_y2 - br->glow_y1;
-            if (x >= br->glow_x1 && x < br->glow_x1 + gw &&
-                y >= br->glow_y1 && y < br->glow_y1 + gh)
+            if ((x >= br->glow_x1) && (x < br->glow_x1 + gw) &&
+                (y >= br->glow_y1) && (y < br->glow_y1 + gh))
             {
                 // distance to this button's core center (x2 = 2*dx to
                 // avoid the division)
                 int cdx = 2 * x - (br->base_x1 + br->base_x2);
                 int cdy = 2 * y - (br->base_y1 + br->base_y2);
-                int d2 = cdx * cdx + cdy * cdy;
+                int d2  = cdx * cdx + cdy * cdy;
                 if (d2 < glow_winner_dist2)
                 {
                     glow_winner_dist2 = d2;
@@ -406,8 +474,8 @@ int EmeraldLayout::hit_button(const DecorContext &ctx, int x, int y,
     return glow_winner;
 }
 
-uint32_t EmeraldLayout::resize_edges(const DecorContext &ctx, int x,
-                                     int y) const
+uint32_t EmeraldLayout::resize_edges(const DecorContext & ctx, int x,
+    int y) const
 {
     // port of the event-window band math (update_event_windows,
     // main.c:3033-3107). A point resizes the window on the bands
@@ -420,7 +488,7 @@ uint32_t EmeraldLayout::resize_edges(const DecorContext &ctx, int x,
     // frame window, main.c:3451). Hit-test coordinates here are PORT frame
     // coords, where the shadow sits between the frame edge and the border.
     // Convert by subtracting the SHADOW SPREAD only (*_space - border):
-    //    shadow_left = left_space - (win_extents.left + extra_left)
+    // shadow_left = left_space - (win_extents.left + extra_left)
     // Subtracting the full *_space (the old code) shifted the bands into
     // the client / the shadow — the left border band landed inside the
     // client (invisible to the pointer: the client surface node wins the
@@ -428,19 +496,23 @@ uint32_t EmeraldLayout::resize_edges(const DecorContext &ctx, int x,
     // cursor while the bottom (still outside the client) did.
     const window_settings *ws = ctx.fs ? ctx.fs->ws : nullptr;
     if (!ws)
+    {
         return 0;
+    }
 
     int w = ctx.client_width;
     int h = ctx.client_height;
     if (ctx.state & EWS_SHADED)
+    {
         h = 0;
+    }
 
     const int shadow_left =
         ws->left_space - (ws->win_extents.left + ws->extra_extents.left);
     const int shadow_top =
         ws->top_space - (ws->win_extents.top + ws->extra_extents.top);
 
-    const int cx = x - shadow_left;      // original-frame coords
+    const int cx = x - shadow_left; // original-frame coords
     const int cy = y - shadow_top;
 
     uint32_t edges = 0;
@@ -451,8 +523,11 @@ uint32_t EmeraldLayout::resize_edges(const DecorContext &ctx, int x,
         {
             const pos_t p = band_table(ws, i, j);
             // region 5 (i==1, j==1) is the titlebar: move, not resize
-            if (i == 1 && j == 1)
+            if ((i == 1) && (j == 1))
+            {
                 continue;
+            }
+
             // Finding 31: emerald main.c update_event_windows — shaded:
             // height = 0; k = l = 1, i.e. ONLY the middle row's side bands
             // (left/right edges at the strip) are live. The original port
@@ -461,7 +536,9 @@ uint32_t EmeraldLayout::resize_edges(const DecorContext &ctx, int x,
             if (ctx.state & EWS_SHADED)
             {
                 if (i != 1)
+                {
                     continue;
+                }
             }
 
             int bx = p.x + p.xw * w;
@@ -473,44 +550,68 @@ uint32_t EmeraldLayout::resize_edges(const DecorContext &ctx, int x,
             // collapse to zero width (main.c:3086-3096)
             if (ctx.state & EWS_MAXIMIZED_HORIZONTALLY)
             {
-                if (j == 0 || j == 2)
+                if ((j == 0) || (j == 2))
+                {
                     bw = 0;
+                }
             }
+
             if (ctx.state & EWS_MAXIMIZED_VERTICALLY)
             {
-                if (i == 0 || i == 2)
+                if ((i == 0) || (i == 2))
+                {
                     bh = 0;
+                }
             }
 
-            if (bw == 0 || bh == 0)
+            if ((bw == 0) || (bh == 0))
+            {
                 continue;
-            if (cx < bx || cx >= bx + bw || cy < by || cy >= by + bh)
+            }
+
+            if ((cx < bx) || (cx >= bx + bw) || (cy < by) || (cy >= by + bh))
+            {
                 continue;
+            }
 
             if (i == 0)
+            {
                 edges |= EMERALDWF_EDGE_TOP;
+            }
+
             if (i == 2)
+            {
                 edges |= EMERALDWF_EDGE_BOTTOM;
+            }
+
             if (j == 0)
+            {
                 edges |= EMERALDWF_EDGE_LEFT;
+            }
+
             if (j == 2)
+            {
                 edges |= EMERALDWF_EDGE_RIGHT;
+            }
         }
     }
+
     return edges;
 }
 
 // Review F2 (-Wall): `x` is unused — the titlebar band spans the full
 // frame width (only the y range matters); unnamed in the definition,
 // named in the header.
-bool EmeraldLayout::in_titlebar(const DecorContext &ctx, int /*x*/, int y) const
+bool EmeraldLayout::in_titlebar(const DecorContext & ctx, int /*x*/, int y) const
 {
     // The titlebar band: from the top extent down to its full height
     // (t_ext_nott .. t_ext_nott + titlebar_height), spanning the frame
     // width. (emerald's region 5, main.c:387.)
     const window_settings *ws = ctx.fs ? ctx.fs->ws : nullptr;
     if (!ws)
+    {
         return false;
+    }
 
     int t_ext_nott = ws->top_space + ws->extra_extents.top;
     int t_ext = t_ext_nott + ws->titlebar_height;
@@ -518,7 +619,7 @@ bool EmeraldLayout::in_titlebar(const DecorContext &ctx, int /*x*/, int y) const
     return y >= t_ext_nott && y < t_ext;
 }
 
-int EmeraldLayout::cursor_region(const DecorContext &ctx, int x, int y) const
+int EmeraldLayout::cursor_region(const DecorContext & ctx, int x, int y) const
 {
     // 3x3 grid index 0..8 (port of the ws->pos[i][j] lookup used by
     // update_event_windows, main.c:3033+). Part 04 maps the index to a
@@ -527,15 +628,19 @@ int EmeraldLayout::cursor_region(const DecorContext &ctx, int x, int y) const
     // NOTE (finding 13): the band table is in ORIGINAL emerald FRAME coords
     // (see band_table). Hit-test coordinates are PORT frame coords, so
     // subtract the SHADOW SPREAD only (not the full *_space):
-    //    client_x = frame_x - shadow_left, client_y = frame_y - shadow_top.
+    // client_x = frame_x - shadow_left, client_y = frame_y - shadow_top.
     const window_settings *ws = ctx.fs ? ctx.fs->ws : nullptr;
     if (!ws)
+    {
         return 4;
+    }
 
     int w = ctx.client_width;
     int h = ctx.client_height;
     if (ctx.state & EWS_SHADED)
+    {
         h = 0;
+    }
 
     const int shadow_left =
         ws->left_space - (ws->win_extents.left + ws->extra_extents.left);
@@ -554,10 +659,15 @@ int EmeraldLayout::cursor_region(const DecorContext &ctx, int x, int y) const
             int by = p.y + p.yh * h;
             int bw = p.w + p.ww * w;
             int bh = p.h + p.hh * h;
-            if (bw == 0 || bh == 0)
+            if ((bw == 0) || (bh == 0))
+            {
                 continue;
-            if (cx >= bx && cx < bx + bw && cy >= by && cy < by + bh)
+            }
+
+            if ((cx >= bx) && (cx < bx + bw) && (cy >= by) && (cy < by + bh))
+            {
                 return i * 3 + j;
+            }
         }
     }
 
@@ -573,17 +683,16 @@ int EmeraldLayout::cursor_region(const DecorContext &ctx, int x, int y) const
     return row * 3 + col;
 }
 
-int EmeraldLayout::double_click_action(const DecorContext &ctx) const
+int EmeraldLayout::double_click_action(const DecorContext & ctx) const
 {
     const window_settings *ws = ctx.fs ? ctx.fs->ws : nullptr;
     return ws ? ws->double_click_action : 0;
 }
 
-int EmeraldLayout::middle_click_action(const DecorContext &ctx) const
+int EmeraldLayout::middle_click_action(const DecorContext & ctx) const
 {
     const window_settings *ws = ctx.fs ? ctx.fs->ws : nullptr;
     return ws ? ws->middle_click_action : 0;
 }
-
 } // namespace emeraldwf
 } // namespace wf

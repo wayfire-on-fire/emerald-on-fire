@@ -37,7 +37,7 @@
 #include <wayfire/scene-render.hpp>
 #include <wayfire/util/duration.hpp>
 
-#include "emerald-decorator.hpp"  // real wayfire_toplevel_view type
+#include "emerald-decorator.hpp" // real wayfire_toplevel_view type
 
 namespace wf
 {
@@ -58,8 +58,8 @@ constexpr char SHADE_TRANSFORMER_NAME[] = "emeraldwf-shade";
 class ShadeState : public simple_animation_t
 {
   public:
-    ShadeState()
-        : ShadeState(nullptr)
+    ShadeState() :
+        ShadeState(nullptr)
     {}
 
     // Finding 22: the emeraldwf/shade_duration option must drive the
@@ -69,47 +69,49 @@ class ShadeState : public simple_animation_t
     // `timed_transition_t` has a `duration` member.
     explicit ShadeState(
         std::shared_ptr<wf::config::option_t<wf::animation_description_t>>
-            duration_opt)
-        : simple_animation_t(duration_opt)
+        duration_opt) :
+        simple_animation_t(duration_opt)
     {
         // Initialize the progression transition (0 → 1).
         set(0.0, 1.0);
     }
 
     // Pixdecor semantics (pixdecor shade.hpp init_animation):
-    //   - same direction as before  → no-op (already animating there)
-    //   - running                   → reverse (mid-animation flip)
-    //   - idle with wrong direction → reverse, then start
-    //   - idle with right direction → just start
+    // - same direction as before  → no-op (already animating there)
+    // - running                   → reverse (mid-animation flip)
+    // - idle with wrong direction → reverse, then start
+    // - idle with right direction → just start
     // After the call `last_direction` always equals @shade.
     void init_animation(bool shade)
     {
         if (shade == last_direction)
+        {
             return;
+        }
 
         if (running())
         {
             reverse();
-        }
-        else
+        } else
         {
             if ((shade && !get_direction()) ||
                 (!shade && get_direction()))
             {
                 reverse();
             }
+
             duration_t::start();
         }
 
         last_direction = shade;
     }
 
-    double get_progression() const  // 0 = unshaded, 1 = fully shaded
+    double get_progression() const // 0 = unshaded, 1 = fully shaded
     {
         return operator double();
     }
 
-    bool get_shade_direction() const  // true = currently shaded
+    bool get_shade_direction() const // true = currently shaded
     {
         return last_direction;
     }
@@ -122,7 +124,7 @@ class emerald_shade_t : public wf::scene::view_2d_transformer_t
   public:
     emerald_shade_t(::wayfire_toplevel_view view, int strip_h,
         std::shared_ptr<wf::config::option_t<wf::animation_description_t>>
-            duration);
+        duration);
     ~emerald_shade_t() override;
 
     // The strip height in view-bounding-box coords (see ctor).
@@ -134,15 +136,16 @@ class emerald_shade_t : public wf::scene::view_2d_transformer_t
     // shadow may start below the titlebar's lower edge). 0 (the default)
     // reproduces the legacy top-strip-only fold.
     void set_bottom_strip_h(int h);
-    void init_animation(bool shade);      // animate to 1.0 (shaded) / 0.0
+    void init_animation(bool shade); // animate to 1.0 (shaded) / 0.0
     // Finding 26: defined inline (here, not emerald-shade.cpp) so the
     // headless-compiled emerald-decorator.cpp can read the progression in
     // make_margins_input() without linking the scene TU.
-    double get_progression() const       // 0 = unshaded, 1 = fully shaded
+    double get_progression() const // 0 = unshaded, 1 = fully shaded
     {
         return state.get_progression();
     }
-    bool get_direction() const           // true = currently shaded
+
+    bool get_direction() const // true = currently shaded
     {
         return state.get_shade_direction();
     }
@@ -185,11 +188,11 @@ class emerald_shade_t : public wf::scene::view_2d_transformer_t
         // Review F2 (-Wshadow): parameter named `owner` — the member it
         // initializes is named `self`.
         shade_render_instance_t(emerald_shade_t *owner,
-                                damage_callback push_damage,
-                                wf::output_t *shown_on)
-            : wf::scene::transformer_render_instance_t<
-                  wf::scene::transformer_base_node_t>(owner, push_damage,
-                  shown_on)
+            damage_callback push_damage,
+            wf::output_t *shown_on) :
+            wf::scene::transformer_render_instance_t<
+                wf::scene::transformer_base_node_t>(owner, push_damage,
+                shown_on)
         {
             this->self = owner;
             this->push_to_parent = push_damage;
@@ -201,10 +204,10 @@ class emerald_shade_t : public wf::scene::view_2d_transformer_t
             const wf::render_target_t& target, wf::regionf_t& damage)
         {
             instructions.push_back(render_instruction_t{
-                .instance = this,
-                .target   = target,
-                .damage   = damage & self->get_bounding_box(),
-            });
+                        .instance = this,
+                        .target   = target,
+                        .damage   = damage & self->get_bounding_box(),
+                    });
         }
 
         void render(const wf::scene::render_instruction_t& data)
@@ -235,15 +238,21 @@ class emerald_shade_t : public wf::scene::view_2d_transformer_t
             // keeps the three bands disjoint; the shift + scissor together
             // produce the roll-up. (Same technique as the pre-fix client
             // fold — orientation-agnostic, no subtexture selection.)
-            auto draw_band = [&](int dy, int dh, int band_shift)
+            auto draw_band = [&] (int dy, int dh, int band_shift)
             {
                 if (dh <= 0)
+                {
                     return;
+                }
+
                 auto region = data.damage;
                 region &= wf::geometry_t{full_box.x, full_box.y + dy,
-                                         full_box.width, (double)dh};
+                    full_box.width, (double)dh};
                 if (region.empty())
+                {
                     return;
+                }
+
                 wf::gles::run_in_context([&]
                 {
                     wf::gles::bind_render_buffer(data.target);
@@ -255,9 +264,9 @@ class emerald_shade_t : public wf::scene::view_2d_transformer_t
                             OpenGL::render_transformed_texture(
                                 wf::gles_texture_t{src_tex},
                                 {float(full_box.x),
-                                 float(full_box.y - band_shift),
-                                 float(full_box.x + full_box.width),
-                                 float(full_box.y + H - band_shift)}, {},
+                                    float(full_box.y - band_shift),
+                                    float(full_box.x + full_box.width),
+                                    float(full_box.y + H - band_shift)}, {},
                                 wf::gles::render_target_orthographic_projection(data.target),
                                 glm::vec4(1.0), 0);
                         });
@@ -270,9 +279,9 @@ class emerald_shade_t : public wf::scene::view_2d_transformer_t
             // 2. Client (middle) [top, top + mid): folds up.
             draw_band(top, mid, shift);
             // 3. Bottom shadow [top + mid, top + mid + bot): moved up to sit
-            //    right below the collapsed client — the frame's bottom
-            //    SHADOW band (border excluded) becomes the soft glow under
-            //    the titlebar of the shaded window.
+            // right below the collapsed client — the frame's bottom
+            // SHADOW band (border excluded) becomes the soft glow under
+            // the titlebar of the shaded window.
             draw_band(top + mid, bot, shift);
         }
     };
@@ -293,8 +302,8 @@ class emerald_shade_t : public wf::scene::view_2d_transformer_t
     {
         auto bbox = this->get_children_bounding_box();
         const double p = get_progression();
-        const int top = strip_h;
-        const int bot = bottom_strip_h;
+        const int top  = strip_h;
+        const int bot  = bottom_strip_h;
         const int mid0 = std::max(0, (int)bbox.height - top - bot);
         const int mid  = (int)(mid0 * (1.0 - p));
         // Visible height = the three bands: top strip + collapsed client +
@@ -323,6 +332,5 @@ class emerald_shade_t : public wf::scene::view_2d_transformer_t
     // re-install it for any subsequent animation.
     bool tick_installed_ = false;
 };
-
 } // namespace emeraldwf
 } // namespace wf

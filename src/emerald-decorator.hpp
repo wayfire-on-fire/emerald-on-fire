@@ -44,8 +44,8 @@ constexpr bool scroll_shades(double delta)
 // declares the enum. Declared here (not in emerald-types.hpp) so the
 // signature can reference wf::toplevel_state_t without pulling wayfire
 // into the frozen contract.
-EmeraldWindowState emerald_state_from_view(const wf::toplevel_state_t &state,
-                                           bool sticky);
+EmeraldWindowState emerald_state_from_view(const wf::toplevel_state_t & state,
+    bool sticky);
 } // namespace emeraldwf
 } // namespace wf
 
@@ -53,14 +53,12 @@ namespace wf
 {
 namespace emeraldwf
 {
-
-class emerald_node_t;    // fwd — implemented by Part 04
-class emerald_shade_t;   // fwd — implemented by Part 05
+class emerald_node_t; // fwd — implemented by Part 04
+class emerald_shade_t; // fwd — implemented by Part 05
 
 /**
- * Plain input struct for the margin function.
- * Decouples the pure margin math from a live wayfire view so it can be
- * tested headlessly (tests/test_margins.cpp).
+ * Plain input struct for the margin function. Decouples the pure margin math from a live wayfire view so it
+ * can be tested headlessly (tests/test_margins.cpp).
  */
 struct MarginsInput
 {
@@ -88,10 +86,10 @@ struct MarginsInput
     bool maximized_shadows = true;
 
     // View state (from toplevel->pending())
-    bool     fullscreen  = false;
-    uint32_t tiled_edges = 0;  // WLR_EDGE_* bitmask
+    bool fullscreen = false;
+    uint32_t tiled_edges = 0; // WLR_EDGE_* bitmask
 
-    bool csd = false;  // view->should_be_decorated() == false
+    bool csd = false; // view->should_be_decorated() == false
 };
 
 // Finding 54: the app's committed size is the ground truth. XDG apps can
@@ -114,7 +112,10 @@ struct MarginsInput
 inline int update_observed_min(int live_min, int adopted_client, int last_requested)
 {
     if (adopted_client > last_requested)
+    {
         return std::max(live_min, adopted_client);
+    }
+
     return live_min;
 }
 
@@ -135,21 +136,21 @@ class emerald_decorator_t : public wf::custom_data_t
 {
   public:
     emerald_decorator_t(::wayfire_toplevel_view view,
-                        std::shared_ptr<const ThemeSettings> theme);
+        std::shared_ptr<const ThemeSettings> theme);
     ~emerald_decorator_t();
 
     // ── Full implementation in Part 01 (pure, testable) ─────────────────────
     // Negotiates frame margins exactly per overview D8.
-    wf::decoration_margins_t get_margins(const wf::toplevel_state_t &state) const;
+    wf::decoration_margins_t get_margins(const wf::toplevel_state_t & state) const;
     int                      get_titlebar_height() const;
     bool                     is_csd() const;
 
     // Pure margin math over a plain struct — extracted for headless tests.
-    static wf::decoration_margins_t margins_for(const MarginsInput &in);
+    static wf::decoration_margins_t margins_for(const MarginsInput & in);
 
     // ── Implemented by Part 04 (node attach/detach, redraw, geometry) ──────
-    void attach_node();          // contract: implemented by part 04
-    void detach_node();         // contract: implemented by part 04
+    void attach_node(); // contract: implemented by part 04
+    void detach_node(); // contract: implemented by part 04
     // part 06 finding 16: pure decision used by detach_node() — may
     // remove_child(node) be called? Only when node's parent is exactly
     // the surface root the node was attached to. Both arguments are raw
@@ -162,7 +163,7 @@ class emerald_decorator_t : public wf::custom_data_t
         wf::scene::floating_inner_node_t *sroot);
     void on_geometry_changed(); // contract: implemented by part 04
     void on_activated_changed(); // contract: implemented by part 04
-    void on_theme_changed();    // contract: implemented by part 04
+    void on_theme_changed(); // contract: implemented by part 04
 
     // ── Implemented by Part 05 (shade) ──────────────────────────────────────
     // Implemented in emerald-decorator-shade.cpp (kept separate from
@@ -202,7 +203,7 @@ class emerald_decorator_t : public wf::custom_data_t
 
     // Populates a MarginsInput from the theme + a live toplevel state.
     // Used by get_margins().
-    MarginsInput make_margins_input(const wf::toplevel_state_t &state) const;
+    MarginsInput make_margins_input(const wf::toplevel_state_t & state) const;
 
     // The UNSHADED client height for the pending frame geometry
     // (frame height − top margin − unshaded bottom margin). Feeds the CSD
@@ -214,7 +215,7 @@ class emerald_decorator_t : public wf::custom_data_t
     // Overview §5.2: `DecorContext &ctx()` — accessor to the decorator's
     // DecorContext (stored in the private member `decor_ctx` to avoid a
     // member/function name clash).
-    DecorContext &ctx();
+    DecorContext& ctx();
 
     // ── Part 04 helpers used by the scene node ──────────────────────────────
     // The live toplevel view (null if the decorator has no view).
@@ -234,8 +235,7 @@ class emerald_decorator_t : public wf::custom_data_t
 
     // Part 05 (spec 05 §2): the plugin registers this option; the shade
     // transformer + margin math read it. Null until the plugin sets it.
-    std::shared_ptr<wf::config::option_t<wf::animation_description_t>>
-        shade_duration_opt() const;
+    std::shared_ptr<wf::config::option_t<wf::animation_description_t>> shade_duration_opt() const;
     void set_shade_duration_opt(
         std::shared_ptr<wf::config::option_t<wf::animation_description_t>> opt);
     // Finding 23: mirror of the plugin's enable_shade option (see above).
@@ -249,7 +249,7 @@ class emerald_decorator_t : public wf::custom_data_t
     wf::signal::connection_t<wf::view_activated_state_signal> on_view_activated;
 
   private:
-    ::wayfire_toplevel_view              view;
+    ::wayfire_toplevel_view view;
     // part 06 finding 16: liveness of the view. `view` is an observer_ptr
     // (non-owning); when the view dies it dangles. weak_view lets
     // view_for_offsets() report "dead" instead of handing out a dangling
@@ -263,8 +263,8 @@ class emerald_decorator_t : public wf::custom_data_t
     // shared_from_this() needs no RTTI. Liveness is identical (same object).
     std::weak_ptr<wf::view_interface_t> weak_view;
     std::shared_ptr<const ThemeSettings> theme;
-    DecorContext                         decor_ctx;
-    std::shared_ptr<emerald_node_t>      node;  // Part 04
+    DecorContext decor_ctx;
+    std::shared_ptr<emerald_node_t> node; // Part 04
     // part 06 finding 16: the surface root the node was attached to.
     // detach_node() must only remove_child(node) when node's parent is
     // STILL this live node — in the destruction order where the view's
@@ -275,38 +275,38 @@ class emerald_decorator_t : public wf::custom_data_t
 
     // Part 05: shade animation duration (set by the plugin).
     std::shared_ptr<wf::config::option_t<wf::animation_description_t>>
-        shade_duration_opt_;
+    shade_duration_opt_;
     // Finding 23: the plugin's enable_shade option, published here so the
     // node-level shade entry points (titlebar scroll, click actions) honor
     // it — the plugin-side checks only cover IPC + the global wheel
     // binding.
-    bool enable_shade_ = true;
-    int                                  titlebar_height = 17;
+    bool enable_shade_  = true;
+    int titlebar_height = 17;
     // Finding 19: plugin options (defaults match emerald's maximized behavior
     // of keeping the full border + shadow).
-    bool                                 maximized_borders_ = true;
-    bool                                 maximized_shadows_ = true;
+    bool maximized_borders_ = true;
+    bool maximized_shadows_ = true;
     // Finding 54: the app's observed min client height (its real floor —
     // invisible via get_min_size() on XDG). See update_observed_min().
     // Persisted across cycles: once observed, the cap keeps requesting
     // sizes the app honors, so the frame stops drifting.
-    int                                  live_min_client_h_ = 0;
+    int live_min_client_h_ = 0;
     // Finding 54: the client height the plugin last requested (for the
     // adopted-vs-requested comparison in update_observed_min()).
-    int                                  last_requested_client_h_ = 0;
+    int last_requested_client_h_ = 0;
     // Finding 54: the last smoothed progress, to tell the animation
     // direction. The floor is only recorded while heading TOWARD full
     // shade (progress rising): during unshade the app follows the growing
     // requests, and a client-initiated grow (adopted > requested while
     // progress is falling) is not a floor — recording it would permanently
     // cap the collapse depth to the grown size.
-    double                               last_shade_progress_ = 0.0;
+    double last_shade_progress_ = 0.0;
     // Finding 54: the frame geometry at the start of the shade animation.
     // When the unshade settles, pending geometry is restored to it: during
     // the shade the app may have committed a size larger than requested
     // (its own minimum) and wayfire adopted that into the frame — without
     // the restore the window would keep the grown size.
-    wf::geometry_t                       shade_ref_geom_{};
+    wf::geometry_t shade_ref_geom_{};
     // True once shade_ref_geom_ has been captured (toggle_shade). The
     // restore in on_shade_progress() must be skipped until then: for a
     // never-shaded window shade_ref_geom_ is the default {} and an
@@ -314,8 +314,7 @@ class emerald_decorator_t : public wf::custom_data_t
     // on_shade_progress(0.0) reset) would zero the window's geometry.
     // Cleared after the settle-restore so a later reset cannot restore a
     // STALE reference (the window may have been resized in the meantime).
-    bool                                 has_shade_ref_ = false;
+    bool has_shade_ref_ = false;
 };
-
 } // namespace emeraldwf
 } // namespace wf

@@ -23,7 +23,7 @@
 #include "emerald-file-stamp.hpp"
 #include "emerald-settings.hpp"
 // Review R2: fixture paths forwarded by meson (configure_file) — the
-// /proc/self/exe heuristic broke for out-of-tree builds, where the engine
+///proc/self/exe heuristic broke for out-of-tree builds, where the engine
 // .so's live in <builddir>/engines, not <srcroot>/build/engines.
 #include "test-paths.h"
 
@@ -48,8 +48,8 @@ class SettingsTest : public ::testing::Test
     void SetUp() override
     {
         tmp_dir_ = fs::temp_directory_path() /
-                   (fs::path("emeraldwf-test") /
-                    std::to_string(::getpid()));
+            (fs::path("emeraldwf-test") /
+                std::to_string(::getpid()));
         fs::create_directories(tmp_dir_ / "theme");
     }
 
@@ -66,7 +66,7 @@ TEST_F(SettingsTest, DefaultSettings)
     // Point at the vendored defaults.
     ThemeSettings ts;
     bool ok = ts.load(defaults_dir() + "/settings.ini",
-                      defaults_dir() + "/theme");
+        defaults_dir() + "/theme");
     ASSERT_TRUE(ok) << "load() failed on the vendored defaults";
     EXPECT_TRUE(ts.valid());
 
@@ -74,9 +74,9 @@ TEST_F(SettingsTest, DefaultSettings)
     ASSERT_NE(ws, nullptr);
 
     // settings.ini core
-    EXPECT_EQ(ws->double_click_action, 0);      // DOUBLE_CLICK_SHADE
-    EXPECT_EQ(ws->middle_click_action, 3);      // DOUBLE_CLICK_SEND_TO_BACK
-    EXPECT_EQ(ws->blur_type, 0);                // BLUR_TYPE_NONE
+    EXPECT_EQ(ws->double_click_action, 0); // DOUBLE_CLICK_SHADE
+    EXPECT_EQ(ws->middle_click_action, 3); // DOUBLE_CLICK_SEND_TO_BACK
+    EXPECT_EQ(ws->blur_type, 0); // BLUR_TYPE_NONE
     // Part 08: use_decoration_cropping / use_button_fade are WCM-owned —
     // the loader leaves them untouched (the plugin applies the WCM values
     // after load; see LoaderLeavesWcmOwnedKeysUntouched).
@@ -118,8 +118,8 @@ TEST_F(SettingsTest, TitlebarFont_ComesFromThemeIni)
 {
     ThemeSettings ts;
     ASSERT_TRUE(ts.load(defaults_dir() + "/settings.ini",
-                        defaults_dir() + "/theme"))
-        << "load() failed on the vendored defaults";
+        defaults_dir() + "/theme")) <<
+        "load() failed on the vendored defaults";
     window_settings *ws = ts.ws();
 
     // The default theme pins titlebar_font=Bitstream Vera Sans Bold 9.
@@ -141,7 +141,7 @@ TEST_F(SettingsTest, TitlebarFont_DefaultsToSans10WhenAbsent)
 
     ThemeSettings ts;
     ASSERT_TRUE(ts.load((tmp_dir_ / "settings.ini").string(),
-                        (tmp_dir_ / "theme").string()));
+        (tmp_dir_ / "theme").string()));
     window_settings *ws = ts.ws();
 
     ASSERT_NE(ws->font_desc, nullptr);
@@ -163,7 +163,7 @@ TEST_F(SettingsTest, CustomTheme)
 
     ThemeSettings ts;
     bool ok = ts.load((tmp_dir_ / "settings.ini").string(),
-                      (tmp_dir_ / "theme").string());
+        (tmp_dir_ / "theme").string());
     ASSERT_TRUE(ok);
 
     EXPECT_EQ(ts.engine(), "truglass");
@@ -183,14 +183,14 @@ TEST_F(SettingsTest, MissingThemeDir)
     // Nonexistent theme dir -> defaults copied.
     ThemeSettings ts;
     bool ok = ts.load((tmp_dir_ / "settings.ini").string(),
-                      (tmp_dir_ / "theme").string());
+        (tmp_dir_ / "theme").string());
     ASSERT_TRUE(ok);
 
     // theme.ini must now exist (copied from defaults)
     EXPECT_TRUE(fs::exists(tmp_dir_ / "theme" / "theme.ini"));
     EXPECT_TRUE(fs::exists(tmp_dir_ / "theme" / "buttons.close.png"));
-    EXPECT_EQ(ts.engine(), "vrunner")
-        << "vendored default theme.ini sets engine=vrunner";
+    EXPECT_EQ(ts.engine(), "vrunner") <<
+        "vendored default theme.ini sets engine=vrunner";
 }
 
 // ── Part 07 (emerald-theme-manager): engine precedence ─────────────────────
@@ -217,9 +217,9 @@ TEST_F(SettingsTest, ThemeEngineUsedWhenOverrideEmpty)
 
     ThemeSettings ts;
     ASSERT_TRUE(ts.load((tmp_dir_ / "settings.ini").string(),
-                        (tmp_dir_ / "theme").string()));
-    EXPECT_EQ(ts.engine(), "truglass")
-        << "no override: the theme's own engine is used";
+        (tmp_dir_ / "theme").string()));
+    EXPECT_EQ(ts.engine(), "truglass") <<
+        "no override: the theme's own engine is used";
 }
 
 TEST_F(SettingsTest, EngineOverrideMatchAppliesTheme)
@@ -238,11 +238,11 @@ TEST_F(SettingsTest, EngineOverrideMatchAppliesTheme)
     // override == the theme's engine → identical to no override: theme applies.
     ThemeSettings ts;
     ASSERT_TRUE(ts.load((tmp_dir_ / "settings.ini").string(),
-                        (tmp_dir_ / "theme").string(), "vrunner"));
+        (tmp_dir_ / "theme").string(), "vrunner"));
     EXPECT_EQ(ts.engine(), "vrunner");
     EXPECT_NEAR(ts.ws()->fs_act->text.color.r, 0.0, 1e-6);
-    EXPECT_NEAR(ts.ws()->fs_act->text.color.g, 1.0, 1e-6)
-        << "theme colors must apply when the override matches the theme";
+    EXPECT_NEAR(ts.ws()->fs_act->text.color.g, 1.0, 1e-6) <<
+        "theme colors must apply when the override matches the theme";
 }
 
 // Regression: a mismatched override must NOT run on the theme's foreign
@@ -265,22 +265,22 @@ TEST_F(SettingsTest, EngineOverrideMismatchRunsDefaultTheme)
 
     ThemeSettings ts;
     ASSERT_TRUE(ts.load((tmp_dir_ / "settings.ini").string(),
-                        (tmp_dir_ / "theme").string(), "truglass"));
-    EXPECT_EQ(ts.engine(), "truglass")
-        << "an explicit override selects the engine";
+        (tmp_dir_ / "theme").string(), "truglass"));
+    EXPECT_EQ(ts.engine(), "truglass") <<
+        "an explicit override selects the engine";
     // Default theme values, NOT the user theme's:
-    EXPECT_NEAR(ts.ws()->fs_act->text.color.r, 1.0, 1e-6)
-        << "theme colors must NOT apply to a mismatched engine "
-           "(default theme text is white, the user theme is green)";
-    EXPECT_NEAR(ts.ws()->shadow_radius, 11.5, 1e-6)
-        << "the default theme's shadow (11.5) must apply, not the "
-           "user theme's (42) or the struct default (15)";
-    EXPECT_EQ(ts.ws()->min_titlebar_height, 18)
-        << "the default theme's min height (18) must apply, not the "
-           "user theme's (99)";
-    EXPECT_STREQ(ts.ws()->tobj_layout, "I(30):T:N(2)X(2)C:")
-        << "the default theme's layout must apply, not the user "
-           "theme's";
+    EXPECT_NEAR(ts.ws()->fs_act->text.color.r, 1.0, 1e-6) <<
+        "theme colors must NOT apply to a mismatched engine "
+        "(default theme text is white, the user theme is green)";
+    EXPECT_NEAR(ts.ws()->shadow_radius, 11.5, 1e-6) <<
+        "the default theme's shadow (11.5) must apply, not the "
+        "user theme's (42) or the struct default (15)";
+    EXPECT_EQ(ts.ws()->min_titlebar_height, 18) <<
+        "the default theme's min height (18) must apply, not the "
+        "user theme's (99)";
+    EXPECT_STREQ(ts.ws()->tobj_layout, "I(30):T:N(2)X(2)C:") <<
+        "the default theme's layout must apply, not the user "
+        "theme's";
 }
 
 TEST_F(SettingsTest, EngineOverrideAppliesWhenThemeUnpinned)
@@ -296,10 +296,10 @@ TEST_F(SettingsTest, EngineOverrideAppliesWhenThemeUnpinned)
 
     ThemeSettings ts;
     ASSERT_TRUE(ts.load((tmp_dir_ / "settings.ini").string(),
-                        (tmp_dir_ / "theme").string(), "vrunner"));
+        (tmp_dir_ / "theme").string(), "vrunner"));
     EXPECT_EQ(ts.engine(), "vrunner");
-    EXPECT_NEAR(ts.ws()->fs_act->text.color.g, 1.0, 1e-6)
-        << "theme colors apply to a theme that does not pin an engine";
+    EXPECT_NEAR(ts.ws()->fs_act->text.color.g, 1.0, 1e-6) <<
+        "theme colors apply to a theme that does not pin an engine";
 }
 
 TEST_F(SettingsTest, EnginesLoad)
@@ -310,10 +310,10 @@ TEST_F(SettingsTest, EnginesLoad)
         "zootreeves", "pixmap", "line"};
 
     const std::string engine_dir = EMERALDWF_TEST_ENGINE_DIR;
-    for (const auto &name : engines)
+    for (const auto & name : engines)
     {
-        EXPECT_TRUE(emerald_engine_load(name, engine_dir))
-            << "engine " << name << " failed to load from " << engine_dir;
+        EXPECT_TRUE(emerald_engine_load(name, engine_dir)) <<
+            "engine " << name << " failed to load from " << engine_dir;
         emerald_engine_unload();
     }
 }
@@ -362,32 +362,35 @@ static int sliver_l(const window_settings *ws)
 {
     return ws->left_space - ws->win_extents.left;
 }
+
 static int sliver_t(const window_settings *ws)
 {
     return ws->top_space - ws->win_extents.top;
 }
+
 static int sliver_w(const window_settings *ws, int tex_w)
 {
     return tex_w - ws->left_space - ws->right_space + ws->win_extents.left +
-        ws->win_extents.right;
+           ws->win_extents.right;
 }
+
 static int sliver_h(const window_settings *ws, int tex_h)
 {
     return tex_h - ws->top_space - ws->bottom_space + ws->win_extents.top +
-        ws->win_extents.bottom;
+           ws->win_extents.bottom;
 }
 
 TEST_F(SettingsTest, ShadowTexture_GeneratedForShadowedTheme)
 {
     ThemeSettings ts;
     ASSERT_TRUE(ts.load(defaults_dir() + "/settings.ini",
-                        defaults_dir() + "/theme"));
+        defaults_dir() + "/theme"));
     window_settings *ws = ts.ws();
 
     // The default theme enables a shadow (radius 11.5, opacity 0.8).
     EXPECT_GT(ws->shadow_radius, 0.0);
-    ASSERT_NE(ws->large_shadow_surface, nullptr)
-        << "shadow texture not generated";
+    ASSERT_NE(ws->large_shadow_surface, nullptr) <<
+        "shadow texture not generated";
     ASSERT_NE(ws->shadow_pattern, nullptr);
 
     // Content size: the full reference frame, with the sliver at the
@@ -400,9 +403,10 @@ TEST_F(SettingsTest, ShadowTexture_GeneratedForShadowedTheme)
     const int stride =
         cairo_image_surface_get_stride(ws->large_shadow_surface);
     const unsigned char *data =
-        (const unsigned char *)
-            cairo_image_surface_get_data(ws->large_shadow_surface);
-    auto alpha_at = [&](int x, int y) {
+        (const unsigned char*)
+        cairo_image_surface_get_data(ws->large_shadow_surface);
+    auto alpha_at = [&] (int x, int y)
+    {
         return data[y * stride + x * 4 + 3];
     };
     // Dense core: where the 2*size box sits fully inside the (offset)
@@ -412,10 +416,10 @@ TEST_F(SettingsTest, ShadowTexture_GeneratedForShadowedTheme)
     const int size = (int)(ws->shadow_radius * 2 + 2) / 2;
     const unsigned char max_a =
         alpha_at(sliver_l(ws) + ws->shadow_offset_x + size + 1,
-                 sliver_t(ws) + ws->shadow_offset_y + size + 1);
+            sliver_t(ws) + ws->shadow_offset_y + size + 1);
     EXPECT_GE(max_a,
-              (unsigned char)(ws->shadow_opacity * 255.0 * 0.9))
-        << "no dense core in the shadow texture";
+        (unsigned char)(ws->shadow_opacity * 255.0 * 0.9)) <<
+        "no dense core in the shadow texture";
 }
 
 // ── Drop-shadow geometry (the silhouette — the engine-rendered frame's
@@ -432,11 +436,11 @@ TEST_F(SettingsTest, ShadowTexture_GeneratedForShadowedTheme)
 // Re-runs update_shadow + texture generation for modified radius/offsets
 // (update_shadow is exported so tests drive the derived state directly
 // instead of duplicating the arithmetic).
-static void regrow_shadow(ThemeSettings &ts, double radius, int offset_x,
-                          int offset_y)
+static void regrow_shadow(ThemeSettings & ts, double radius, int offset_x,
+    int offset_y)
 {
     window_settings *ws = ts.ws();
-    ws->shadow_radius = radius;
+    ws->shadow_radius   = radius;
     ws->shadow_offset_x = offset_x;
     ws->shadow_offset_y = offset_y;
     update_shadow(ts.fs_active());
@@ -446,7 +450,7 @@ static void regrow_shadow(ThemeSettings &ts, double radius, int offset_x,
 static unsigned char alpha_at(cairo_surface_t *s, int x, int y)
 {
     const unsigned char *data =
-        (const unsigned char *)cairo_image_surface_get_data(s);
+        (const unsigned char*)cairo_image_surface_get_data(s);
     return data[cairo_image_surface_get_stride(s) * y + 4 * x + 3];
 }
 
@@ -454,7 +458,7 @@ TEST_F(SettingsTest, ShadowTexture_DropShadowFallsDownward)
 {
     ThemeSettings ts;
     ASSERT_TRUE(ts.load(defaults_dir() + "/settings.ini",
-                        defaults_dir() + "/theme"));
+        defaults_dir() + "/theme"));
     window_settings *ws = ts.ws();
 
     // radius 4 -> size 5; offset_y = size shifts the silhouette a full size
@@ -463,8 +467,8 @@ TEST_F(SettingsTest, ShadowTexture_DropShadowFallsDownward)
     cairo_surface_t *tex = ws->large_shadow_surface;
     const int h = cairo_image_surface_get_height(tex);
 
-    EXPECT_EQ(ws->shadow_top_space, 0)
-        << "a full-size downward offset must leave no shadow space above";
+    EXPECT_EQ(ws->shadow_top_space, 0) <<
+        "a full-size downward offset must leave no shadow space above";
     EXPECT_EQ(ws->shadow_bottom_space, 10);
 
     const int size = (int)(ws->shadow_radius * 2 + 2) / 2;
@@ -474,29 +478,31 @@ TEST_F(SettingsTest, ShadowTexture_DropShadowFallsDownward)
 
     // The dense edge sits exactly (sliver_t + offset_y + size) below the
     // texture's top; the row just above it is already substantial.
-    EXPECT_GE(alpha_at(tex, x, sl_t + ws->shadow_offset_y + size), 200)
-        << "no dense core at the dense edge";
+    EXPECT_GE(alpha_at(tex, x, sl_t + ws->shadow_offset_y + size), 200) <<
+        "no dense core at the dense edge";
     EXPECT_GT(alpha_at(tex, x, sl_t + ws->shadow_offset_y + size - 1), 150);
     // Nothing above the window's top edge (sliver_t rows) is dense: with a
     // full-size offset the window top is at the texture top, so row 0 is
     // the (occluded) fade tail, not the core.
     for (int y = 0; y < sl_t; y++)
-        EXPECT_LT(alpha_at(tex, x, y), 200)
-            << "dense shadow above the window's top edge";
+    {
+        EXPECT_LT(alpha_at(tex, x, y), 200) <<
+            "dense shadow above the window's top edge";
+    }
 
     // The outward fade reaches the reserved spread's edge: the spread is
     // size + offset, the fade needs `size` past the shifted sliver edge
     // (sliver_t + sliver_h + offset_y + size rows = the texture's bottom
     // edge exactly).
-    EXPECT_GT(alpha_at(tex, x, h - 1), 0)
-        << "the fade must reach the reserved spread's edge";
+    EXPECT_GT(alpha_at(tex, x, h - 1), 0) <<
+        "the fade must reach the reserved spread's edge";
 }
 
 TEST_F(SettingsTest, ShadowTexture_DropShadowFallsRightward)
 {
     ThemeSettings ts;
     ASSERT_TRUE(ts.load(defaults_dir() + "/settings.ini",
-                        defaults_dir() + "/theme"));
+        defaults_dir() + "/theme"));
     window_settings *ws = ts.ws();
 
     // radius 4 -> size 5; offset_x = size shifts the silhouette a full size
@@ -505,42 +511,44 @@ TEST_F(SettingsTest, ShadowTexture_DropShadowFallsRightward)
     cairo_surface_t *tex = ws->large_shadow_surface;
     const int w = cairo_image_surface_get_width(tex);
 
-    EXPECT_EQ(ws->shadow_left_space, 0)
-        << "a full-size rightward offset must leave no shadow space on the "
+    EXPECT_EQ(ws->shadow_left_space, 0) <<
+        "a full-size rightward offset must leave no shadow space on the "
         "left";
     EXPECT_EQ(ws->shadow_right_space, 10);
 
     const int size = (int)(ws->shadow_radius * 2 + 2) / 2;
     const int sl_t = sliver_t(ws);
-    const int sl = sliver_l(ws);
+    const int sl   = sliver_l(ws);
     // Sample in the dense core's y range.
     const int y = sl_t + ws->shadow_offset_y + size + 1;
 
     // The dense edge sits exactly (sliver_l + offset_x + size) right of the
     // texture's left; the column just left of it is already substantial.
-    EXPECT_GE(alpha_at(tex, sl + ws->shadow_offset_x + size, y), 200)
-        << "no dense core at the dense edge";
+    EXPECT_GE(alpha_at(tex, sl + ws->shadow_offset_x + size, y), 200) <<
+        "no dense core at the dense edge";
     EXPECT_GT(
         alpha_at(tex, sl + ws->shadow_offset_x + size - 1, y), 150);
     // Nothing left of the window's left edge (sliver_l columns) is dense:
     // with a full-size offset the window left is at the texture left, so
     // column 0 is the (occluded) fade tail, not the core.
     for (int xx = 0; xx < sl; xx++)
-        EXPECT_LT(alpha_at(tex, xx, y), 200)
-            << "dense shadow left of the window's left edge";
+    {
+        EXPECT_LT(alpha_at(tex, xx, y), 200) <<
+            "dense shadow left of the window's left edge";
+    }
 
     // The outward fade reaches the reserved spread's edge: the spread is
     // size + offset, the fade needs `size` past the shifted sliver edge
     // (= the texture's right edge exactly).
-    EXPECT_GT(alpha_at(tex, w - 1, y), 0)
-        << "the fade must reach the reserved spread's edge";
+    EXPECT_GT(alpha_at(tex, w - 1, y), 0) <<
+        "the fade must reach the reserved spread's edge";
 }
 
 TEST_F(SettingsTest, ShadowTexture_DropShadowAsymmetricSpread)
 {
     ThemeSettings ts;
     ASSERT_TRUE(ts.load(defaults_dir() + "/settings.ini",
-                        defaults_dir() + "/theme"));
+        defaults_dir() + "/theme"));
     window_settings *ws = ts.ws();
 
     // Partial offset: the shadow exists on all sides, but the reserved
@@ -563,25 +571,25 @@ TEST_F(SettingsTest, ShadowTexture_DropShadowAsymmetricSpread)
     // Above the window: the shadow exists within the reduced top space
     // (size - offset = 3 rows above the window's top edge), ramping up
     // toward the window.
-    EXPECT_GT(alpha_at(tex, x, 0), 0)
-        << "no shadow in the reduced top space";
-    EXPECT_GT(alpha_at(tex, x, 1), alpha_at(tex, x, 0))
-        << "the top fade must ramp up toward the window";
+    EXPECT_GT(alpha_at(tex, x, 0), 0) <<
+        "no shadow in the reduced top space";
+    EXPECT_GT(alpha_at(tex, x, 1), alpha_at(tex, x, 0)) <<
+        "the top fade must ramp up toward the window";
     // Below the window: the fade reaches the reserved spread's edge
     // (sliver_t + sliver_h + offset_y + size rows = the texture's bottom
     // edge exactly).
-    EXPECT_GT(alpha_at(tex, x, h - 1), 0)
-        << "the bottom fade must reach the reserved spread's edge";
+    EXPECT_GT(alpha_at(tex, x, h - 1), 0) <<
+        "the bottom fade must reach the reserved spread's edge";
     // Left margin (reduced): the shadow exists within the first column,
     // ramping up toward the window.
-    EXPECT_GT(alpha_at(tex, 0, y), 0)
-        << "no shadow in the reduced left space";
-    EXPECT_GT(alpha_at(tex, 1, y), alpha_at(tex, 0, y))
-        << "the left fade must ramp up toward the window";
+    EXPECT_GT(alpha_at(tex, 0, y), 0) <<
+        "no shadow in the reduced left space";
+    EXPECT_GT(alpha_at(tex, 1, y), alpha_at(tex, 0, y)) <<
+        "the left fade must ramp up toward the window";
     // Right: the fade reaches the reserved spread's edge.
     EXPECT_GT(
-        alpha_at(tex, cairo_image_surface_get_width(tex) - 1, y), 0)
-        << "the right fade must reach the reserved spread's edge";
+        alpha_at(tex, cairo_image_surface_get_width(tex) - 1, y), 0) <<
+        "the right fade must reach the reserved spread's edge";
 }
 
 // The silhouette carries the theme's per-corner rounding (top corners
@@ -593,10 +601,10 @@ TEST_F(SettingsTest, ShadowTexture_CornersAreRounded)
 {
     ThemeSettings ts;
     ASSERT_TRUE(ts.load(defaults_dir() + "/settings.ini",
-                        defaults_dir() + "/theme"));
+        defaults_dir() + "/theme"));
     window_settings *ws = ts.ws();
 
-    regrow_shadow(ts, 4, 0, 0);  // spread 5, kernel width 2*size = 10
+    regrow_shadow(ts, 4, 0, 0); // spread 5, kernel width 2*size = 10
     cairo_surface_t *tex = ws->large_shadow_surface;
 
     // The silhouette's top-left corner sits at (sliver_l, sliver_t) = the
@@ -607,20 +615,20 @@ TEST_F(SettingsTest, ShadowTexture_CornersAreRounded)
     // the straight edge at the same x-distance is inside (opaque border).
     const int sl = sliver_l(ws);
     const int st = sliver_t(ws);
-    EXPECT_LT(alpha_at(tex, sl - 2, st - 2), alpha_at(tex, sl + 2, st + 8))
-        << "shadow corner not rounded (no less transparent than the edge)";
-    EXPECT_GT(alpha_at(tex, sl + 2, st + 8), 100)
-        << "the straight edge must be dense at the same distance";
+    EXPECT_LT(alpha_at(tex, sl - 2, st - 2), alpha_at(tex, sl + 2, st + 8)) <<
+        "shadow corner not rounded (no less transparent than the edge)";
+    EXPECT_GT(alpha_at(tex, sl + 2, st + 8), 100) <<
+        "the straight edge must be dense at the same distance";
     // The corner decays toward zero off the diagonal.
-    EXPECT_LT(alpha_at(tex, sl, st), alpha_at(tex, sl + 2, st + 8))
-        << "corner does not decay off the diagonal";
+    EXPECT_LT(alpha_at(tex, sl, st), alpha_at(tex, sl + 2, st + 8)) <<
+        "corner does not decay off the diagonal";
 }
 
 TEST_F(SettingsTest, ShadowTexture_CenteredWhenNoOffset)
 {
     ThemeSettings ts;
     ASSERT_TRUE(ts.load(defaults_dir() + "/settings.ini",
-                        defaults_dir() + "/theme"));
+        defaults_dir() + "/theme"));
     window_settings *ws = ts.ws();
 
     // No offset: the spread is symmetric (size on every side) and the fade
@@ -638,47 +646,47 @@ TEST_F(SettingsTest, ShadowTexture_CenteredWhenNoOffset)
     EXPECT_EQ(ws->shadow_left_space, ws->shadow_right_space);
 
     const int size = (int)(ws->shadow_radius * 2 + 2) / 2;
-    const int sl = sliver_l(ws);
-    const int st = sliver_t(ws);
-    const int sw = sliver_w(ws, w);
-    const int sh = sliver_h(ws, h);
-    const int cx = sl + size + 2;  // deep in the dense core
-    const int cy = st + size + 2;
+    const int sl   = sliver_l(ws);
+    const int st   = sliver_t(ws);
+    const int sw   = sliver_w(ws, w);
+    const int sh   = sliver_h(ws, h);
+    const int cx   = sl + size + 2;  // deep in the dense core
+    const int cy   = st + size + 2;
 
     // A point deep in the core is dense.
     EXPECT_GE(alpha_at(tex, cx, cy),
-              (unsigned char)(ws->shadow_opacity * 255.0 * 0.9))
-        << "no dense core in the centered shadow";
+        (unsigned char)(ws->shadow_opacity * 255.0 * 0.9)) <<
+        "no dense core in the centered shadow";
 
     // Each side has a fade: present 1 px outside the sliver edge and at the
     // reserved spread's edge, ramping monotonically toward the core.
     // Top (edge at st, fade in rows < st):
     EXPECT_GT(alpha_at(tex, cx, st - 1), 0) << "top fade missing";
-    EXPECT_GT(alpha_at(tex, cx, st - size + 1), 0)
-        << "top fade must reach the spread's edge";
-    EXPECT_GT(alpha_at(tex, cx, st - size + 2), alpha_at(tex, cx, st - size + 1))
-        << "top fade must ramp up toward the window";
+    EXPECT_GT(alpha_at(tex, cx, st - size + 1), 0) <<
+        "top fade must reach the spread's edge";
+    EXPECT_GT(alpha_at(tex, cx, st - size + 2), alpha_at(tex, cx, st - size + 1)) <<
+        "top fade must ramp up toward the window";
     // Bottom (edge at st+sh, fade in rows > st+sh):
     EXPECT_GT(alpha_at(tex, cx, st + sh + 1), 0) << "bottom fade missing";
-    EXPECT_GT(alpha_at(tex, cx, st + sh + size - 1), 0)
-        << "bottom fade must reach the spread's edge";
+    EXPECT_GT(alpha_at(tex, cx, st + sh + size - 1), 0) <<
+        "bottom fade must reach the spread's edge";
     EXPECT_GT(alpha_at(tex, cx, st + sh + size - 2),
-              alpha_at(tex, cx, st + sh + size - 1))
-        << "bottom fade must ramp down away from the window";
+        alpha_at(tex, cx, st + sh + size - 1)) <<
+        "bottom fade must ramp down away from the window";
     // Left (edge at sl, fade in cols < sl):
     EXPECT_GT(alpha_at(tex, sl - 1, cy), 0) << "left fade missing";
-    EXPECT_GT(alpha_at(tex, sl - size + 1, cy), 0)
-        << "left fade must reach the spread's edge";
+    EXPECT_GT(alpha_at(tex, sl - size + 1, cy), 0) <<
+        "left fade must reach the spread's edge";
     EXPECT_GT(alpha_at(tex, sl - size + 2, cy),
-              alpha_at(tex, sl - size + 1, cy))
-        << "left fade must ramp up toward the window";
+        alpha_at(tex, sl - size + 1, cy)) <<
+        "left fade must ramp up toward the window";
     // Right (edge at sl+sw, fade in cols > sl+sw):
     EXPECT_GT(alpha_at(tex, sl + sw + 1, cy), 0) << "right fade missing";
-    EXPECT_GT(alpha_at(tex, sl + sw + size - 1, cy), 0)
-        << "right fade must reach the spread's edge";
+    EXPECT_GT(alpha_at(tex, sl + sw + size - 1, cy), 0) <<
+        "right fade must reach the spread's edge";
     EXPECT_GT(alpha_at(tex, sl + sw + size - 2, cy),
-              alpha_at(tex, sl + sw + size - 1, cy))
-        << "right fade must ramp down away from the window";
+        alpha_at(tex, sl + sw + size - 1, cy)) <<
+        "right fade must ramp down away from the window";
 }
 
 // The texture must be visible to cairo COMPOSITING, not just to raw data
@@ -689,14 +697,14 @@ TEST_F(SettingsTest, ShadowTexture_VisibleToCairoCompositing)
 {
     ThemeSettings ts;
     ASSERT_TRUE(ts.load(defaults_dir() + "/settings.ini",
-                        defaults_dir() + "/theme"));
+        defaults_dir() + "/theme"));
     window_settings *ws = ts.ws();
     ASSERT_NE(ws->large_shadow_surface, nullptr);
 
     const int w = cairo_image_surface_get_width(ws->large_shadow_surface);
     const int h = cairo_image_surface_get_height(ws->large_shadow_surface);
     cairo_surface_t *bg = cairo_image_surface_create(CAIRO_FORMAT_ARGB32,
-                                                     w, h);
+        w, h);
     cairo_t *cr = cairo_create(bg);
     cairo_set_source_rgba(cr, 1.0, 1.0, 1.0, 1.0);
     cairo_paint(cr);
@@ -704,17 +712,17 @@ TEST_F(SettingsTest, ShadowTexture_VisibleToCairoCompositing)
     cairo_paint(cr);
     cairo_destroy(cr);
     const unsigned char *d =
-        (const unsigned char *)cairo_image_surface_get_data(bg);
+        (const unsigned char*)cairo_image_surface_get_data(bg);
     const int stride = cairo_image_surface_get_stride(bg);
 
     // A point inside the dense core (the core starts at
     // (sliver_l + offset_x + size, sliver_t + offset_y + size)): the white
     // background must be darkened by the shadow coverage.
     const int size = (int)(ws->shadow_radius * 2 + 2) / 2;
-    const int px = sliver_l(ws) + ws->shadow_offset_x + size + 1;
-    const int py = sliver_t(ws) + ws->shadow_offset_y + size + 1;
-    EXPECT_LT(d[stride * py + 4 * px + 2], 200)
-        << "shadow texture invisible to cairo compositing";
+    const int px   = sliver_l(ws) + ws->shadow_offset_x + size + 1;
+    const int py   = sliver_t(ws) + ws->shadow_offset_y + size + 1;
+    EXPECT_LT(d[stride * py + 4 * px + 2], 200) <<
+        "shadow texture invisible to cairo compositing";
 }
 
 TEST_F(SettingsTest, ShadowTexture_NoShadowTheme_NoTexture)
@@ -724,15 +732,15 @@ TEST_F(SettingsTest, ShadowTexture_NoShadowTheme_NoTexture)
     fs::path theme = tmp_dir_ / "theme";
     {
         std::ofstream out(theme / "theme.ini");
-        out << "[engine]\nengine=legacy\n\n"
-            << "[shadow]\n"
-            << "shadow_radius=0\n"
-            << "shadow_offset_x=0\n"
-            << "shadow_offset_y=0\n";
+        out << "[engine]\nengine=legacy\n\n" <<
+            "[shadow]\n" <<
+            "shadow_radius=0\n" <<
+            "shadow_offset_x=0\n" <<
+            "shadow_offset_y=0\n";
     }
     ThemeSettings ts;
     ASSERT_TRUE(ts.load((tmp_dir_ / "settings.ini").string(),
-                        theme.string()));
+        theme.string()));
     window_settings *ws = ts.ws();
     EXPECT_EQ(ws->large_shadow_surface, nullptr);
     EXPECT_EQ(ws->shadow_pattern, nullptr);
@@ -753,17 +761,17 @@ TEST_F(SettingsTest, ShadowTexture_ColorMatchesSetting)
     fs::path theme = tmp_dir_ / "theme";
     {
         std::ofstream out(theme / "theme.ini");
-        out << "[engine]\nengine=legacy\n\n"
-            << "[shadow]\n"
-            << "shadow_color=#808080\n"
-            << "shadow_opacity=1\n"
-            << "shadow_radius=12\n"
-            << "shadow_offset_x=0\n"
-            << "shadow_offset_y=0\n";
+        out << "[engine]\nengine=legacy\n\n" <<
+            "[shadow]\n" <<
+            "shadow_color=#808080\n" <<
+            "shadow_opacity=1\n" <<
+            "shadow_radius=12\n" <<
+            "shadow_offset_x=0\n" <<
+            "shadow_offset_y=0\n";
     }
     ThemeSettings ts;
     ASSERT_TRUE(ts.load((tmp_dir_ / "settings.ini").string(),
-                        theme.string()));
+        theme.string()));
     window_settings *ws = ts.ws();
 
     // 16-bit storage: (128/255) * 65536 -> 32896 (truncated).
@@ -781,7 +789,7 @@ TEST_F(SettingsTest, ShadowTexture_ColorMatchesSetting)
     const int stride =
         cairo_image_surface_get_stride(ws->large_shadow_surface);
     const unsigned char *p =
-        (const unsigned char *)cairo_image_surface_get_data(
+        (const unsigned char*)cairo_image_surface_get_data(
             ws->large_shadow_surface) +
         (h / 2) * stride + (w / 2) * 4;
     // ARGB32 bytes: [B, G, R, A]. Gray 128 shadow -> un-premultiplied color
@@ -789,12 +797,12 @@ TEST_F(SettingsTest, ShadowTexture_ColorMatchesSetting)
     // (255), which un-premultiply would expose as ~255.
     const int a = p[3];
     ASSERT_GT(a, 0) << "center fully transparent";
-    EXPECT_NEAR(p[2] * 255.0 / a, 128, 8) << "red: " << (int)p[2]
-        << " alpha: " << a;
-    EXPECT_NEAR(p[1] * 255.0 / a, 128, 8) << "green: " << (int)p[1]
-        << " alpha: " << a;
-    EXPECT_NEAR(p[0] * 255.0 / a, 128, 8) << "blue: " << (int)p[0]
-        << " alpha: " << a;
+    EXPECT_NEAR(p[2] * 255.0 / a, 128, 8) << "red: " << (int)p[2] <<
+        " alpha: " << a;
+    EXPECT_NEAR(p[1] * 255.0 / a, 128, 8) << "green: " << (int)p[1] <<
+        " alpha: " << a;
+    EXPECT_NEAR(p[0] * 255.0 / a, 128, 8) << "blue: " << (int)p[0] <<
+        " alpha: " << a;
 }
 
 // ── part 06 finding 14: engine teardown on live engine switching ───────────
@@ -811,10 +819,10 @@ TEST_F(SettingsTest, ShadowTexture_ColorMatchesSetting)
 TEST(EngineLifecycle, ReloadFreesEnginePrivateState)
 {
     window_settings *ws =
-        (window_settings *)calloc(1, sizeof(window_settings));
-    frame_settings *f1 = (frame_settings *)calloc(1, sizeof(frame_settings));
-    frame_settings *f2 = (frame_settings *)calloc(1, sizeof(frame_settings));
-    ws->fs_act = f1;
+        (window_settings*)calloc(1, sizeof(window_settings));
+    frame_settings *f1 = (frame_settings*)calloc(1, sizeof(frame_settings));
+    frame_settings *f2 = (frame_settings*)calloc(1, sizeof(frame_settings));
+    ws->fs_act   = f1;
     ws->fs_inact = f2;
 
     const std::string eng = EMERALDWF_TEST_ENGINE_DIR;
@@ -826,8 +834,8 @@ TEST(EngineLifecycle, ReloadFreesEnginePrivateState)
     // Theme-only reload (same engine): the keep-.so fast path must still
     // fini the previous ws (freeing its pws).
     ASSERT_TRUE(emerald_engine_load("zootreeves", eng));
-    EXPECT_EQ(ws->engine_ws, nullptr)
-        << "old ws's pws must be freed on same-engine reload";
+    EXPECT_EQ(ws->engine_ws, nullptr) <<
+        "old ws's pws must be freed on same-engine reload";
 
     // Engine switch: the leaving engine's fini already ran; the new engine
     // must init FRESH state, never reusing the old pws pointer.
@@ -902,18 +910,18 @@ TEST(Metadata, NoEmptyValueElements)
     std::ifstream in(path);
     ASSERT_TRUE(in.good()) << path;
     std::string content((std::istreambuf_iterator<char>(in)),
-                        std::istreambuf_iterator<char>());
-    EXPECT_EQ(content.find("<value></value>"), std::string::npos)
-        << "empty <value> segfaults WCM's metadata parser";
+        std::istreambuf_iterator<char>());
+    EXPECT_EQ(content.find("<value></value>"), std::string::npos) <<
+        "empty <value> segfaults WCM's metadata parser";
     EXPECT_EQ(content.find("<value/>"), std::string::npos);
     size_t pos = 0;
     while ((pos = content.find("<value>", pos)) != std::string::npos)
     {
         const size_t start = pos + std::string("<value>").size();
-        const size_t end = content.find("</value>", start);
+        const size_t end   = content.find("</value>", start);
         ASSERT_NE(end, std::string::npos);
-        EXPECT_GT(end, start)
-            << "empty <value> at offset " << pos << " segfaults WCM";
+        EXPECT_GT(end, start) <<
+            "empty <value> at offset " << pos << " segfaults WCM";
         pos = end;
     }
 }
@@ -938,7 +946,7 @@ TEST(TitlebarAction, ParseAllValues)
         {"close", DOUBLE_CLICK_CLOSE},
         {"none", DOUBLE_CLICK_NONE},
     };
-    for (const auto &c : cases)
+    for (const auto & c : cases)
     {
         auto v = parse_titlebar_action(c.name);
         ASSERT_TRUE(v.has_value()) << c.name;
@@ -969,8 +977,8 @@ TEST_F(SettingsTest, TitlebarActionOverrideAppliesToLoadedTheme)
     // win.
     ThemeSettings ts;
     ASSERT_TRUE(ts.load(defaults_dir() + "/settings.ini",
-                        defaults_dir() + "/theme"));
-    window_settings *ws = ts.ws();
+        defaults_dir() + "/theme"));
+    window_settings *ws     = ts.ws();
     const int default_value = ws->double_click_action;
     EXPECT_EQ(default_value, DOUBLE_CLICK_SHADE);
 
@@ -998,10 +1006,10 @@ TEST_F(SettingsTest, ResolveTitlebarActionFallsBackToDefault)
 {
     // An explicit action wins (WCM defines the click action).
     EXPECT_EQ(resolve_titlebar_action("maximize", 0),
-              DOUBLE_CLICK_MAXIMIZE);
+        DOUBLE_CLICK_MAXIMIZE);
     EXPECT_EQ(resolve_titlebar_action("SHADE", 4), DOUBLE_CLICK_SHADE);
     EXPECT_EQ(resolve_titlebar_action("send_to_back", 0),
-              DOUBLE_CLICK_SEND_TO_BACK);
+        DOUBLE_CLICK_SEND_TO_BACK);
     EXPECT_EQ(resolve_titlebar_action("none", 3), DOUBLE_CLICK_NONE);
 
     // Empty / whitespace → the passed default stands (not a reset to 0).
@@ -1025,10 +1033,10 @@ TEST_F(SettingsTest, DecorCtxFsTracksThemeSwap)
 {
     ThemeSettings ts_a;
     ASSERT_TRUE(ts_a.load(defaults_dir() + "/settings.ini",
-                          defaults_dir() + "/theme"));
+        defaults_dir() + "/theme"));
     ThemeSettings ts_b;
     ASSERT_TRUE(ts_b.load(defaults_dir() + "/settings.ini",
-                          defaults_dir() + "/theme"));
+        defaults_dir() + "/theme"));
     ASSERT_NE(ts_a.fs_active(), ts_b.fs_active());
 
     DecorContext ctx;
@@ -1059,7 +1067,7 @@ TEST_F(SettingsTest, ButtonFadeIdleStaysNonHovered)
     // A never-hovered button stays idle: the timer skips it and it draws
     // the non-hovered surface at full opacity.
     ButtonFadeConfig cfg;
-    cfg.enabled = true;
+    cfg.enabled   = true;
     cfg.num_steps = 5;
     ButtonFadeState st;
     auto r = button_fade_tick(cfg, st);
@@ -1073,7 +1081,7 @@ TEST_F(SettingsTest, ButtonFadeIdleStaysNonHovered)
 TEST_F(SettingsTest, ButtonFadeHoverInAndOut)
 {
     ButtonFadeConfig cfg;
-    cfg.enabled = true;
+    cfg.enabled   = true;
     cfg.num_steps = 5;
 
     // Hovering an idle button starts the fade in (counter 0 → 1) and the
@@ -1087,10 +1095,16 @@ TEST_F(SettingsTest, ButtonFadeHoverInAndOut)
     {
         auto r = button_fade_tick(cfg, st);
         if (r.changed)
+        {
             ticks++;
+        }
+
         if (!r.animating)
+        {
             break;
+        }
     }
+
     EXPECT_EQ(ticks, 5); // 1→2, 2→3, …, 5→6
     EXPECT_EQ(st.counter, 6); // num+1 = at max fade
     auto a = button_fade_alphas(st, cfg.num_steps);
@@ -1106,10 +1120,16 @@ TEST_F(SettingsTest, ButtonFadeHoverInAndOut)
     {
         auto r = button_fade_tick(cfg, st);
         if (r.changed)
+        {
             ticks++;
+        }
+
         if (!r.animating)
+        {
             break;
+        }
     }
+
     EXPECT_EQ(ticks, 5); // -5→-4, …, -1→0
     EXPECT_EQ(st.counter, 0);
     a = button_fade_alphas(st, cfg.num_steps);
@@ -1120,7 +1140,7 @@ TEST_F(SettingsTest, ButtonFadeHoverInAndOut)
 TEST_F(SettingsTest, ButtonFadeMidFadeReversal)
 {
     ButtonFadeConfig cfg;
-    cfg.enabled = true;
+    cfg.enabled   = true;
     cfg.num_steps = 5;
     ButtonFadeState st;
     st.counter = 3; // mid fade-in (hover alpha 2/5)
@@ -1135,10 +1155,10 @@ TEST_F(SettingsTest, ButtonFadeMidFadeReversal)
 TEST_F(SettingsTest, ButtonFadePressStopsFade)
 {
     ButtonFadeConfig cfg;
-    cfg.enabled = true;
+    cfg.enabled   = true;
     cfg.num_steps = 5;
     ButtonFadeState st;
-    st.counter = 3;
+    st.counter   = 3;
     st.pulsating = true;
     button_fade_on_press(st);
     EXPECT_EQ(st.counter, 0);
@@ -1155,22 +1175,22 @@ TEST_F(SettingsTest, ButtonFadePulseBreathesHighlight)
     // between full and the min-opacity floor, holding `wait` steps at the
     // top — it never settles, and the button never disappears.
     ButtonFadeConfig cfg;
-    cfg.enabled = true;
-    cfg.pulse = true;
+    cfg.enabled   = true;
+    cfg.pulse     = true;
     cfg.num_steps = 10;
-    cfg.pulse_len_steps = 4; // floor = 1 - 4/10 = 0.6
+    cfg.pulse_len_steps  = 4; // floor = 1 - 4/10 = 0.6
     cfg.pulse_wait_steps = 2;
 
     ButtonFadeState st;
     button_fade_on_hover(cfg, st, true); // fade in, counter → 1
     double min_seen = 1.0, max_seen = 0.0;
     bool saw_pulsating = false;
-    bool measuring = false;
+    bool measuring     = false;
     for (int i = 0; i < 80; i++)
     {
         auto r = button_fade_tick(cfg, st);
-        ASSERT_TRUE(r.animating)
-            << "the pulse must not settle while the button is hovered";
+        ASSERT_TRUE(r.animating) <<
+            "the pulse must not settle while the button is hovered";
         if (!measuring)
         {
             // The first fade-in (counter 1 → num) is a plain fade, not the
@@ -1178,15 +1198,17 @@ TEST_F(SettingsTest, ButtonFadePulseBreathesHighlight)
             measuring = st.pulsating;
             continue;
         }
+
         saw_pulsating = true;
         auto a = button_fade_alphas(st, cfg.num_steps);
         min_seen = std::min(min_seen, a.hover);
         max_seen = std::max(max_seen, a.hover);
     }
+
     EXPECT_TRUE(saw_pulsating);
     EXPECT_DOUBLE_EQ(max_seen, 1.0) << "the pulse reaches full highlight";
-    EXPECT_GE(min_seen, 0.6 - 1e-9)
-        << "the pulse bottoms out at the min-opacity floor, never at 0";
+    EXPECT_GE(min_seen, 0.6 - 1e-9) <<
+        "the pulse bottoms out at the min-opacity floor, never at 0";
 
     // Unhovering stops the pulse: the highlight fades out to idle.
     button_fade_on_hover(cfg, st, false);
@@ -1195,8 +1217,11 @@ TEST_F(SettingsTest, ButtonFadePulseBreathesHighlight)
     {
         auto r = button_fade_tick(cfg, st);
         if (!r.animating)
+        {
             break;
+        }
     }
+
     EXPECT_EQ(st.counter, 0);
     auto a = button_fade_alphas(st, cfg.num_steps);
     EXPECT_DOUBLE_EQ(a.hover, 0.0);
@@ -1222,18 +1247,18 @@ TEST_F(SettingsTest, LoaderLeavesWcmOwnedKeysUntouched)
     std::ofstream(tmp_dir_ / "theme" / "theme.ini") << theme_ini;
 
     std::ofstream sf(tmp_dir_ / "settings.ini");
-    sf << "[buttons]\n"
-       << "use_button_fade = true\n"
-       << "button_fade_total_duration = 500\n"
-       << "[titlebars]\n"
-       << "no_scroll_shade = true\n"
-       << "[decorations]\n"
-       << "use_decoration_cropping = true\n";
+    sf << "[buttons]\n" <<
+        "use_button_fade = true\n" <<
+        "button_fade_total_duration = 500\n" <<
+        "[titlebars]\n" <<
+        "no_scroll_shade = true\n" <<
+        "[decorations]\n" <<
+        "use_decoration_cropping = true\n";
     sf.close();
 
     ThemeSettings ts;
     bool ok = ts.load((tmp_dir_ / "settings.ini").string(),
-                      (tmp_dir_ / "theme").string());
+        (tmp_dir_ / "theme").string());
     ASSERT_TRUE(ok);
 
     auto *ws = ts.ws();
@@ -1256,18 +1281,18 @@ TEST_F(SettingsTest, ApplyButtonFadeMapsDurationsToSteps)
     std::memset(ws, 0, sizeof(*ws));
 
     emeraldwf_apply_button_fade(ws, true, true,
-                                500 /*total*/, 50 /*step*/,
-                                200 /*pulse wait*/, 50 /*min opacity*/);
+        500 /*total*/, 50 /*step*/,
+        200 /*pulse wait*/, 50 /*min opacity*/);
     EXPECT_TRUE(ws->use_button_fade);
     EXPECT_EQ(ws->button_fade_step_duration, 50);
-    EXPECT_EQ(ws->button_fade_num_steps, 10);       // 500/50
-    EXPECT_EQ(ws->button_fade_pulse_len_steps, 5);  // 10*(100-50)/100
+    EXPECT_EQ(ws->button_fade_num_steps, 10); // 500/50
+    EXPECT_EQ(ws->button_fade_pulse_len_steps, 5); // 10*(100-50)/100
     EXPECT_EQ(ws->button_fade_pulse_wait_steps, 4); // 200/50
 
     // Pulse off → the pulse fields are zeroed (the node derives
     // `pulse = pulse_len_steps > 0`).
     emeraldwf_apply_button_fade(ws, true, false,
-                                200, 50, 200, 50);
+        200, 50, 200, 50);
     EXPECT_EQ(ws->button_fade_num_steps, 4);
     EXPECT_EQ(ws->button_fade_pulse_len_steps, 0);
     EXPECT_EQ(ws->button_fade_pulse_wait_steps, 0);
@@ -1275,16 +1300,16 @@ TEST_F(SettingsTest, ApplyButtonFadeMapsDurationsToSteps)
     // Min opacity clamps to [0, 100] (a bad WCM value must not make the
     // pulse negative or exceed num_steps).
     emeraldwf_apply_button_fade(ws, true, true,
-                                200, 50, 0, 150);
+        200, 50, 0, 150);
     EXPECT_EQ(ws->button_fade_pulse_len_steps, 0); // (100-100)
     emeraldwf_apply_button_fade(ws, true, true,
-                                200, 50, 0, -10);
+        200, 50, 0, -10);
     EXPECT_EQ(ws->button_fade_pulse_len_steps, 4); // (100-0)/100 * 4
 
     // Degenerate durations: total/step ≤ 0 fall back to sane values
     // (one step, default 50 ms step), never 0.
     emeraldwf_apply_button_fade(ws, true, false,
-                                0, 0, 0, 0);
+        0, 0, 0, 0);
     EXPECT_EQ(ws->button_fade_num_steps, 1);
     EXPECT_EQ(ws->button_fade_step_duration, 50);
 
@@ -1294,10 +1319,10 @@ TEST_F(SettingsTest, ApplyButtonFadeMapsDurationsToSteps)
 TEST_F(SettingsTest, FileStampDetectsSameSecondRewrites)
 {
     fs::path dir = fs::temp_directory_path() / "emeraldwf-stamp";
-    fs::path p = dir / (std::to_string(::getpid()) + ".ini");
+    fs::path p   = dir / (std::to_string(::getpid()) + ".ini");
     fs::create_directories(dir);
 
-    auto write_ini = [&](const char *content)
+    auto write_ini = [&] (const char *content)
     {
         std::ofstream out(p.string());
         out << content;
@@ -1308,8 +1333,8 @@ TEST_F(SettingsTest, FileStampDetectsSameSecondRewrites)
     const std::uint64_t s2 = emwf_file_stamp(p.string());
 
     ASSERT_NE(s1, 0u) << "an existing file must have a non-zero stamp";
-    EXPECT_NE(s1, s2)
-        << "a same-second rewrite must be visible to the poller";
+    EXPECT_NE(s1, s2) <<
+        "a same-second rewrite must be visible to the poller";
     EXPECT_EQ(emwf_file_stamp(p.string() + ".missing"), 0u);
 
     fs::remove_all(dir);
@@ -1337,24 +1362,22 @@ class ConfigSyncTest : public ::testing::Test
             "emeraldwf-config-sync-test.ini").string();
     }
 
-    void write_ini(const std::string &content)
+    void write_ini(const std::string & content)
     {
         std::ofstream(ini_path_) << content;
     }
 
-    template <typename T>
-    std::shared_ptr<wf::config::option_t<T>>
-    make_opt(const char *name, const T &def)
+    template<typename T>
+    std::shared_ptr<wf::config::option_t<T>> make_opt(const char *name, const T & def)
     {
         return std::make_shared<wf::config::option_t<T>>(name, def);
     }
 
-    wf::animation_description_t
-    animation(int ms, const char *name = "linear")
+    wf::animation_description_t animation(int ms, const char *name = "linear")
     {
         // Test-local smoothing lambda: the headless test binary interposes
         // an empty local smoothing::linear over libwf-config's.
-        auto linear = [](double x) { return x; };
+        auto linear = [] (double x) { return x; };
         return wf::animation_description_t{
             ms, wf::animation::smoothing::smooth_function(linear), name};
     }
@@ -1366,23 +1389,23 @@ class ConfigSyncTest : public ::testing::Test
 
 TEST_F(ConfigSyncTest, AppliesEveryOptionTypeAndFiresCallbacks)
 {
-    auto engine = make_opt<std::string>("emeraldwf/engine", "legacy");
+    auto engine  = make_opt<std::string>("emeraldwf/engine", "legacy");
     auto borders = make_opt<bool>("emeraldwf/maximized_borders", true);
-    auto shade = make_opt<bool>("emeraldwf/enable_shade", true);
-    auto tb = make_opt<int>("emeraldwf/csd_titlebar_height", 64);
+    auto shade   = make_opt<bool>("emeraldwf/enable_shade", true);
+    auto tb  = make_opt<int>("emeraldwf/csd_titlebar_height", 64);
     auto pad = make_opt<int>("emeraldwf/shadow_pad", 0);
     auto mod = make_opt<wf::keybinding_t>("emeraldwf/shade_modifier",
-                                          wf::keybinding_t(0, 0));
+        wf::keybinding_t(0, 0));
     auto dur = make_opt<wf::animation_description_t>(
         "emeraldwf/shade_duration", animation(1000));
     // Part 08: the WCM-owned global emerald settings.
     auto no_scroll = make_opt<bool>("emeraldwf/no_scroll_shade", false);
-    auto cropping = make_opt<bool>("emeraldwf/use_decoration_cropping", false);
+    auto cropping  = make_opt<bool>("emeraldwf/use_decoration_cropping", false);
     auto fade = make_opt<bool>("emeraldwf/use_button_fade", true);
-    auto fade_pulse = make_opt<bool>("emeraldwf/use_button_fade_pulse", true);
-    auto fade_total = make_opt<int>("emeraldwf/button_fade_total_duration", 250);
-    auto fade_step = make_opt<int>("emeraldwf/button_fade_step_duration", 50);
-    auto fade_wait = make_opt<int>("emeraldwf/button_fade_pulse_wait_duration", 0);
+    auto fade_pulse   = make_opt<bool>("emeraldwf/use_button_fade_pulse", true);
+    auto fade_total   = make_opt<int>("emeraldwf/button_fade_total_duration", 250);
+    auto fade_step    = make_opt<int>("emeraldwf/button_fade_step_duration", 50);
+    auto fade_wait    = make_opt<int>("emeraldwf/button_fade_pulse_wait_duration", 0);
     auto fade_opacity =
         make_opt<int>("emeraldwf/button_fade_pulse_min_opacity", 0);
 
@@ -1407,33 +1430,33 @@ TEST_F(ConfigSyncTest, AppliesEveryOptionTypeAndFiresCallbacks)
 
     // Exactly the kind of [emeraldwf] section WCM writes on save.
     write_ini("[emeraldwf]\n"
-        "engine = truglass\n"
-        "maximized_borders = false\n"
-        "enable_shade = false\n"
-        "csd_titlebar_height = 42\n"
-        "shadow_pad = 8\n"
-        "shade_modifier = <ctrl> <super>\n"
-        "shade_duration = 300ms linear\n"
-        "no_scroll_shade = true\n"
-        "use_decoration_cropping = true\n"
-        "use_button_fade = false\n"
-        "use_button_fade_pulse = false\n"
-        "button_fade_total_duration = 500\n"
-        "button_fade_step_duration = 100\n"
-        "button_fade_pulse_wait_duration = 300\n"
-        "button_fade_pulse_min_opacity = 40\n");
+              "engine = truglass\n"
+              "maximized_borders = false\n"
+              "enable_shade = false\n"
+              "csd_titlebar_height = 42\n"
+              "shadow_pad = 8\n"
+              "shade_modifier = <ctrl> <super>\n"
+              "shade_duration = 300ms linear\n"
+              "no_scroll_shade = true\n"
+              "use_decoration_cropping = true\n"
+              "use_button_fade = false\n"
+              "use_button_fade_pulse = false\n"
+              "button_fade_total_duration = 500\n"
+              "button_fade_step_duration = 100\n"
+              "button_fade_pulse_wait_duration = 300\n"
+              "button_fade_pulse_min_opacity = 40\n");
 
     emerald_config_options_t targets{engine, nullptr, nullptr, nullptr,
         nullptr, nullptr, borders, nullptr, shade, tb, pad, mod, dur,
         no_scroll, cropping, fade, fade_pulse, fade_total, fade_step,
         fade_wait, fade_opacity};
-    EXPECT_TRUE(sync_emeraldwf_options_from_config(ini_path_, targets))
-        << "changed values must be reported so the poller arms a reload";
+    EXPECT_TRUE(sync_emeraldwf_options_from_config(ini_path_, targets)) <<
+        "changed values must be reported so the poller arms a reload";
 
     EXPECT_EQ(engine->get_value(), "truglass");
     EXPECT_FALSE(borders->get_value());
-    EXPECT_FALSE(shade->get_value())
-        << "the enable_shade checkbox is the regression itself";
+    EXPECT_FALSE(shade->get_value()) <<
+        "the enable_shade checkbox is the regression itself";
     EXPECT_EQ(tb->get_value(), 42);
     EXPECT_EQ(pad->get_value(), 8);
 
@@ -1455,9 +1478,9 @@ TEST_F(ConfigSyncTest, AppliesEveryOptionTypeAndFiresCallbacks)
     EXPECT_EQ(fade_wait->get_value(), 300);
     EXPECT_EQ(fade_opacity->get_value(), 40);
 
-    EXPECT_EQ(callbacks, 15)
-        << "set_value() must fire each option's callback (that is how the "
-           "plugin applies the side effects)";
+    EXPECT_EQ(callbacks, 15) <<
+        "set_value() must fire each option's callback (that is how the "
+        "plugin applies the side effects)";
 }
 
 TEST_F(ConfigSyncTest, LeavesAbsentKeysAlone)
@@ -1467,8 +1490,8 @@ TEST_F(ConfigSyncTest, LeavesAbsentKeysAlone)
     // fire callbacks — a spurious enable_shade callback would re-shade /
     // unshade every window on every unrelated WCM edit).
     auto engine = make_opt<std::string>("emeraldwf/engine", "legacy");
-    auto shade = make_opt<bool>("emeraldwf/enable_shade", true);
-    auto tb = make_opt<int>("emeraldwf/csd_titlebar_height", 64);
+    auto shade  = make_opt<bool>("emeraldwf/enable_shade", true);
+    auto tb     = make_opt<int>("emeraldwf/csd_titlebar_height", 64);
 
     int shade_cb = 0, tb_cb = 0;
     cb_t shade_handler = [&shade_cb] { ++shade_cb; };
@@ -1495,7 +1518,7 @@ TEST_F(ConfigSyncTest, LeavesAbsentKeysAlone)
 TEST_F(ConfigSyncTest, NoChangeMeansNoCallbacksAndFalse)
 {
     auto engine = make_opt<std::string>("emeraldwf/engine", "truglass");
-    auto shade = make_opt<bool>("emeraldwf/enable_shade", true);
+    auto shade  = make_opt<bool>("emeraldwf/enable_shade", true);
 
     int engine_cb = 0, shade_cb = 0;
     cb_t engine_handler = [&engine_cb] { ++engine_cb; };
@@ -1509,9 +1532,9 @@ TEST_F(ConfigSyncTest, NoChangeMeansNoCallbacksAndFalse)
     emerald_config_options_t targets;
     targets.engine = engine;
     targets.enable_shade = shade;
-    EXPECT_FALSE(sync_emeraldwf_options_from_config(ini_path_, targets))
-        << "unchanged values must not report a change (the poller would "
-           "re-arm the debounced theme reload on every 500 ms tick)";
+    EXPECT_FALSE(sync_emeraldwf_options_from_config(ini_path_, targets)) <<
+        "unchanged values must not report a change (the poller would "
+        "re-arm the debounced theme reload on every 500 ms tick)";
     EXPECT_EQ(engine_cb, 0);
     EXPECT_EQ(shade_cb, 0);
 
@@ -1521,7 +1544,7 @@ TEST_F(ConfigSyncTest, NoChangeMeansNoCallbacksAndFalse)
 
 TEST_F(ConfigSyncTest, IgnoresUnparseableValues)
 {
-    auto tb = make_opt<int>("emeraldwf/csd_titlebar_height", 64);
+    auto tb  = make_opt<int>("emeraldwf/csd_titlebar_height", 64);
     auto dur = make_opt<wf::animation_description_t>(
         "emeraldwf/shade_duration", animation(1000));
     auto shade = make_opt<bool>("emeraldwf/enable_shade", true);
@@ -1533,9 +1556,9 @@ TEST_F(ConfigSyncTest, IgnoresUnparseableValues)
     dur->add_updated_handler(&dur_handler);
 
     write_ini("[emeraldwf]\n"
-        "csd_titlebar_height = abc\n"
-        "shade_duration = banana\n"
-        "enable_shade = false\n");
+              "csd_titlebar_height = abc\n"
+              "shade_duration = banana\n"
+              "enable_shade = false\n");
 
     // Review F2 (-Wmissing-field-initializers): named-field init.
     emerald_config_options_t targets;
@@ -1553,7 +1576,7 @@ TEST_F(ConfigSyncTest, IgnoresUnparseableValues)
 TEST_F(ConfigSyncTest, MissingFileReturnsFalse)
 {
     auto shade = make_opt<bool>("emeraldwf/enable_shade", true);
-    int cb = 0;
+    int cb     = 0;
     cb_t handler = [&cb] { ++cb; };
     shade->add_updated_handler(&handler);
 
@@ -1565,5 +1588,4 @@ TEST_F(ConfigSyncTest, MissingFileReturnsFalse)
     EXPECT_TRUE(shade->get_value());
     EXPECT_EQ(cb, 0);
 }
-
 }

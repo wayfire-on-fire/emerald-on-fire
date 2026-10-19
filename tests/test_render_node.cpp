@@ -18,13 +18,12 @@ using namespace wf::emeraldwf;
 
 namespace
 {
-
 // Build a cache matching the given inputs.
-node_cache_t make_cache(bool active, const std::string &title,
-                        int w, int h, int hover)
+node_cache_t make_cache(bool active, const std::string & title,
+    int w, int h, int hover)
 {
     node_cache_t c;
-    c.surface = reinterpret_cast<cairo_surface_t *>(0x1); // sentinel (never destroyed)
+    c.surface = reinterpret_cast<cairo_surface_t*>(0x1); // sentinel (never destroyed)
     c.active  = active;
     c.title   = title;
     c.width   = w;
@@ -32,7 +31,6 @@ node_cache_t make_cache(bool active, const std::string &title,
     c.hover_button = hover;
     return c;
 }
-
 } // namespace
 
 // ── needs_rebuild (invalidation predicate) ──────────────────────────────────
@@ -115,7 +113,7 @@ const frame_box_input_t MARGINS{
 TEST(FrameBoxTest, ZeroClient_CollapsesToBorderSliver)
 {
     // Mapping-time state: client is 0×0. The frame is only the borders.
-    auto in = MARGINS;
+    auto in  = MARGINS;
     auto box = frame_box_for(in);
     // Width = 0 + 6 + 6 = 12, height = 0 + 21 + 6 = 27. This is the
     // degenerate sliver the bug produces — visible as "no decoration".
@@ -138,8 +136,8 @@ TEST(FrameBoxTest, PopulatedClient_ProducesFullFrame)
     in.client_w = 800;
     in.client_h = 600;
     auto box = frame_box_for(in);
-    EXPECT_EQ(box.w, 800 + 6 + 6);   // 812
-    EXPECT_EQ(box.h, 600 + 21 + 6);  // 627
+    EXPECT_EQ(box.w, 800 + 6 + 6); // 812
+    EXPECT_EQ(box.h, 600 + 21 + 6); // 627
     EXPECT_EQ(box.x, -6);
     EXPECT_EQ(box.y, -21);
     // Sanity: the frame strictly contains the client (not just borders).
@@ -173,9 +171,10 @@ TEST(FrameBoxTest, ReconfigureMatchesRealToplevelTransition)
     // The bounding box MUST change; if it didn't, the node would keep
     // rendering the degenerate sliver. This is what the
     // view_geometry_changed_signal handler relies on.
-    auto mapped = frame_box_for(MARGINS);                 // 0×0 client
-    auto in = MARGINS;
-    in.client_w = 800; in.client_h = 600;
+    auto mapped = frame_box_for(MARGINS); // 0×0 client
+    auto in     = MARGINS;
+    in.client_w = 800;
+    in.client_h = 600;
     auto populated = frame_box_for(in);
     EXPECT_NE(mapped.w, populated.w);
     EXPECT_NE(mapped.h, populated.h);
@@ -196,7 +195,7 @@ TEST(FrameBoxTest, ReconfigureMatchesRealToplevelTransition)
 TEST(FrameFromPendingTest, NormalFrame_MatchesClientPlusMargins)
 {
     // Frame 812×627, margins left/right=6, top=21, bottom=6 → client 800×600.
-    auto in = pending_box_input_t{812, 627, 6, 6, 6, 21};
+    auto in  = pending_box_input_t{812, 627, 6, 6, 6, 21};
     auto box = frame_box_from_pending(in);
     EXPECT_EQ(box.w, 812);
     EXPECT_EQ(box.h, 627);
@@ -211,7 +210,7 @@ TEST(FrameFromPendingTest, ZeroFrame_CollapsesToBorderSliver)
     // populated it). The client clamps to 0×0 → the frame is only borders.
     // This is the degenerate sliver; the geometry-changed handler recomputes
     // once the real size is known. It must NOT be negative or unbounded.
-    auto in = pending_box_input_t{0, 0, 6, 6, 6, 21};
+    auto in  = pending_box_input_t{0, 0, 6, 6, 6, 21};
     auto box = frame_box_from_pending(in);
     EXPECT_EQ(box.w, 12); // 6 + 6
     EXPECT_EQ(box.h, 27); // 21 + 6
@@ -223,7 +222,7 @@ TEST(FrameFromPendingTest, FrameEqualMargins_ClonseToBordersOnly)
 {
     // A frame exactly the size of its margins ⇒ client 0×0 (signature of a
     // collapsed client). The box must equal the margins, no more.
-    auto in = pending_box_input_t{12, 27, 6, 6, 6, 21};
+    auto in  = pending_box_input_t{12, 27, 6, 6, 6, 21};
     auto box = frame_box_from_pending(in);
     EXPECT_EQ(box.w, in.m_left + in.m_right);
     EXPECT_EQ(box.h, in.m_top + in.m_bottom);
@@ -257,7 +256,8 @@ TEST(FrameFromPendingTest, ConsistentWithFrameBoxFor)
 TEST(FrameLocalTest, ClientOrigin_IsFrameOriginPlusMargins)
 {
     auto in = MARGINS;
-    in.client_w = 800; in.client_h = 600;
+    in.client_w = 800;
+    in.client_h = 600;
     auto box = frame_box_for(in);
     // Parent (0,0) is the client's top-left → frame-local (m_left, m_top).
     auto local = frame_local_for(0, 0, box);
@@ -268,7 +268,8 @@ TEST(FrameLocalTest, ClientOrigin_IsFrameOriginPlusMargins)
 TEST(FrameLocalTest, FrameTopLeft_IsZero)
 {
     auto in = MARGINS;
-    in.client_w = 800; in.client_h = 600;
+    in.client_w = 800;
+    in.client_h = 600;
     auto box = frame_box_for(in);
     // The frame's own top-left in parent coords is the box origin (negative)
     // → frame-local (0,0).
@@ -280,7 +281,8 @@ TEST(FrameLocalTest, FrameTopLeft_IsZero)
 TEST(FrameLocalTest, TitlebarPress_LandsInsideFrame)
 {
     auto in = MARGINS;
-    in.client_w = 800; in.client_h = 600;
+    in.client_w = 800;
+    in.client_h = 600;
     auto box = frame_box_for(in);
     // A parent point in the title bar band: client_x 200, 10px below the
     // top border (title bar spans local y in [m_top - thickness, m_top)).
@@ -368,12 +370,12 @@ TEST(TitlebarInputTest, DoubleClickCancelsThePendingMove)
 {
     titlebar_input_state_t st;
     EXPECT_EQ(on_titlebar_press(st, 100, 50, 1000),
-              titlebar_press_result::ARM_MOVE);
+        titlebar_press_result::ARM_MOVE);
     ASSERT_TRUE(st.pending_move);
     // The second press within the window fires the double-click and drops
     // the pending move — the node must NOT have committed a move gesture.
     EXPECT_EQ(on_titlebar_press(st, 100, 50, 1300),
-              titlebar_press_result::DOUBLE_CLICK);
+        titlebar_press_result::DOUBLE_CLICK);
     EXPECT_FALSE(st.pending_move);
 }
 
@@ -383,7 +385,7 @@ TEST(TitlebarInputTest, MotionCommitsTheMoveExactlyOnce)
     on_titlebar_press(st, 100, 50, 1000);
     EXPECT_FALSE(on_titlebar_motion(st, 102, 50, 4.0)); // 2px — below 4
     ASSERT_TRUE(st.pending_move);
-    EXPECT_TRUE(on_titlebar_motion(st, 105, 50, 4.0));  // 5px — commit
+    EXPECT_TRUE(on_titlebar_motion(st, 105, 50, 4.0)); // 5px — commit
     EXPECT_FALSE(st.pending_move);
     // Already committed — further motion must not re-commit.
     EXPECT_FALSE(on_titlebar_motion(st, 200, 50, 4.0));
@@ -414,7 +416,7 @@ TEST(TitlebarInputTest, ReleaseDoesNotBreakTheDoubleClickPair)
     on_titlebar_press(st, 100, 50, 1000);
     on_button_release(st);
     EXPECT_EQ(on_titlebar_press(st, 100, 50, 1200),
-              titlebar_press_result::DOUBLE_CLICK);
+        titlebar_press_result::DOUBLE_CLICK);
 }
 
 TEST(TitlebarInputTest, PressAfterWindowArmsAFreshMove)
@@ -422,7 +424,7 @@ TEST(TitlebarInputTest, PressAfterWindowArmsAFreshMove)
     titlebar_input_state_t st;
     on_titlebar_press(st, 100, 50, 1000);
     EXPECT_EQ(on_titlebar_press(st, 100, 50, 1500), // 500ms > 400ms
-              titlebar_press_result::ARM_MOVE);
+        titlebar_press_result::ARM_MOVE);
 }
 
 TEST(TitlebarInputTest, PressAfterCommitStartsFresh)
@@ -432,7 +434,7 @@ TEST(TitlebarInputTest, PressAfterCommitStartsFresh)
     on_titlebar_motion(st, 110, 50, 4.0); // commit the drag
     // A later press is a fresh sequence, not a double-click of the old one.
     EXPECT_EQ(on_titlebar_press(st, 110, 50, 2000),
-              titlebar_press_result::ARM_MOVE);
+        titlebar_press_result::ARM_MOVE);
 }
 
 TEST(TitlebarInputTest, ReleaseWithoutPressIsANoop)
@@ -453,22 +455,22 @@ TEST(TitlebarInputTest, ReleaseWithoutPressIsANoop)
 TEST(TitlebarActionMapTest, AllEmeraldActionsMapToConcreteRequests)
 {
     EXPECT_EQ(map_titlebar_action(DOUBLE_CLICK_SHADE),
-              titlebar_action_request::TOGGLE_SHADE);
+        titlebar_action_request::TOGGLE_SHADE);
     EXPECT_EQ(map_titlebar_action(DOUBLE_CLICK_MAXIMIZE),
-              titlebar_action_request::MAXIMIZE_TOGGLE);
+        titlebar_action_request::MAXIMIZE_TOGGLE);
     EXPECT_EQ(map_titlebar_action(DOUBLE_CLICK_MINIMIZE),
-              titlebar_action_request::MINIMIZE);
+        titlebar_action_request::MINIMIZE);
     // The regression case: send-to-back must map to SEND_TO_BACK, not NONE.
     EXPECT_EQ(map_titlebar_action(DOUBLE_CLICK_SEND_TO_BACK),
-              titlebar_action_request::SEND_TO_BACK);
+        titlebar_action_request::SEND_TO_BACK);
     EXPECT_EQ(map_titlebar_action(DOUBLE_CLICK_CLOSE),
-              titlebar_action_request::CLOSE);
+        titlebar_action_request::CLOSE);
 }
 
 TEST(TitlebarActionMapTest, NoneAndUnknownMapToNoRequest)
 {
     EXPECT_EQ(map_titlebar_action(DOUBLE_CLICK_NONE),
-              titlebar_action_request::NONE);
+        titlebar_action_request::NONE);
     EXPECT_EQ(map_titlebar_action(-1), titlebar_action_request::NONE);
     EXPECT_EQ(map_titlebar_action(99), titlebar_action_request::NONE);
 }
@@ -483,11 +485,11 @@ TEST(TitlebarActionMapTest, NoneAndUnknownMapToNoRequest)
 TEST(FrameRenderGuardTest, FullscreenAndZeroSizeAreNotRendered)
 {
     EXPECT_TRUE(frame_should_render(false, 400, 300));
-    EXPECT_FALSE(frame_should_render(true, 400, 300))
-        << "fullscreen windows must not draw the frame (it would land on "
-           "the client)";
-    EXPECT_FALSE(frame_should_render(false, 0, 300))
-        << "zero-width frames are degenerate (no decoration to draw)";
+    EXPECT_FALSE(frame_should_render(true, 400, 300)) <<
+        "fullscreen windows must not draw the frame (it would land on "
+        "the client)";
+    EXPECT_FALSE(frame_should_render(false, 0, 300)) <<
+        "zero-width frames are degenerate (no decoration to draw)";
     EXPECT_FALSE(frame_should_render(false, 400, 0));
     EXPECT_FALSE(frame_should_render(false, 0, 0));
 }
@@ -517,8 +519,8 @@ namespace
 node_cache_t make_texture_cache()
 {
     node_cache_t c;
-    c.surface = reinterpret_cast<cairo_surface_t *>(0x1);
-    c.texture = reinterpret_cast<void *>(0xABCDEF); // the cached GL texture (sentinel)
+    c.surface = reinterpret_cast<cairo_surface_t*>(0x1);
+    c.texture = reinterpret_cast<void*>(0xABCDEF); // the cached GL texture (sentinel)
     c.active  = true;
     c.title   = "title";
     c.width   = 200;
@@ -535,12 +537,12 @@ TEST(FrameTexturePickTest, CacheHit_ReusesTextureWithoutUpload)
     // again — a full CPU→GPU copy of the frame on a frame that needed
     // nothing.
     auto cache = make_texture_cache();
-    auto pick = pick_frame_texture(cache, cache.surface);
-    EXPECT_FALSE(pick.must_create)
-        << "cache hit must not re-create the texture (per-frame full-buffer "
-           "upload — the video-page CPU regression)";
-    EXPECT_EQ(pick.texture, cache.texture)
-        << "cache hit must hand back the EXISTING texture, not a new one";
+    auto pick  = pick_frame_texture(cache, cache.surface);
+    EXPECT_FALSE(pick.must_create) <<
+        "cache hit must not re-create the texture (per-frame full-buffer "
+        "upload — the video-page CPU regression)";
+    EXPECT_EQ(pick.texture, cache.texture) <<
+        "cache hit must hand back the EXISTING texture, not a new one";
 }
 
 TEST(FrameTexturePickTest, NewSurface_RequiresNewTexture)
@@ -549,10 +551,10 @@ TEST(FrameTexturePickTest, NewSurface_RequiresNewTexture)
     // texture derives from the old surface — it must be replaced.
     auto cache = make_texture_cache();
     // Opaque sentinel (not a real surface) — int->ptr is a reinterpret_cast.
-    const cairo_surface_t *new_surface = reinterpret_cast<cairo_surface_t *>(0x2);
+    const cairo_surface_t *new_surface = reinterpret_cast<cairo_surface_t*>(0x2);
     auto pick = pick_frame_texture(cache, new_surface);
-    EXPECT_TRUE(pick.must_create)
-        << "a new surface has no texture yet — one must be created";
+    EXPECT_TRUE(pick.must_create) <<
+        "a new surface has no texture yet — one must be created";
 }
 
 TEST(FrameTexturePickTest, NoSurface_NoTexture)
@@ -583,9 +585,9 @@ TEST(FrameTexturePickTest, StaleTextureAfterReplace_RequiresNewTexture)
     auto cache = make_texture_cache();
     // Opaque sentinel (not a real surface) — int->ptr is a reinterpret_cast.
     // (non-const: it is stored into cache.surface, a non-const member)
-    cairo_surface_t *new_surface = reinterpret_cast<cairo_surface_t *>(0x2);
+    cairo_surface_t *new_surface = reinterpret_cast<cairo_surface_t*>(0x2);
     // Caller-created texture for the new surface — a DIFFERENT one.
-    void *new_texture = reinterpret_cast<void *>(0x123456);
+    void *new_texture = reinterpret_cast<void*>(0x123456);
     cache.surface = new_surface;
     cache.texture = new_texture;
     auto pick = pick_frame_texture(cache, new_surface);

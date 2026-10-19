@@ -2,13 +2,13 @@
 //
 // Exercises emerald_decorator_t::margins_for() (pure) and, through a
 // constructed DecorContext-driven path, the D8 rules:
-//   1. normal windowed        → {t, t, t, top_space+tb}
-//   2. fullscreen             → zero
-//   3. CSD                    → zero
-//   4. maximized + borders on → {t, t, t, top_space+tb}
-//   5. maximized + borders off→ {shadow, shadow, shadow, shadow_top+tb}
-//      (finding 19: the shadow spread remains; both off → {0,0,0,tb})
-//   6. extra_extents nonzero  → added per side
+// 1. normal windowed        → {t, t, t, top_space+tb}
+// 2. fullscreen             → zero
+// 3. CSD                    → zero
+// 4. maximized + borders on → {t, t, t, top_space+tb}
+// 5. maximized + borders off→ {shadow, shadow, shadow, shadow_top+tb}
+// (finding 19: the shadow spread remains; both off → {0,0,0,tb})
+// 6. extra_extents nonzero  → added per side
 //
 // The *_space values are the engine layout (border + shadow), so the
 // margins must match them — the engines draw the title bar at
@@ -41,7 +41,7 @@ class MarginsTest : public ::testing::Test
         in.right_space  = 6;
         in.top_space    = 4;
         in.bottom_space = 6;
-        in.titlebar_height = 17;
+        in.titlebar_height   = 17;
         in.maximized_borders = true;
         return in;
     }
@@ -53,7 +53,7 @@ TEST_F(MarginsTest, NormalWindowed)
     EXPECT_DOUBLE_EQ(m.left, 6.0);
     EXPECT_DOUBLE_EQ(m.right, 6.0);
     EXPECT_DOUBLE_EQ(m.bottom, 6.0);
-    EXPECT_DOUBLE_EQ(m.top, 21.0);  // top_space 4 + titlebar 17
+    EXPECT_DOUBLE_EQ(m.top, 21.0); // top_space 4 + titlebar 17
 }
 
 TEST_F(MarginsTest, Fullscreen)
@@ -87,7 +87,7 @@ TEST_F(MarginsTest, MaximizedBordersOn)
     EXPECT_DOUBLE_EQ(m.left, 6.0);
     EXPECT_DOUBLE_EQ(m.right, 6.0);
     EXPECT_DOUBLE_EQ(m.bottom, 6.0);
-    EXPECT_DOUBLE_EQ(m.top, 21.0);  // top_space 4 + titlebar 17
+    EXPECT_DOUBLE_EQ(m.top, 21.0); // top_space 4 + titlebar 17
 }
 
 TEST_F(MarginsTest, MaximizedBordersOff)
@@ -98,10 +98,10 @@ TEST_F(MarginsTest, MaximizedBordersOff)
     in.tiled_edges = TILED_ALL;
     in.maximized_borders = false;
     auto m = emerald_decorator_t::margins_for(in);
-    EXPECT_DOUBLE_EQ(m.left, 6.0);   // shadow spread only
+    EXPECT_DOUBLE_EQ(m.left, 6.0); // shadow spread only
     EXPECT_DOUBLE_EQ(m.right, 6.0);
     EXPECT_DOUBLE_EQ(m.bottom, 6.0);
-    EXPECT_DOUBLE_EQ(m.top, 21.0);   // top shadow spread 4 + titlebar 17
+    EXPECT_DOUBLE_EQ(m.top, 21.0); // top shadow spread 4 + titlebar 17
 }
 
 // Finding 19: maximized windows hug the screen edges. Each side's margin
@@ -119,7 +119,8 @@ TEST_F(MarginsTest, MaximizedCropMatrix)
     in.win_ext_top    = 4;
     // shadow spreads: L/R/B = 6 − 2 − 0 = 4; top = 4 − 4 − 0 = 0.
 
-    in.maximized_borders = true;  in.maximized_shadows = true;
+    in.maximized_borders = true;
+    in.maximized_shadows = true;
     auto m = emerald_decorator_t::margins_for(in);
     // Both on → full extents (default, regression).
     EXPECT_DOUBLE_EQ(m.left, 6.0);
@@ -127,24 +128,27 @@ TEST_F(MarginsTest, MaximizedCropMatrix)
     EXPECT_DOUBLE_EQ(m.bottom, 6.0);
     EXPECT_DOUBLE_EQ(m.top, 21.0);
 
-    in.maximized_borders = false; in.maximized_shadows = true;
+    in.maximized_borders = false;
+    in.maximized_shadows = true;
     m = emerald_decorator_t::margins_for(in);
     // Borders dropped → shadow spread only.
     EXPECT_DOUBLE_EQ(m.left, 4.0);
     EXPECT_DOUBLE_EQ(m.right, 4.0);
     EXPECT_DOUBLE_EQ(m.bottom, 4.0);
-    EXPECT_DOUBLE_EQ(m.top, 17.0);  // 0 shadow + 17 titlebar
+    EXPECT_DOUBLE_EQ(m.top, 17.0); // 0 shadow + 17 titlebar
 
-    in.maximized_borders = true;  in.maximized_shadows = false;
+    in.maximized_borders = true;
+    in.maximized_shadows = false;
     m = emerald_decorator_t::margins_for(in);
     // Shadows dropped → border only; the window fills the screen below the
     // border + titlebar strip (no gaps at the edges).
     EXPECT_DOUBLE_EQ(m.left, 2.0);
     EXPECT_DOUBLE_EQ(m.right, 2.0);
     EXPECT_DOUBLE_EQ(m.bottom, 2.0);
-    EXPECT_DOUBLE_EQ(m.top, 21.0);  // 4 border + 17 titlebar
+    EXPECT_DOUBLE_EQ(m.top, 21.0); // 4 border + 17 titlebar
 
-    in.maximized_borders = false; in.maximized_shadows = false;
+    in.maximized_borders = false;
+    in.maximized_shadows = false;
     m = emerald_decorator_t::margins_for(in);
     // Both dropped → titlebar strip only, zero gaps (use_decoration_cropping).
     EXPECT_DOUBLE_EQ(m.left, 0.0);
@@ -163,10 +167,10 @@ TEST_F(MarginsTest, ExtraExtentsAddedPerSide)
     auto m = emerald_decorator_t::margins_for(in);
     // D8: thickness = *_space + extra_extents.X per side;
     // top = top_space + extra_top + titlebar.
-    //   left   = 6 + 2 = 8
-    //   right  = 6 + 3 = 9
-    //   bottom = 6 + 4 = 10
-    //   top    = 4 + 1 + 17 = 22
+    // left   = 6 + 2 = 8
+    // right  = 6 + 3 = 9
+    // bottom = 6 + 4 = 10
+    // top    = 4 + 1 + 17 = 22
     EXPECT_DOUBLE_EQ(m.left, 8.0);
     EXPECT_DOUBLE_EQ(m.right, 9.0);
     EXPECT_DOUBLE_EQ(m.bottom, 10.0);
@@ -180,14 +184,14 @@ TEST_F(MarginsTest, MaximizedPartiallyTiledKeepsBorders)
     in.tiled_edges = 0x1 | 0x4; // TOP | LEFT
     auto m = emerald_decorator_t::margins_for(in);
     EXPECT_DOUBLE_EQ(m.left, 6.0);
-    EXPECT_DOUBLE_EQ(m.top, 21.0);  // top_space 4 + titlebar 17
+    EXPECT_DOUBLE_EQ(m.top, 21.0); // top_space 4 + titlebar 17
 }
 
 TEST_F(MarginsTest, FullscreenBeatsCsdAndMaximized)
 {
     auto in = base();
     in.csd = true;
-    in.fullscreen = true;
+    in.fullscreen  = true;
     in.tiled_edges = TILED_ALL;
     auto m = emerald_decorator_t::margins_for(in);
     EXPECT_DOUBLE_EQ(m.left, 0.0);
@@ -258,15 +262,15 @@ TEST_F(MarginsTest, DetachOnlyRemovesFromLiveSurfaceRoot)
     // The predicate is a pure pointer compare, so dummy bytes suffice.
     // Review F2 (-Wall): the second dummy sroot alias was unused — dropped.
     char a, b;
-    auto pa = reinterpret_cast<wf::scene::node_t *>(&a);
-    auto pb = reinterpret_cast<wf::scene::node_t *>(&b);
-    auto sa = reinterpret_cast<wf::scene::floating_inner_node_t *>(&a);
+    auto pa = reinterpret_cast<wf::scene::node_t*>(&a);
+    auto pb = reinterpret_cast<wf::scene::node_t*>(&b);
+    auto sa = reinterpret_cast<wf::scene::floating_inner_node_t*>(&a);
 
     EXPECT_TRUE(emerald_decorator_t::detach_should_remove_child(pa, sa));
-    EXPECT_FALSE(emerald_decorator_t::detach_should_remove_child(pb, sa))
-        << "a dead/reparented parent must never be remove_child()ed";
-    EXPECT_FALSE(emerald_decorator_t::detach_should_remove_child(pa, nullptr))
-        << "without a captured sroot, removal must be refused";
+    EXPECT_FALSE(emerald_decorator_t::detach_should_remove_child(pb, sa)) <<
+        "a dead/reparented parent must never be remove_child()ed";
+    EXPECT_FALSE(emerald_decorator_t::detach_should_remove_child(pa, nullptr)) <<
+        "without a captured sroot, removal must be refused";
 }
 
 // The liveness gate: a decorator whose view is gone (null here — the
@@ -291,11 +295,11 @@ TEST_F(MarginsTest, ViewForOffsetsIsNullForDeadView)
 TEST_F(MarginsTest, TopMarginUsesLiveThemeTitlebar)
 {
     auto theme = std::make_shared<ThemeSettings>();
-    theme->load("ignored.ini", "ignored");  // stub: valid_=true
+    theme->load("ignored.ini", "ignored"); // stub: valid_=true
     auto *ws = theme->ws();
     ASSERT_NE(ws, nullptr);
-    ws->top_space       = 10;  // known, distinct values
-    ws->titlebar_height = 30;  // ≠ the member default (17)
+    ws->top_space = 10; // known, distinct values
+    ws->titlebar_height = 30; // ≠ the member default (17)
 
     // view=nullptr → is_csd() false (SSD). The constructor copies the member
     // from ws (30); then corrupt it to the stale default (17) to prove the
@@ -303,11 +307,11 @@ TEST_F(MarginsTest, TopMarginUsesLiveThemeTitlebar)
     emerald_decorator_t deco(nullptr, theme);
     deco.set_titlebar_height(17);
 
-    wf::toplevel_state_t state{};  // normal windowed
+    wf::toplevel_state_t state{}; // normal windowed
     auto in = deco.make_margins_input(state);
-    EXPECT_EQ(in.titlebar_height, 30)
-        << "top margin must reserve the LIVE theme titlebar (30), not the "
-           "stale member (17)";
+    EXPECT_EQ(in.titlebar_height, 30) <<
+        "top margin must reserve the LIVE theme titlebar (30), not the "
+        "stale member (17)";
     EXPECT_EQ(in.top_space, 10);
 
     // End-to-end: top margin = top_space + titlebar = 40.
@@ -332,14 +336,22 @@ struct crop_ws_t
         std::memset(&ws, 0, sizeof(ws));
         // A theme with non-zero shadow spread on every side so all four
         // flag combinations are distinguishable.
-        //   left   : space 17 = ext 4 + shadow 11 + extra 2
-        //   right  : space 16 = ext 5 + shadow 10 + extra 1
-        //   top    : space 14 = ext 4 + shadow 10 + extra 0
-        //   bottom : space 15 = ext 5 + shadow 7 + extra 3
-        ws.win_extents.left = 4;   ws.extra_extents.left = 2;   ws.left_space = 17;
-        ws.win_extents.right = 5;  ws.extra_extents.right = 1;  ws.right_space = 16;
-        ws.win_extents.top = 4;    ws.extra_extents.top = 0;    ws.top_space = 14;
-        ws.win_extents.bottom = 5; ws.extra_extents.bottom = 3; ws.bottom_space = 15;
+        // left   : space 17 = ext 4 + shadow 11 + extra 2
+        // right  : space 16 = ext 5 + shadow 10 + extra 1
+        // top    : space 14 = ext 4 + shadow 10 + extra 0
+        // bottom : space 15 = ext 5 + shadow 7 + extra 3
+        ws.win_extents.left   = 4;
+        ws.extra_extents.left = 2;
+        ws.left_space = 17;
+        ws.win_extents.right   = 5;
+        ws.extra_extents.right = 1;
+        ws.right_space     = 16;
+        ws.win_extents.top = 4;
+        ws.extra_extents.top = 0;
+        ws.top_space = 14;
+        ws.win_extents.bottom   = 5;
+        ws.extra_extents.bottom = 3;
+        ws.bottom_space = 15;
     }
 };
 } // namespace
@@ -349,9 +361,9 @@ TEST(MarginsCrop, DecompositionPerSide)
     // crop = (shadows off ? shadow spread : 0) + (borders off ? border part : 0)
     // left (17,4,2): margin 19 = shadow 11 + border 8
     EXPECT_EQ(maximized_crop_side(17, 4, 2, true, true), 0);
-    EXPECT_EQ(maximized_crop_side(17, 4, 2, false, true), 8);  // borders off
+    EXPECT_EQ(maximized_crop_side(17, 4, 2, false, true), 8); // borders off
     EXPECT_EQ(maximized_crop_side(17, 4, 2, true, false), 11); // shadows off
-    EXPECT_EQ(maximized_crop_side(17, 4, 2, false, false), 19);// both off
+    EXPECT_EQ(maximized_crop_side(17, 4, 2, false, false), 19); // both off
 }
 
 TEST(MarginsCrop, BothOffCropsTheWholeSide)
@@ -373,27 +385,27 @@ TEST(MarginsCrop, MarginPlusCropIsTheFullExtent)
     // original full-extent side (no drift between the two consumers).
     crop_ws_t c;
     const bool combos[4][2] = {{true, true}, {false, true},
-                               {true, false}, {false, false}};
-    for (auto &cb : combos)
+        {true, false}, {false, false}};
+    for (auto & cb : combos)
     {
         bool borders = cb[0], shadows = cb[1];
         auto crop = maximized_crop(c.ws, borders, shadows);
 
         MarginsInput in;
-        in.left_space = c.ws.left_space;
-        in.right_space = c.ws.right_space;
-        in.top_space = c.ws.top_space;
-        in.bottom_space = c.ws.bottom_space;
-        in.extra_left = c.ws.extra_extents.left;
-        in.extra_right = c.ws.extra_extents.right;
-        in.extra_top = c.ws.extra_extents.top;
-        in.extra_bottom = c.ws.extra_extents.bottom;
-        in.win_ext_left = c.ws.win_extents.left;
+        in.left_space    = c.ws.left_space;
+        in.right_space   = c.ws.right_space;
+        in.top_space     = c.ws.top_space;
+        in.bottom_space  = c.ws.bottom_space;
+        in.extra_left    = c.ws.extra_extents.left;
+        in.extra_right   = c.ws.extra_extents.right;
+        in.extra_top     = c.ws.extra_extents.top;
+        in.extra_bottom  = c.ws.extra_extents.bottom;
+        in.win_ext_left  = c.ws.win_extents.left;
         in.win_ext_right = c.ws.win_extents.right;
-        in.win_ext_top = c.ws.win_extents.top;
-        in.win_ext_bottom = c.ws.win_extents.bottom;
+        in.win_ext_top   = c.ws.win_extents.top;
+        in.win_ext_bottom  = c.ws.win_extents.bottom;
         in.titlebar_height = 17;
-        in.tiled_edges = TILED_ALL;
+        in.tiled_edges     = TILED_ALL;
         in.maximized_borders = borders;
         in.maximized_shadows = shadows;
 
@@ -408,5 +420,4 @@ TEST(MarginsCrop, MarginPlusCropIsTheFullExtent)
             c.ws.top_space + c.ws.extra_extents.top - crop.top + 17.0);
     }
 }
-
 } // namespace

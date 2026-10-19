@@ -38,13 +38,12 @@ namespace wf
 {
 namespace emeraldwf
 {
-
 class emerald_decorator_t;
 class ThemeSettings;
 
 class emerald_node_t : public wf::scene::node_t,
-                       public wf::pointer_interaction_t,
-                       public wf::touch_interaction_t
+    public wf::pointer_interaction_t,
+    public wf::touch_interaction_t
 {
   public:
     explicit emerald_node_t(std::shared_ptr<emerald_decorator_t> deco);
@@ -53,18 +52,18 @@ class emerald_node_t : public wf::scene::node_t,
     // ── Pure helpers (testable headless) ────────────────────────────────────
     // Bounding box of the node in parent (surface-root) coordinates: the
     // full frame size at offset {-margins.left, -margins.top} (spec 04 §1).
-    static wf::geometry_t node_bounding_box(const emerald_decorator_t &deco);
+    static wf::geometry_t node_bounding_box(const emerald_decorator_t & deco);
     // Frame-coord hit test: returns a non-empty input node when the point
     // (in parent coordinates) is inside the frame region including the
     // resize bands (layout.resize_edges != 0) that surround the client.
-    static std::optional<wf::scene::input_node_t>
-        hit_test(const emerald_decorator_t &deco, const wf::pointf_t &at);
+    static std::optional<wf::scene::input_node_t> hit_test(const emerald_decorator_t & deco,
+        const wf::pointf_t & at);
 
     // ── State updates (called by emerald_decorator_t, part 04) ─────────────
-    void resize();                       // recompute ctx sizes, layout, region
-    void set_active(bool active);        // invalidates + damages
-    void set_title(std::string title);   // invalidates + damages
-    void set_theme_dirty();              // forces full re-render next frame
+    void resize(); // recompute ctx sizes, layout, region
+    void set_active(bool active); // invalidates + damages
+    void set_title(std::string title); // invalidates + damages
+    void set_theme_dirty(); // forces full re-render next frame
 
     // ── Cached render state (exposed for tests) ────────────────────────────
     node_cache_t cache;
@@ -81,28 +80,34 @@ class emerald_node_t : public wf::scene::node_t,
         wf::scene::damage_callback push_damage,
         wf::output_t *output = nullptr) override;
     wf::geometry_t get_bounding_box() override;
-    std::optional<wf::scene::input_node_t>
-        find_node_at(const wf::pointf_t& at) override;
+    std::optional<wf::scene::input_node_t> find_node_at(const wf::pointf_t& at) override;
 
     // Route scene pointer/touch events to THIS node. Without these overrides
     // the base node_t returns a static noop, so no input (title-bar move,
     // border resize, button clicks) would ever reach the handle_* methods.
-    wf::pointer_interaction_t& pointer_interaction() override { return *this; }
-    wf::touch_interaction_t& touch_interaction() override { return *this; }
+    wf::pointer_interaction_t& pointer_interaction() override
+    {
+        return *this;
+    }
+
+    wf::touch_interaction_t& touch_interaction() override
+    {
+        return *this;
+    }
 
     // pointer/touch interaction
     void handle_pointer_enter(wf::pointf_t position) override;
     void handle_pointer_leave() override;
     void handle_pointer_motion(wf::pointf_t pointer_position,
-                               uint32_t time_ms) override;
+        uint32_t time_ms) override;
     void handle_pointer_button(const wlr_pointer_button_event& event) override;
     void handle_pointer_axis(const wlr_pointer_axis_event& event) override;
     void handle_touch_down(uint32_t time_ms, int finger_id,
-                           wf::pointf_t position) override;
+        wf::pointf_t position) override;
     void handle_touch_up(uint32_t time_ms, int finger_id,
-                         wf::pointf_t lift_off_position) override;
+        wf::pointf_t lift_off_position) override;
     void handle_touch_motion(uint32_t time_ms, int finger_id,
-                             wf::pointf_t position) override;
+        wf::pointf_t position) override;
 
     // WM actions (overview D11).
     void handle_move();
@@ -143,8 +148,8 @@ class emerald_node_t : public wf::scene::node_t,
     // The crossfade is between the button's non-hovered and hovered
     // surface columns (the button never fades out); the pulse breathes
     // the highlight while a button is hovered. Events:
-    //   button_fade_hover(b, now_hovered) — pointer enter/leave
-    //   button_fade_pressed(b)            — pointer button down
+    // button_fade_hover(b, now_hovered) — pointer enter/leave
+    // button_fade_pressed(b)            — pointer button down
     // The one-shot timer ticks all buttons per step and reschedules
     // itself while any counter is moving (or a pulse is active).
     void button_fade_hover(int b, bool now_hovered);
@@ -155,11 +160,11 @@ class emerald_node_t : public wf::scene::node_t,
     ButtonFadeConfig button_fade_config() const;
 
     std::shared_ptr<emerald_decorator_t> deco;
-    EmeraldLayout layout;                // part 03
-    bool theme_dirty = true;             // set_theme_dirty() → full re-render
+    EmeraldLayout layout; // part 03
+    bool theme_dirty  = true;             // set_theme_dirty() → full re-render
     bool active_dirty = false;
-    bool title_dirty = false;
-    bool size_dirty = true;
+    bool title_dirty  = false;
+    bool size_dirty   = true;
 
     // Review N2: title-measure context, reused across rebuilds. The old
     // code created a 1×1 cairo surface + PangoLayout on EVERY frame
@@ -168,13 +173,13 @@ class emerald_node_t : public wf::scene::node_t,
     // input is the text (set on the cached layout below). Freed in the
     // dtor. (Measurements are font/text only, so a 1×1 surface suffices.)
     cairo_surface_t *measure_surface = nullptr;
-    cairo_t *measure_cr = nullptr;
+    cairo_t *measure_cr     = nullptr;
     PangoLayout *measure_pl = nullptr;
 
-    int last_hover_button = -1;          // mirror of cache.hover_button
+    int last_hover_button = -1; // mirror of cache.hover_button
 
     // Button press tracking (per-button, like pixdecor deco-layout.cpp:136-146)
-    int pressed_button = -1;             // btype pressed, -1 if none
+    int pressed_button = -1; // btype pressed, -1 if none
 
     // Last known pointer/touch position (parent coords). wlr button/axis
     // events carry no position, so the node tracks it from enter/motion.
@@ -193,6 +198,5 @@ class emerald_node_t : public wf::scene::node_t,
     // second press within the timeout fires double_click_action().
     titlebar_input_state_t titlebar_input;
 };
-
 } // namespace emeraldwf
 } // namespace wf

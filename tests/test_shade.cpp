@@ -1,19 +1,19 @@
 // test_shade.cpp — headless gtest coverage of Part 05 (shade + shadows).
 //
 // Exercises:
-//   1. margin steadiness: the SSD margins are UNCHANGED across the whole
-//      shade progression — the bottom margin stays pinned to the theme
-//      value (bottom_space + extra_bottom). The visual roll-up is done by
-//      the shade transformer; the emerald frame texture is drawn from the
-//      logical margins, so a moving bottom margin would desync the texture
-//      layout and put client rows into the shaded bottom strip.
-//   2. left/right/top margins unchanged by shade (top stays 21).
-//   3. `ShadeState::init_animation` direction bookkeeping: after shading,
-//      `get_direction()` true; toggle back → false (state machine tested
-//      without a GL context).
-//   4. shadow custom data: `shadow_margins_for(client_h, thickness,
-//      titlebar, progress)` matches the formula (pure computation — a live
-//      view is not required for headless tests).
+// 1. margin steadiness: the SSD margins are UNCHANGED across the whole
+// shade progression — the bottom margin stays pinned to the theme
+// value (bottom_space + extra_bottom). The visual roll-up is done by
+// the shade transformer; the emerald frame texture is drawn from the
+// logical margins, so a moving bottom margin would desync the texture
+// layout and put client rows into the shaded bottom strip.
+// 2. left/right/top margins unchanged by shade (top stays 21).
+// 3. `ShadeState::init_animation` direction bookkeeping: after shading,
+// `get_direction()` true; toggle back → false (state machine tested
+// without a GL context).
+// 4. shadow custom data: `shadow_margins_for(client_h, thickness,
+// titlebar, progress)` matches the formula (pure computation — a live
+// view is not required for headless tests).
 #include <gtest/gtest.h>
 
 #include <cmath>
@@ -42,7 +42,7 @@ class ShadeTest : public ::testing::Test
         in.right_space  = 6;
         in.top_space    = 4;
         in.bottom_space = 6;
-        in.titlebar_height = 17;
+        in.titlebar_height   = 17;
         in.maximized_borders = true;
         return in;
     }
@@ -65,9 +65,9 @@ TEST_F(ShadeTest, BottomMarginSteadyUnderShade)
         auto in = base();
         (void)p;
         auto m = emerald_decorator_t::margins_for(in);
-        EXPECT_DOUBLE_EQ(m.bottom, 6.0)
-            << "bottom must stay the theme's unshaded value at progress "
-               << p << " (the collapse formula was removed)";
+        EXPECT_DOUBLE_EQ(m.bottom, 6.0) <<
+            "bottom must stay the theme's unshaded value at progress " <<
+            p << " (the collapse formula was removed)";
     }
 }
 
@@ -75,10 +75,10 @@ TEST_F(ShadeTest, BottomMarginSteadyUnderShade)
 TEST_F(ShadeTest, LeftRightTopUnchangedByShade)
 {
     auto in = base();
-    auto m = emerald_decorator_t::margins_for(in);
+    auto m  = emerald_decorator_t::margins_for(in);
     EXPECT_DOUBLE_EQ(m.left, 6.0);
     EXPECT_DOUBLE_EQ(m.right, 6.0);
-    EXPECT_DOUBLE_EQ(m.top, 21.0);  // top_space 4 + titlebar 17
+    EXPECT_DOUBLE_EQ(m.top, 21.0); // top_space 4 + titlebar 17
 }
 
 // ── 3. ShadeState direction bookkeeping ────────────────────────────────────
@@ -116,9 +116,9 @@ TEST_F(ShadeTest, ShadeStateDirectionBookkeeping)
 // (client_h - thickness - titlebar) * progress.
 TEST_F(ShadeTest, ShadowMarginsPureComputation)
 {
-    const int client_h = 300;
+    const int client_h  = 300;
     const int thickness = 6;
-    const int titlebar = 17;
+    const int titlebar  = 17;
 
     // p = 0 → all four = thickness.
     {
@@ -157,9 +157,9 @@ TEST_F(ShadeTest, ShadowMarginsPureComputation)
 // ── 5. Shadow margins for a maximized window ──────────────────────────────
 TEST_F(ShadeTest, ShadowMarginsMaximized)
 {
-    const int client_h = 300;
+    const int client_h  = 300;
     const int thickness = 6;
-    const int titlebar = 17;
+    const int titlebar  = 17;
 
     auto m = shadow_margins_for(client_h, thickness, titlebar, 0.0);
     EXPECT_DOUBLE_EQ(m.left, 6.0);
@@ -205,9 +205,10 @@ TEST_F(ShadeTest, SlowScrollUpSettlesAndDoesNotOscillate)
     {
         st.init_animation(wf::emeraldwf::scroll_shades(-5.0));
     }
-    EXPECT_TRUE(st.get_shade_direction())
-        << "repeated wheel-up ticks must keep the window shaded (settle), "
-           "not flip it back";
+
+    EXPECT_TRUE(st.get_shade_direction()) <<
+        "repeated wheel-up ticks must keep the window shaded (settle), "
+        "not flip it back";
 
     // Contrast: the pre-fix TOGGLE logic would flip on every tick.
     // Demonstrate that toggling the same 8 ticks lands UNshaded (even
@@ -218,8 +219,9 @@ TEST_F(ShadeTest, SlowScrollUpSettlesAndDoesNotOscillate)
     {
         old.init_animation(!old.get_shade_direction());
     }
-    EXPECT_FALSE(old.get_shade_direction())
-        << "the old toggle logic oscillates; even tick count ends unshaded";
+
+    EXPECT_FALSE(old.get_shade_direction()) <<
+        "the old toggle logic oscillates; even tick count ends unshaded";
 }
 
 // ── Finding 22: the shade_duration option must drive the animation ─────────
@@ -234,20 +236,20 @@ TEST_F(ShadeTest, ShadeStateRespectsDurationOption)
     // A test-local smoothing lambda: the headless test binary interposes an
     // empty local `smoothing::linear` over libwf-config's, so the extern
     // wayfire smooth functions are not a reliable fixture here.
-    auto linear = [](double x) { return x; };
+    auto linear = [] (double x) { return x; };
     auto dur = std::make_shared<wf::config::option_t<wf::animation_description_t>>(
         "emeraldwf/shade_duration",
         wf::animation_description_t{5000,
-                                    wf::animation::smoothing::smooth_function(linear),
-                                    "linear"});
+            wf::animation::smoothing::smooth_function(linear),
+            "linear"});
     ShadeState st(dur);
     st.init_animation(true);
-    EXPECT_TRUE(st.running())
-        << "a 5000 ms animation must still be running after start";
-    EXPECT_LT(st.get_progression(), 1.0)
-        << "progression must not jump to the end value on the first frame — "
-           "with the option unwired (the bug) the transition completed "
-           "instantly and progression was already 1.0";
+    EXPECT_TRUE(st.running()) <<
+        "a 5000 ms animation must still be running after start";
+    EXPECT_LT(st.get_progression(), 1.0) <<
+        "progression must not jump to the end value on the first frame — "
+        "with the option unwired (the bug) the transition completed "
+        "instantly and progression was already 1.0";
 }
 
 // ── Finding 23: enable_shade reaches the decorator's input paths ────────────
@@ -283,15 +285,15 @@ TEST_F(ShadeTest, MarginsIndependentOfShadeState)
 {
     emerald_decorator_t deco(nullptr, nullptr);
     wf::toplevel_state_t state;
-    state.fullscreen = false;
+    state.fullscreen  = false;
     state.tiled_edges = 0;
     auto m = deco.get_margins(state);
     EXPECT_DOUBLE_EQ(m.left, 6.0);
     EXPECT_DOUBLE_EQ(m.right, 6.0);
-    EXPECT_DOUBLE_EQ(m.bottom, 6.0)
-        << "without a shade transformer the bottom margin must be the "
-           "unshaded theme value (steady — the margins no longer read the "
-           "transformer's progression)";
+    EXPECT_DOUBLE_EQ(m.bottom, 6.0) <<
+        "without a shade transformer the bottom margin must be the "
+        "unshaded theme value (steady — the margins no longer read the "
+        "transformer's progression)";
     EXPECT_DOUBLE_EQ(m.top, 21.0);
 }
 
@@ -314,9 +316,9 @@ TEST_F(ShadeTest, MarginsLeaveTheClientInvariant)
 
     auto m = emerald_decorator_t::margins_for(base());
     const int client_after = frame_h - (int)m.top - (int)m.bottom;
-    EXPECT_EQ(client_after, frame_h - top - bottom0)
-        << "the margins must leave exactly the unshaded client inside the "
-           "frame (steady bottom margin — the client is never collapsed)";
+    EXPECT_EQ(client_after, frame_h - top - bottom0) <<
+        "the margins must leave exactly the unshaded client inside the "
+        "frame (steady bottom margin — the client is never collapsed)";
     EXPECT_GE(client_after, 0);
 }
 
@@ -327,7 +329,7 @@ TEST_F(ShadeTest, MakeMarginsInputNullViewHasSteadyMargins)
 {
     emerald_decorator_t deco(nullptr, nullptr);
     wf::toplevel_state_t state;
-    state.fullscreen = false;
+    state.fullscreen  = false;
     state.tiled_edges = 0;
     auto m = deco.get_margins(state);
     EXPECT_DOUBLE_EQ(m.bottom, 6.0);
@@ -348,16 +350,16 @@ TEST_F(ShadeTest, SteadyMarginsNeverDipBelowMinClientHeight)
     // (a terminal that refuses to shrink below ~5 rows).
     const int frame_h = 400, top = 21, bottom0 = 6;
     const int client = frame_h - top - bottom0;
-    const int min_h = 100;
+    const int min_h  = 100;
 
     auto m = emerald_decorator_t::margins_for(base());
     const int client_after = frame_h - (int)m.top - (int)m.bottom;
-    EXPECT_EQ(client_after, client)
-        << "the steady margins must leave the full unshaded client inside "
-           "the frame (no collapse)";
-    EXPECT_GE(client_after, min_h)
-        << "the client must stay at or above the min-size hint (it never "
-           "shrinks, so it cannot dip below it)";
+    EXPECT_EQ(client_after, client) <<
+        "the steady margins must leave the full unshaded client inside "
+        "the frame (no collapse)";
+    EXPECT_GE(client_after, min_h) <<
+        "the client must stay at or above the min-size hint (it never "
+        "shrinks, so it cannot dip below it)";
 }
 
 TEST_F(ShadeTest, ShadowMarginsRespectMinClientHeight)
@@ -365,8 +367,8 @@ TEST_F(ShadeTest, ShadowMarginsRespectMinClientHeight)
     const int client = 373, thickness = 6, titlebar = 17, min_h = 100;
 
     auto m = shadow_margins_for(client, thickness, titlebar, 1.0, min_h);
-    EXPECT_DOUBLE_EQ(m.bottom, 6.0 + (client - min_h))
-        << "the shadow bottom uses the same cap as the frame margins";
+    EXPECT_DOUBLE_EQ(m.bottom, 6.0 + (client - min_h)) <<
+        "the shadow bottom uses the same cap as the frame margins";
     EXPECT_EQ(client - (int)(m.bottom - 6.0), min_h);
 
     // Without the hint the old formula stands.
@@ -379,18 +381,18 @@ TEST_F(ShadeTest, ShadowMarginsRespectMinClientHeight)
 // The margin math is only correct if it composes stably with the toplevel's
 // COMMIT protocol, which no single-function test covers:
 //
-//   1. emeraldwf sets pending margins for the current progression p
-//      (margins_for — STEADY: identical for every p).
-//   2. wayfire configures the app to client = frame − top − bottom
-//      (xdg-toplevel configure_surface_with_state: floor, min 1).
-//   3. The app commits the size it actually chose — it may REFUSE to
-//      shrink below its own minimum (X11: the WM_NORMAL_HINTS min;
-//      Wayland: the app's internal min — invisible on XDG, where
-//      get_min_size() reports {0,0}).
-//   4. wayfire ADOPTS the committed size: frame = actual + margins
-//      (xdg-toplevel handle_surface_commit →
-//      adjust_geometry_for_gravity — the frame is re-derived from what
-//      the app really has).
+// 1. emeraldwf sets pending margins for the current progression p
+// (margins_for — STEADY: identical for every p).
+// 2. wayfire configures the app to client = frame − top − bottom
+// (xdg-toplevel configure_surface_with_state: floor, min 1).
+// 3. The app commits the size it actually chose — it may REFUSE to
+// shrink below its own minimum (X11: the WM_NORMAL_HINTS min;
+// Wayland: the app's internal min — invisible on XDG, where
+// get_min_size() reports {0,0}).
+// 4. wayfire ADOPTS the committed size: frame = actual + margins
+// (xdg-toplevel handle_surface_commit →
+// adjust_geometry_for_gravity — the frame is re-derived from what
+// the app really has).
 //
 // The old design collapsed the bottom margin with p, so step 2 requested a
 // shrinking client; when it dipped below the app's floor, step 4 grew the
@@ -406,11 +408,11 @@ TEST_F(ShadeTest, ShadowMarginsRespectMinClientHeight)
 
 struct FakeApp
 {
-    int min_h;  // the app's real floor (hint-visible on X11, invisible on XDG)
+    int min_h; // the app's real floor (hint-visible on X11, invisible on XDG)
 
     int commit(int requested) const
     {
-        return std::max(requested, min_h);  // apps never commit BELOW their floor
+        return std::max(requested, min_h); // apps never commit BELOW their floor
     }
 };
 
@@ -419,17 +421,20 @@ struct FakeApp
 // (what wayfire's current() carries); the frame it pairs with is `frame`.
 // `last_progress` is the previous tick's smoothed progress (direction
 // guard, see on_shade_progress()).
-void feedback_tick(double p, int &frame, int &app_h,
-                   int &live_min, int &last_requested, double &last_progress,
-                   wf::decoration_margins_t &margins_prev,
-                   const MarginsInput &base, const FakeApp &app)
+void feedback_tick(double p, int & frame, int & app_h,
+    int & live_min, int & last_requested, double & last_progress,
+    wf::decoration_margins_t & margins_prev,
+    const MarginsInput & base, const FakeApp & app)
 {
     // (1) emeraldwf: observe the app's floor from what wayfire last
-    //     adopted (current()), then compute this tick's margins. Only
-    //     while heading toward full shade (progress rising).
+    // adopted (current()), then compute this tick's margins. Only
+    // while heading toward full shade (progress rising).
     const int adopted = frame - (int)margins_prev.top - (int)margins_prev.bottom;
     if (p >= last_progress)
+    {
         live_min = wf::emeraldwf::update_observed_min(live_min, adopted, last_requested);
+    }
+
     last_progress = p;
 
     // margins_for() is steady (no progression input): identical margins on
@@ -437,7 +442,7 @@ void feedback_tick(double p, int &frame, int &app_h,
     const auto m = emerald_decorator_t::margins_for(base);
 
     // (2) wayfire: configure the app to the client inside the frame
-    //     (xdg: floor, min 1 — configure_surface_with_state).
+    // (xdg: floor, min 1 — configure_surface_with_state).
     const int requested =
         std::max(1, (int)std::floor((double)frame - m.top - m.bottom));
     last_requested = requested;
@@ -446,7 +451,7 @@ void feedback_tick(double p, int &frame, int &app_h,
     app_h = app.commit(requested);
 
     // (4) wayfire adopts: frame = actual client + margins (apply /
-    //     handle_surface_commit → adjust_geometry_for_gravity).
+    // handle_surface_commit → adjust_geometry_for_gravity).
     frame = app_h + (int)m.top + (int)m.bottom;
     margins_prev = m;
 }
@@ -456,20 +461,20 @@ void feedback_tick(double p, int &frame, int &app_h,
 // (duration_t::impl::progress() returns the exact end value when ready).
 //
 // Mirrors the production bookkeeping (toggle_shade / on_shade_progress):
-//   - the observed floor (live_min) PERSISTS across cycles;
-//   - at the start of the shade the frame is remembered as the reference;
-//   - when the unshade settles (p = 0.0, margins = exactly unshaded) the
-//     pending frame is restored to the reference — so the requested client
-//     is exactly the unshaded client, which the app honors.
-void run_shade_unshade_cycle(int &frame, int &app_h, int &live_min,
-                             int &last_requested, double &last_progress,
-                             wf::decoration_margins_t &margins_prev,
-                             const MarginsInput &base, const FakeApp &app)
+// - the observed floor (live_min) PERSISTS across cycles;
+// - at the start of the shade the frame is remembered as the reference;
+// - when the unshade settles (p = 0.0, margins = exactly unshaded) the
+// pending frame is restored to the reference — so the requested client
+// is exactly the unshaded client, which the app honors.
+void run_shade_unshade_cycle(int & frame, int & app_h, int & live_min,
+    int & last_requested, double & last_progress,
+    wf::decoration_margins_t & margins_prev,
+    const MarginsInput & base, const FakeApp & app)
 {
-    const double sigmoid_max = 1.0 + std::exp(-6.0);  // wayfire's sigmoid()
+    const double sigmoid_max = 1.0 + std::exp(-6.0); // wayfire's sigmoid()
     const int frames = 12;
-    const int top_m = base.top_space + base.extra_top + base.titlebar_height;
-    const int bot_m = base.bottom_space + base.extra_bottom;
+    const int top_m  = base.top_space + base.extra_top + base.titlebar_height;
+    const int bot_m  = base.bottom_space + base.extra_bottom;
 
     // Shade start, as toggle_shade() does it.
     const int ref_frame = frame;
@@ -479,8 +484,8 @@ void run_shade_unshade_cycle(int &frame, int &app_h, int &live_min,
     for (int k = 1; k <= frames; k++)
     {
         const double x = 1.0 * k / frames;
-        const double p = (k == frames) ? 1.0
-                                       : sigmoid_max / (1.0 + std::exp(-12.0 * x + 6.0));
+        const double p = (k == frames) ? 1.0 :
+            sigmoid_max / (1.0 + std::exp(-12.0 * x + 6.0));
         feedback_tick(p, frame, app_h, live_min, last_requested, last_progress, margins_prev, base, app);
     }
 
@@ -488,8 +493,8 @@ void run_shade_unshade_cycle(int &frame, int &app_h, int &live_min,
     for (int k = 1; k <= frames; k++)
     {
         const double x = 1.0 * k / frames;
-        const double p = (k == frames) ? 0.0
-                                       : 1.0 - sigmoid_max / (1.0 + std::exp(-12.0 * x + 6.0));
+        const double p = (k == frames) ? 0.0 :
+            1.0 - sigmoid_max / (1.0 + std::exp(-12.0 * x + 6.0));
         if (p < wf::emeraldwf::SHADE_SETTLE_EPSILON)
         {
             // on_shade_progress: settled unshaded → restore the reference
@@ -498,6 +503,7 @@ void run_shade_unshade_cycle(int &frame, int &app_h, int &live_min,
             // client). Mirrors production's epsilon settle gate (review N6).
             frame = ref_frame;
         }
+
         feedback_tick(p, frame, app_h, live_min, last_requested, last_progress, margins_prev, base, app);
     }
 }
@@ -510,25 +516,25 @@ TEST_F(ShadeTest, FeedbackLoopStable_XdgAppWithInvisibleMin)
     const MarginsInput cfg = base();
     const FakeApp app{100}; // the app's real (invisible) floor
 
-    const int top = base().top_space + base().titlebar_height;  // 21
-    const int bot0 = base().bottom_space;                       // 6
+    const int top     = base().top_space + base().titlebar_height;  // 21
+    const int bot0    = base().bottom_space;                       // 6
     const int client0 = 373;
-    int frame = client0 + top + bot0;   // 400
+    int frame = client0 + top + bot0; // 400
     int app_h = client0;
     int live_min = 0, last_requested = client0;
     double last_progress = 0.0;
     wf::decoration_margins_t mprev{};
-    mprev.top = top;
+    mprev.top    = top;
     mprev.bottom = bot0;
 
     for (int i = 0; i < 20; i++)
     {
         const int before = frame;
         run_shade_unshade_cycle(frame, app_h, live_min, last_requested, last_progress, mprev, cfg, app);
-        EXPECT_EQ(frame, before)
-            << "cycle " << i << ": frame height drifted " << before << " -> "
-            << frame << " (the app's committed size was adopted into the "
-               "frame without the cap honoring the app's floor)";
+        EXPECT_EQ(frame, before) <<
+            "cycle " << i << ": frame height drifted " << before << " -> " <<
+            frame << " (the app's committed size was adopted into the "
+                 "frame without the cap honoring the app's floor)";
     }
 }
 
@@ -540,24 +546,24 @@ TEST_F(ShadeTest, FeedbackLoopStable_X11AppWithVisibleHint)
     const MarginsInput cfg = base();
     const FakeApp app{100};
 
-    const int top = base().top_space + base().titlebar_height;
-    const int bot0 = base().bottom_space;
+    const int top     = base().top_space + base().titlebar_height;
+    const int bot0    = base().bottom_space;
     const int client0 = 373;
     int frame = client0 + top + bot0;
     int app_h = client0;
     int live_min = 0, last_requested = client0;
     double last_progress = 0.0;
     wf::decoration_margins_t mprev{};
-    mprev.top = top;
+    mprev.top    = top;
     mprev.bottom = bot0;
 
     for (int i = 0; i < 20; i++)
     {
         const int before = frame;
         run_shade_unshade_cycle(frame, app_h, live_min, last_requested, last_progress, mprev, cfg, app);
-        EXPECT_EQ(frame, before)
-            << "cycle " << i << ": frame height drifted " << before << " -> "
-            << frame;
+        EXPECT_EQ(frame, before) <<
+            "cycle " << i << ": frame height drifted " << before << " -> " <<
+            frame;
     }
 }
 
@@ -569,25 +575,26 @@ TEST_F(ShadeTest, FeedbackLoopStable_IdealApp)
     const MarginsInput cfg = base();
     const FakeApp app{1};
 
-    const int top = base().top_space + base().titlebar_height;
-    const int bot0 = base().bottom_space;
+    const int top     = base().top_space + base().titlebar_height;
+    const int bot0    = base().bottom_space;
     const int client0 = 373;
     int frame = client0 + top + bot0;
     int app_h = client0;
     int live_min = 0, last_requested = client0;
     double last_progress = 0.0;
     wf::decoration_margins_t mprev{};
-    mprev.top = top;
+    mprev.top    = top;
     mprev.bottom = bot0;
 
     for (int i = 0; i < 20; i++)
     {
         const int before = frame;
         run_shade_unshade_cycle(frame, app_h, live_min, last_requested, last_progress, mprev, cfg, app);
-        EXPECT_EQ(frame, before)
-            << "cycle " << i << ": frame height drifted " << before << " -> "
-            << frame;
+        EXPECT_EQ(frame, before) <<
+            "cycle " << i << ": frame height drifted " << before << " -> " <<
+            frame;
     }
+
     // And at rest the app is back at its original size.
     EXPECT_EQ(app_h, client0);
 }
@@ -602,28 +609,31 @@ TEST_F(ShadeTest, FeedbackLoopStable_IdealApp)
 TEST_F(ShadeTest, FeedbackLoopStable_EvenWithoutObservedFloor)
 {
     const MarginsInput cfg = base();
-    const FakeApp app{100};  // the app refuses to shrink below 100
+    const FakeApp app{100}; // the app refuses to shrink below 100
 
-    const int top = base().top_space + base().titlebar_height;
-    const int bot0 = base().bottom_space;
+    const int top     = base().top_space + base().titlebar_height;
+    const int bot0    = base().bottom_space;
     const int client0 = 373;
     int frame = client0 + top + bot0;
     int app_h = client0;
-    int last_requested = client0;
+    int last_requested   = client0;
     double last_progress = 0.0;
     wf::decoration_margins_t mprev{};
-    mprev.top = top;
+    mprev.top    = top;
     mprev.bottom = bot0;
 
     // Same loop as feedback_tick, but live_min is never updated (no
     // observation at all).
-    int live_min = 0;
+    int live_min     = 0;
     const int frames = 12;
     const double sigmoid_max = 1.0 + std::exp(-6.0);
-    auto tick = [&](double p)
+    auto tick = [&] (double p)
     {
         if (p >= last_progress)
+        {
             live_min = wf::emeraldwf::update_observed_min(0 /*frozen*/, 0, 0);
+        }
+
         last_progress = p;
         const auto m = emerald_decorator_t::margins_for(cfg);
         const int requested = std::max(1, (int)std::floor((double)frame - m.top - m.bottom));
@@ -639,15 +649,17 @@ TEST_F(ShadeTest, FeedbackLoopStable_EvenWithoutObservedFloor)
         const double x = 1.0 * k / frames;
         tick(k == frames ? 1.0 : sigmoid_max / (1.0 + std::exp(-12.0 * x + 6.0)));
     }
+
     for (int k = 1; k <= frames; k++)
     {
         const double x = 1.0 * k / frames;
         tick(k == frames ? 0.0 : 1.0 - sigmoid_max / (1.0 + std::exp(-12.0 * x + 6.0)));
     }
-    EXPECT_EQ(frame, start_frame)
-        << "with the steady bottom margin the requested client is always the "
-           "unshaded one, so the frame must be invariant even without the "
-           "observed-floor tracking (the old collapse+drift path is gone)";
+
+    EXPECT_EQ(frame, start_frame) <<
+        "with the steady bottom margin the requested client is always the "
+        "unshaded one, so the frame must be invariant even without the "
+        "observed-floor tracking (the old collapse+drift path is gone)";
 }
 
 // The floor decision itself (production pure function):
@@ -674,5 +686,4 @@ TEST_F(ShadeTest, UpdateObservedMinTakesTheLargerFloor)
     EXPECT_EQ(effective_min_client_h(120, 100), 120);
     EXPECT_EQ(effective_min_client_h(0, 0), 0);
 }
-
 } // namespace

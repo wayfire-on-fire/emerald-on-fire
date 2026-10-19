@@ -17,7 +17,6 @@ namespace wf
 {
 namespace emeraldwf
 {
-
 class ThemeSettings
 {
   public:
@@ -27,33 +26,33 @@ class ThemeSettings
 
     // Move support: transfers ownership of ws_/fs_act_/fs_inact_ and
     // nulls the source so its destructor is a no-op.
-    ThemeSettings(ThemeSettings &&other) noexcept;
-    ThemeSettings &operator=(ThemeSettings &&other) noexcept;
+    ThemeSettings(ThemeSettings && other) noexcept;
+    ThemeSettings& operator =(ThemeSettings && other) noexcept;
 
     // Non-copyable (raw ownership of emerald structs).
     ThemeSettings(const ThemeSettings &) = delete;
-    ThemeSettings &operator=(const ThemeSettings &) = delete;
+    ThemeSettings& operator =(const ThemeSettings&) = delete;
 
     // Engine override semantics (Part 07, emerald-theme-manager):
-    //  - engine_override empty            → the theme's own [engine]
-    //    (theme.ini); themes are self-contained packages.
-    //  - engine_override == theme's engine → identical to the empty case.
-    //  - engine_override != theme's engine → the override engine runs with
-    //    emerald's DEFAULT theme (its stock look): a theme's colors/
-    //    geometry/[<engine>_settings] are authored for its own engine, so
-    //    applying them to a foreign engine is meaningless. (Bare engine
-    //    struct defaults are zero-initialized = transparent, so the
-    //    defaults theme's per-engine sections are what "engine stock
-    //    look" means — same as emerald with no theme installed.)
-    //    settings.ini (engine-independent user settings) still applies.
-    bool load(const std::string &settings_ini, const std::string &theme_dir,
-              const std::string &engine_override = {});
+    // - engine_override empty            → the theme's own [engine]
+    // (theme.ini); themes are self-contained packages.
+    // - engine_override == theme's engine → identical to the empty case.
+    // - engine_override != theme's engine → the override engine runs with
+    // emerald's DEFAULT theme (its stock look): a theme's colors/
+    // geometry/[<engine>_settings] are authored for its own engine, so
+    // applying them to a foreign engine is meaningless. (Bare engine
+    // struct defaults are zero-initialized = transparent, so the
+    // defaults theme's per-engine sections are what "engine stock
+    // look" means — same as emerald with no theme installed.)
+    // settings.ini (engine-independent user settings) still applies.
+    bool load(const std::string & settings_ini, const std::string & theme_dir,
+        const std::string & engine_override = {});
 
     window_settings *ws() const;
     frame_settings *fs_active() const;
     frame_settings *fs_inactive() const;
-    const std::string &engine() const;
-    const std::string &theme_dir() const;
+    const std::string& engine() const;
+    const std::string& theme_dir() const;
     bool valid() const;
 
   private:
@@ -82,8 +81,8 @@ int get_b_t_offset(gint b_t);
 // read ctx.fs BETWEEN renders. After reload_theme() the previous
 // ThemeSettings is destroyed — a stale ctx.fs is a use-after-free, and the
 // first hover after any live reload segfaulted wayfire (whole session).
-inline void decor_ctx_set_theme(DecorContext &ctx, const ThemeSettings &ts,
-                                bool active)
+inline void decor_ctx_set_theme(DecorContext & ctx, const ThemeSettings & ts,
+    bool active)
 {
     ctx.fs = active ? ts.fs_active() : ts.fs_inactive();
 }
@@ -102,7 +101,7 @@ inline void decor_ctx_set_theme(DecorContext &ctx, const ThemeSettings &ts,
 // calling); falls back to the original's sharp rectangle if the reference
 // render fails. Destroys any previous textures; leaves both NULL for
 // shadow-free themes.
-void create_large_shadow_surface(ThemeSettings &ts);
+void create_large_shadow_surface(ThemeSettings & ts);
 
 // Port of emerald's update_shadow (original main.c:5183-5275) minus the
 // XRender parts: (re)computes the derived *_space fields (frame margins,
@@ -119,14 +118,14 @@ void update_shadow(frame_settings *fs);
 // the caller falls back to emerald's own default (DOUBLE_CLICK_SHADE /
 // DOUBLE_CLICK_SEND_TO_BACK), so a typo in the wayfire config never
 // breaks the click behavior.
-std::optional<int> parse_titlebar_action(const std::string &name);
+std::optional<int> parse_titlebar_action(const std::string & name);
 
 // Resolve the effective titlebar action from the emeraldwf option value:
 // a parseable value is used; anything else (empty/typo) yields `base`,
 // which the call sites set to emerald's own default (the WCM option
 // DEFINES the click action — it is a global emerald setting, not an
 // override over settings.ini).
-int resolve_titlebar_action(const std::string &override, int base);
+int resolve_titlebar_action(const std::string & override, int base);
 
 // Part 08: WCM owns the button fade/pulse settings (moved off the theme
 // manager's Emerald Settings tab — one setting, one editor). Convert the
@@ -139,6 +138,5 @@ void emeraldwf_apply_button_fade(window_settings *ws,
     bool use_fade, bool use_pulse,
     int total_duration_ms, int step_duration_ms,
     int pulse_wait_ms, int pulse_min_opacity_pct);
-
 } // namespace emeraldwf
 } // namespace wf

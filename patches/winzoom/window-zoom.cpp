@@ -3,23 +3,20 @@
  *
  * Copyright (c) 2023 Scott Moreau
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without the limitations of
- * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+ * associated documentation files (the "Software"), to deal in the Software without restriction, including
+ * without the limitations of rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the
+ * following conditions:
  *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
+ * The above copyright notice and this permission notice shall be included in all copies or substantial
+ * portions of the Software.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT
+ * LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO
+ * EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+ * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
  */
 
 // emeraldwf patch (2026-10-10): based on wayfire-plugins-extra v0.11.2
@@ -40,11 +37,11 @@
 // back.
 //
 // Diff vs. upstream (only wayfire_winzoom):
-//   - new member `unmap_connections`, new method `unzoom(view)`;
-//   - update_winzoom(): registers the unmap connection when the transformer
-//     is created; the "back to scale 1.0" path calls unzoom() (upstream left
-//     the stale map entry behind);
-//   - fini(): removes transformers from live views, clears both maps.
+// - new member `unmap_connections`, new method `unzoom(view)`;
+// - update_winzoom(): registers the unmap connection when the transformer
+// is created; the "back to scale 1.0" path calls unzoom() (upstream left
+// the stale map entry behind);
+// - fini(): removes transformers from live views, clears both maps.
 
 #include <wayfire/core.hpp>
 #include <wayfire/scene.hpp>
@@ -212,7 +209,7 @@ class wayfire_winzoom : public wf::per_output_plugin_instance_t
     // so the connections live in stable unique_ptr storage.
     std::map<wayfire_toplevel_view,
         std::unique_ptr<wf::signal::connection_t<wf::view_unmapped_signal>>>
-        unmap_connections;
+    unmap_connections;
     wf::plugin_activation_data_t grab_interface{
         .name = "window-zoom",
         .capabilities = 0,

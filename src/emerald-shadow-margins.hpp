@@ -18,14 +18,13 @@ namespace wf
 {
 namespace emeraldwf
 {
-
 // Custom data key — identical to pixdecor so an installed shadow plugin
 // (wayfire-contrib `shadow` etc.) that reads this key keeps working.
 constexpr char SHADOW_MARGIN_DATA_KEY[] = "wf-decoration-shadow-margin";
 
 /**
- * Shadow margins, same shape as pixdecor's `wf_shadow_margin_t`.
- * A standalone shadow plugin reads this from the view's custom data.
+ * Shadow margins, same shape as pixdecor's `wf_shadow_margin_t`. A standalone shadow plugin reads this from
+ * the view's custom data.
  */
 class wf_shadow_margin_t : public wf::custom_data_t
 {
@@ -46,27 +45,23 @@ class wf_shadow_margin_t : public wf::custom_data_t
 
 /**
  * Pure shadow-margin computation (spec 05 Tests):
- *   left   = thickness
- *   right  = thickness
- *   top    = thickness
- *   bottom = thickness + (client_h − thickness − titlebar) × progress
+ *   left   = thickness right  = thickness top    = thickness bottom = thickness + (client_h − thickness −
+ * titlebar) × progress
  *
  * `progress` is the shade progression (0 = unshaded, 1 = fully shaded).
- * `min_client_h` (finding 53) caps the collapse so the shadow bottom never
- * implies a client below the toplevel's min-size hint (same cap as
- * margins_for — X11 servers clamp to the hint and wayfire re-derives the
- * frame from the clamped client).
- * For CSD views without a decorator, call with `thickness = 0` (the
+ * `min_client_h` (finding 53) caps the collapse so the shadow bottom never implies a client below the
+ * toplevel's min-size hint (same cap as margins_for — X11 servers clamp to the hint and wayfire re-derives
+ * the frame from the clamped client). For CSD views without a decorator, call with `thickness = 0` (the
  * plugin exposes the option `emeraldwf/shadow_pad` for non-zero values).
  */
 wf::decoration_margins_t shadow_margins_for(int client_h, int thickness,
-                                            int titlebar, double progress,
-                                            int min_client_h = 0);
+    int titlebar, double progress,
+    int min_client_h = 0);
 
 /**
  * Store/update the `wf_shadow_margin_t` on the view under
- * `SHADOW_MARGIN_DATA_KEY`. Free function so the plugin can call it for
- * CSD views (which have no `emerald_decorator_t`).
+ * `SHADOW_MARGIN_DATA_KEY`. Free function so the plugin can call it for CSD views (which have no
+ * `emerald_decorator_t`).
  *
  * @param view       live toplevel view (any view type; CSD ok)
  * @param client_h   pending client height
@@ -76,8 +71,7 @@ wf::decoration_margins_t shadow_margins_for(int client_h, int thickness,
  * @param min_client_h toplevel min-size hint (client height; finding 53)
  */
 void export_shadow_margins(wayfire_view view, int client_h, int thickness,
-                           int titlebar, double progress,
-                           int min_client_h = 0);
-
+    int titlebar, double progress,
+    int min_client_h = 0);
 } // namespace emeraldwf
 } // namespace wf

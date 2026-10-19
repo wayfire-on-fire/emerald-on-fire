@@ -19,17 +19,18 @@ namespace wf
 {
 namespace emeraldwf
 {
-
 // Stamp of the file at `path` (nanoseconds since epoch); 0 when the file
 // does not exist (the poller treats "missing" as a change too).
-inline std::uint64_t emwf_file_stamp(const std::string &path)
+inline std::uint64_t emwf_file_stamp(const std::string & path)
 {
     struct stat st;
     if (stat(path.c_str(), &st) != 0)
+    {
         return 0;
+    }
+
     return (std::uint64_t)st.st_mtim.tv_sec * 1000000000ull +
            (std::uint64_t)st.st_mtim.tv_nsec;
 }
-
 } // namespace emeraldwf
 } // namespace wf

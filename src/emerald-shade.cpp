@@ -9,20 +9,22 @@ namespace wf
 {
 namespace emeraldwf
 {
-
 // Review F2 (-Wshadow): parameters named *_arg — bare `view`/`strip_h`
 // shadow the members they initialize (and `duration` shadows the base
 // `timed_transition_t::duration` member).
 emerald_shade_t::emerald_shade_t(::wayfire_toplevel_view view_arg, int strip_h_arg,
     std::shared_ptr<wf::config::option_t<wf::animation_description_t>>
-        duration_opt)
-    : wf::scene::view_2d_transformer_t(view_arg)
+    duration_opt) :
+    wf::scene::view_2d_transformer_t(view_arg)
     , view(view_arg)
     , strip_h(strip_h_arg)
     , state(duration_opt)
 {
     if (view_arg)
+    {
         output = view_arg->get_output();
+    }
+
     if (output)
     {
         tick_hook = [=] ()
@@ -67,13 +69,17 @@ void emerald_shade_t::init_animation(bool shade)
 
     state.init_animation(shade);
     if (view)
+    {
         view->damage();
+    }
 }
 
 void emerald_shade_t::tick()
 {
     if (view == nullptr)
+    {
         return;
+    }
 
     // Advance the animation (duration_t advances its internal clock).
     // `progression.shade` now holds the smoothed value for this frame.
@@ -87,9 +93,12 @@ void emerald_shade_t::tick()
     if (auto toplevel = view->toplevel())
     {
         if (auto deco = toplevel->get_data<emerald_decorator_t>())
+        {
             deco->on_shade_progress(p);
-        else if (shadow_update_)
+        } else if (shadow_update_)
+        {
             shadow_update_();
+        }
     }
 
     view->damage();
@@ -115,13 +124,12 @@ void emerald_shade_t::tick()
         {
             auto tmgr = view->get_transformed_node();
             if (auto tr = tmgr->get_transformer<emerald_shade_t>(
-                    SHADE_TRANSFORMER_NAME))
+                SHADE_TRANSFORMER_NAME))
             {
                 tmgr->rem_transformer<emerald_shade_t>(tr);
             }
         }
     }
 }
-
 } // namespace emeraldwf
 } // namespace wf

@@ -12,7 +12,6 @@ namespace wf
 {
 namespace emeraldwf
 {
-
 ThemeSettings::ThemeSettings()
 {
     // window_settings is a plain C struct; `new T{}` value-initializes it
@@ -26,8 +25,8 @@ ThemeSettings::~ThemeSettings()
     delete ws_;
 }
 
-bool ThemeSettings::load(const std::string &settings_ini, const std::string &theme_dir,
-                         const std::string &engine_override)
+bool ThemeSettings::load(const std::string & settings_ini, const std::string & theme_dir,
+    const std::string & engine_override)
 {
     (void)engine_override;
     settings_path_ = settings_ini;
@@ -43,22 +42,22 @@ bool ThemeSettings::load(const std::string &settings_ini, const std::string &the
     return true;
 }
 
-window_settings *ThemeSettings::ws() const
+window_settings*ThemeSettings::ws() const
 {
     return ws_;
 }
 
-frame_settings *ThemeSettings::fs_active() const
+frame_settings*ThemeSettings::fs_active() const
 {
     return fs_act_;
 }
 
-frame_settings *ThemeSettings::fs_inactive() const
+frame_settings*ThemeSettings::fs_inactive() const
 {
     return fs_inact_;
 }
 
-const std::string &ThemeSettings::engine() const
+const std::string& ThemeSettings::engine() const
 {
     return engine_;
 }
@@ -67,6 +66,5 @@ bool ThemeSettings::valid() const
 {
     return valid_;
 }
-
 } // namespace emeraldwf
 } // namespace wf
