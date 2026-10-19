@@ -57,7 +57,7 @@ jobs:
           cd /tmp/wayland
           meson setup build --prefix=/usr -Ddocumentation=false
           ninja -C build
-          ninja -C build install
+          sudo ninja -C build install
       - name: Build + install wayland-protocols from source (1.47)
         run: |
           # noble ships wayland-protocols 1.45; wayfire 0.11's bundled wlroots
@@ -68,7 +68,7 @@ jobs:
           cd /tmp/wayland-protocols
           meson setup build --prefix=/usr
           ninja -C build
-          ninja -C build install
+          sudo ninja -C build install
       - name: Build + install libdrm from source (2.4.129)
         run: |
           # noble ships libdrm 2.4.125; wayfire 0.11's bundled wlroots needs
@@ -79,7 +79,7 @@ jobs:
           cd libdrm-2.4.129
           meson setup build --prefix=/usr
           ninja -C build
-          ninja -C build install
+          sudo ninja -C build install
       - name: Build + install xkbcommon from source (1.13.2)
         run: |
           # noble ships xkbcommon 1.6.0; wayfire 0.11's bundled wlroots needs
@@ -91,7 +91,7 @@ jobs:
             -Denable-tools=false -Denable-x11=false \
             -Denable-docs=false -Denable-xkbregistry=false
           ninja -C build
-          ninja -C build install
+          sudo ninja -C build install
       - name: Build + install pixman from source (0.46.4)
         run: |
           # noble ships pixman 0.42.2; wayfire 0.11's bundled wlroots needs
@@ -101,7 +101,7 @@ jobs:
           cd /tmp/pixman
           meson setup build --prefix=/usr -Dtests=disabled
           ninja -C build
-          ninja -C build install
+          sudo ninja -C build install
       - name: Build + install wayfire from source (v0.11.0)
         run: |
           git clone --recursive --depth 1 --branch v0.11.0 \
@@ -109,7 +109,7 @@ jobs:
           cd /tmp/wayfire
           meson setup build --prefix=/usr
           ninja -C build
-          ninja -C build install
+          sudo ninja -C build install
       - name: Configure
         run: meson setup build --buildtype=release
       - name: Build
