@@ -23,15 +23,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         git \
         ca-certificates \
         # plugin deps
-        libgtk-3.0-dev \
-        libpangocairo-1.0-dev \
+        libgtk-3-0-dev \
+        libpangocairo-1.0-0-dev \
         libgdk-pixbuf-2.0-dev \
         libcairo2-dev \
         libglib2.0-dev \
         libx11-dev \
         libgtest-dev \
         # wayfire build deps
-        wayland-dev \
         libwayland-dev \
         wayland-protocols \
         libinput-dev \
