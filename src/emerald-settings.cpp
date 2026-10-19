@@ -102,9 +102,9 @@ void apply_emerald_defaults(window_settings *ws)
     ws->extra_extents.top   = 0;
     ws->extra_extents.right = 0;
     ws->extra_extents.bottom = 0;
-    ws->shadow_radius  = 15;
+    ws->shadow_radius  = 11.5;
     ws->shadow_opacity = .8;
-    ws->min_titlebar_height = 17;
+    ws->min_titlebar_height = 18;
     ws->double_click_action = DOUBLE_CLICK_SHADE;
     ws->middle_click_action = DOUBLE_CLICK_SEND_TO_BACK;
     ws->button_hover_cursor = 1;
@@ -119,7 +119,7 @@ void apply_emerald_defaults(window_settings *ws)
         g_free(ws->tobj_layout);
     }
 
-    ws->tobj_layout = g_strdup("IT::HNXC");
+    ws->tobj_layout = g_strdup("I(30):T:N(2)X(2)C:");
 
     // frame settings: active
     ws->fs_act->text.color.r = 1.0;
