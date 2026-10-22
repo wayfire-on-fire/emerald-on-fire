@@ -227,6 +227,19 @@ void copy_from_defaults_if_needed(const std::string & settings_path,
     }
 }
 
+// Non-throwing __FILE__-relative root; falls back to the raw path on failure.
+static fs::path file_relative_root()
+{
+    std::error_code ec;
+    fs::path p = fs::weakly_canonical(fs::current_path() / __FILE__, ec);
+    if (ec)
+    {
+        p = fs::path(__FILE__);
+    }
+
+    return p;
+}
+
 // port of main.c:5490-5512 (titlebar_font_changed)
 void titlebar_font_changed(window_settings *ws, const std::string & font_name)
 {
@@ -1164,8 +1177,7 @@ bool ThemeSettings::load(const std::string & settings_ini,
     }
     if (defaults_dir.empty() || !fs::is_directory(defaults_dir))
     {
-        defaults_dir = fs::weakly_canonical(fs::current_path() / __FILE__)
-            .parent_path()
+        defaults_dir = file_relative_root().parent_path()
             .parent_path()
             .parent_path() / "third_party" / "emerald" /
             "defaults";
@@ -1217,8 +1229,7 @@ bool ThemeSettings::load(const std::string & settings_ini,
             return p.string();
         }
 
-        return (fs::weakly_canonical(fs::current_path() / __FILE__)
-            .parent_path()
+        return (file_relative_root().parent_path()
             .parent_path()
             .parent_path() / "third_party" / "emerald" /
             "defaults" / "theme")
@@ -1352,8 +1363,7 @@ bool ThemeSettings::load(const std::string & settings_ini,
         }
 
         // 3. fallback: cwd-relative __FILE__ (project root 3 hops up)
-        return (fs::weakly_canonical(fs::current_path() / __FILE__)
-            .parent_path()
+        return (file_relative_root().parent_path()
             .parent_path()
             .parent_path() / "build" / "engines")
                    .string();

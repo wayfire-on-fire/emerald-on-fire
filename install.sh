@@ -140,7 +140,9 @@ atomic_versioned_so() {  # srcfile destdir
 }
 
 echo "==> installing (plugin, engines, metadata, icon)"
-if [ -d "$DATADIR/wayfire/metadata" ] && [ -w "$DATADIR/wayfire/metadata" ]; then
+# [ -w ] is false for a missing path, so create the target dirs first.
+mkdir -p "$DATADIR/wayfire/metadata" 2>/dev/null || true
+if [ -w "$DATADIR/wayfire/metadata" ]; then
     cp metadata/emeraldwf.xml "$DATADIR/wayfire/metadata/"
     echo "==> emeraldwf.xml → $DATADIR/wayfire/metadata"
 else
@@ -149,7 +151,8 @@ else
     exit 1
 fi
 
-# runtime .so files — atomic placement (see note above)
+# runtime .so files — atomic placement (see note above); target dirs first
+mkdir -p "$LIBDIR/wayfire" "$LIBDIR/emeraldwf" "$LIBDIR/emeraldwf/engines" 2>/dev/null || true
 if [ ! -w "$LIBDIR/wayfire" ] || [ ! -w "$LIBDIR/emeraldwf/engines" ]; then
     echo "FATAL: $LIBDIR/wayfire and $LIBDIR/emeraldwf/engines must be" >&2
     echo "writable. Re-run with:  sudo $0 $*" >&2
