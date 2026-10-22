@@ -1,0 +1,3 @@
+# cached cloud base images (hundreds of MB each) + per-VM run state
+images/
+run/

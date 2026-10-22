@@ -124,6 +124,41 @@ jobs:
           name: emeraldwf-native
           path: build/src/libemeraldwf.so
 
+  # per-distro compilation-only jobs (no session; the visible-GUI path is the
+  # local QEMU harness in e2e/distros/, intentionally not in CI)
+  distro-compile:
+    name: compile (${{ matrix.distro }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro: arch
+            image: archlinux:latest
+            install: |
+              pacman -Syu --noconfirm --needed base-devel git meson ninja pkgconf \
+                wayfire glm gtk3 gdk-pixbuf2 cairo glib2 libx11 pango gtest
+          - distro: opensuse
+            image: opensuse/tumbleweed:latest
+            install: |
+              zypper --non-interactive install --no-recommends \
+                gcc gcc-c++ make glm-devel wayfire wayfire-devel meson ninja pkgconf \
+                gtk3-devel gdk-pixbuf-devel cairo-devel glib2-devel libX11-devel \
+                pango-devel gtest Mesa-libGLESv3-devel
+    container: ${{ matrix.image }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build deps
+        run: ${{ matrix.install }}
+      - name: Configure (meson)
+        run: meson setup build
+      - name: Build (ninja)
+        run: ninja -C build
+      - name: Verify plugin compiled
+        run: |
+          test -f build/src/libemeraldwf.so
+          echo "built: $(du -h build/src/libemeraldwf.so | cut -f1)"
+
   # Wayfire enforces a shared uncrustify config; match it. Project C++ only —
   # the vendored third_party/emerald tree is excluded (kept unmodified).
   code_style:

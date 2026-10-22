@@ -1,0 +1,21 @@
+#cloud-config
+# NoCloud seed for the emeraldwf Arch test VM.
+# __PUBKEY__ is substituted by run-kvm.sh with the host's ssh public key.
+# We SSH in as ROOT; the default user (arch) is only used for the visible
+# wayfire autologin session (see provision.sh).
+hostname: emeraldwf-arch
+disable_root: false
+ssh_pwauth: false
+users:
+  - name: arch
+    sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+runcmd:
+  - mkdir -p /root/.ssh
+  - echo '__PUBKEY__' > /root/.ssh/authorized_keys
+  - chmod 700 /root/.ssh
+  - chmod 600 /root/.ssh/authorized_keys
+  - sed -ri 's/^#?PermitRootLogin.*/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config
+  - grep -qE '^PermitRootLogin' /etc/ssh/sshd_config || echo 'PermitRootLogin prohibit-password' >> /etc/ssh/sshd_config
+  - mkdir -p /etc/ssh/sshd_config.d
+  - echo 'PermitRootLogin prohibit-password' > /etc/ssh/sshd_config.d/99-emeraldwf.conf
+  - systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null || true
