@@ -406,6 +406,76 @@ TEST_F(PixmapIntegrationTest, NonDefaultThemeDir_WarnsForPixmapEngine)
 // wayfire.ini + config sync), num = INT_MAX/50 = 42949672, and
 // num * 100 = 4294967200 overflows INT_MAX — UB, a bogus step count.
 // The fix uses an int64_t intermediate.
+// M8 (issue #1): first-run seeding used to be coupled to settings.ini —
+// copy_from_defaults_if_needed() returned early if settings.ini existed,
+// so a destroyed theme/theme.ini was NEVER re-seeded (the theme silently
+// ran on bare defaults). Upstream checks the two files independently.
+TEST_F(SettingsTest, MissingThemeIniReseedsIndependentOfSettingsIni)
+{
+    const fs::path dir = tmp_dir_ / "m8-reseed";
+    fs::create_directories(dir / "theme");
+    std::ofstream(dir / "settings.ini") << "# present\n";
+    // theme/ exists but theme.ini is MISSING (destroyed/never created).
+
+    ThemeSettings ts;
+    const bool ok = ts.load((dir / "settings.ini").string(),
+        (dir / "theme").string());
+    ASSERT_TRUE(ok);
+
+    EXPECT_TRUE(fs::exists(dir / "theme" / "theme.ini"))
+        << "a missing theme.ini must be re-seeded even when "
+           "settings.ini exists (pre-fix: the early return skipped "
+           "the theme seed)";
+
+    // The seed is the vendored default theme (spot-check its engine).
+    GKeyFile *f = g_key_file_new();
+    g_key_file_load_from_file(f,
+        (dir / "theme" / "theme.ini").c_str(),
+        G_KEY_FILE_NONE, nullptr);
+    gchar *eng = g_key_file_get_string(f, "engine", "engine", nullptr);
+    EXPECT_STREQ(eng, "vrunner")
+        << "the re-seeded theme must be the vendored default";
+    g_free(eng);
+    g_key_file_free(f);
+}
+
+TEST_F(SettingsTest, ExistingThemeNotOverwrittenBySeed)
+{
+    // Both files exist -> nothing is re-seeded; the user's theme.ini
+    // content survives the load.
+    const fs::path dir = tmp_dir_ / "m8-keep";
+    fs::create_directories(dir / "theme");
+    std::ofstream(dir / "settings.ini") << "# present\n";
+    std::ofstream(dir / "theme" / "theme.ini")
+        << "[engine]\nengine=oxygen\n[titlebar]\nactive_text=#ff0000\n";
+
+    ThemeSettings ts;
+    const bool ok = ts.load((dir / "settings.ini").string(),
+        (dir / "theme").string());
+    ASSERT_TRUE(ok);
+
+    // The user theme was used, not the default (red active_text).
+    EXPECT_FLOAT_EQ(ts.ws()->fs_act->text.color.r, 1.0f);
+    EXPECT_FLOAT_EQ(ts.ws()->fs_act->text.color.g, 0.0f);
+}
+
+TEST_F(SettingsTest, FreshDirSeedsBothFiles)
+{
+    // Neither file exists -> both are seeded (the pre-existing first-run
+    // behavior, pinned here so the M8 decoupling can't regress it).
+    const fs::path dir = tmp_dir_ / "m8-fresh";
+    fs::create_directories(dir / "theme");
+
+    ThemeSettings ts;
+    const bool ok = ts.load((dir / "settings.ini").string(),
+        (dir / "theme").string());
+    ASSERT_TRUE(ok);
+    EXPECT_TRUE(fs::exists(dir / "settings.ini"))
+        << "a fresh dir must seed settings.ini";
+    EXPECT_TRUE(fs::exists(dir / "theme" / "theme.ini"))
+        << "a fresh dir must seed theme.ini";
+}
+
 TEST(ButtonFadeOverflow, HugeDurationPulseDerivationDoesNotOverflow)
 {
     auto *ws = new window_settings{};

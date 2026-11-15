@@ -180,14 +180,15 @@ void copy_from_defaults_if_needed(const std::string & settings_path,
     const std::string & defaults_dir,
     const std::string & installed_theme_dir)
 {
-    if (fs::exists(settings_path))
-    {
-        return;
-    }
+    // M8 (issue #1): settings.ini and theme/theme.ini are seeded
+    // INDEPENDENTLY (upstream checks both). Pre-fix, an existing
+    // settings.ini returned early and skipped the theme.ini seed
+    // entirely, so a destroyed theme.ini was never re-seeded — the
+    // theme silently ran on bare defaults.
 
     const std::string default_settings =
         defaults_dir + "/settings.ini";
-    if (fs::exists(default_settings))
+    if (!fs::exists(settings_path) && fs::exists(default_settings))
     {
         std::ifstream in(default_settings, std::ios::binary);
         std::string content((std::istreambuf_iterator<char>(in)),
