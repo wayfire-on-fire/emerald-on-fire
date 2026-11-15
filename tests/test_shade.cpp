@@ -686,4 +686,91 @@ TEST_F(ShadeTest, UpdateObservedMinTakesTheLargerFloor)
     EXPECT_EQ(effective_min_client_h(120, 100), 120);
     EXPECT_EQ(effective_min_client_h(0, 0), 0);
 }
+
+// ── 5. export_shadow_margins against a live view (R3, issue #1) ────────
+// SHADOW_MARGIN_DATA_KEY is DELIBERATELY shared with pixdecor (the header
+// documents it as identical so installed shadow plugins keep working).
+// has_data() is type-agnostic, but get_data<T>() is a dynamic_cast: when a
+// FOREIGN custom-data type is stored under the key, get_data<
+// wf_shadow_margin_t>() returns nullptr. Pre-fix, export_shadow_margins()
+// dereferenced that nullptr (->set_margins) — a segfault in the plugin.
+// Post-fix: the foreign entry is replaced with a wf_shadow_margin_t
+// carrying the right margins.
+class foreign_shadow_data_t : public wf::custom_data_t
+{
+  public:
+    int foreign = 42;
+};
+
+class R3TestView : public wf::view_interface_t
+{
+  public:
+    wlr_surface *get_keyboard_focus_surface() override
+    {
+        return nullptr;
+    }
+};
+
+TEST_F(ShadeTest, ExportShadowMarginsForeignTypeUnderSharedKey)
+{
+    auto view = std::make_shared<R3TestView>();
+
+    // A foreign plugin (pixdecor, a standalone shadow plugin, ...)
+    // stored its OWN type under the shared key.
+    view->store_data(std::make_unique<foreign_shadow_data_t>(),
+        wf::emeraldwf::SHADOW_MARGIN_DATA_KEY);
+    ASSERT_TRUE(view->has_data(wf::emeraldwf::SHADOW_MARGIN_DATA_KEY));
+
+    // Pre-fix: get_data<wf_shadow_margin_t>() dynamic_casts the foreign
+    // type to nullptr and ->set_margins segfaulted here.
+    wf::emeraldwf::export_shadow_margins(view, 300, 6, 17, 0.5, 0);
+
+    auto data = view->get_data<wf::emeraldwf::wf_shadow_margin_t>(
+        wf::emeraldwf::SHADOW_MARGIN_DATA_KEY);
+    ASSERT_NE(data.get(), nullptr)
+        << "after export, the shared key must hold a wf_shadow_margin_t "
+        << "(the foreign entry is replaced, not dereferenced)";
+
+    const auto expected = shadow_margins_for(300, 6, 17, 0.5, 0);
+    const auto m = data->get_margins();
+    EXPECT_DOUBLE_EQ(m.left, expected.left);
+    EXPECT_DOUBLE_EQ(m.right, expected.right);
+    EXPECT_DOUBLE_EQ(m.top, expected.top);
+    EXPECT_DOUBLE_EQ(m.bottom, expected.bottom);
+}
+
+TEST_F(ShadeTest, ExportShadowMarginsFreshViewStores)
+{
+    auto view = std::make_shared<R3TestView>();
+    ASSERT_FALSE(view->has_data(wf::emeraldwf::SHADOW_MARGIN_DATA_KEY));
+
+    wf::emeraldwf::export_shadow_margins(view, 300, 6, 17, 0.5, 0);
+
+    auto data = view->get_data<wf::emeraldwf::wf_shadow_margin_t>(
+        wf::emeraldwf::SHADOW_MARGIN_DATA_KEY);
+    ASSERT_NE(data.get(), nullptr);
+
+    const auto expected = shadow_margins_for(300, 6, 17, 0.5, 0);
+    const auto m = data->get_margins();
+    EXPECT_DOUBLE_EQ(m.left, expected.left);
+    EXPECT_DOUBLE_EQ(m.bottom, expected.bottom);
+}
+
+TEST_F(ShadeTest, ExportShadowMarginsRepeatUpdates)
+{
+    auto view = std::make_shared<R3TestView>();
+
+    wf::emeraldwf::export_shadow_margins(view, 300, 6, 17, 0.0, 0);
+    wf::emeraldwf::export_shadow_margins(view, 300, 6, 17, 1.0, 0);
+
+    auto data = view->get_data<wf::emeraldwf::wf_shadow_margin_t>(
+        wf::emeraldwf::SHADOW_MARGIN_DATA_KEY);
+    ASSERT_NE(data.get(), nullptr);
+
+    const auto m = data->get_margins();
+    const auto expected = shadow_margins_for(300, 6, 17, 1.0, 0);
+    EXPECT_DOUBLE_EQ(m.bottom, expected.bottom)
+        << "a second export must UPDATE the existing margins, not "
+        << "leave the first call's value";
+}
 } // namespace

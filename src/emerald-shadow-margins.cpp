@@ -58,17 +58,24 @@ void export_shadow_margins(wayfire_view view, int client_h, int thickness,
 
     auto margins = shadow_margins_for(client_h, thickness, titlebar, progress,
         min_client_h);
-    if (view->has_data(SHADOW_MARGIN_DATA_KEY))
+    auto data = view->get_data<wf_shadow_margin_t>(SHADOW_MARGIN_DATA_KEY);
+    if (data != nullptr)
     {
-        view->get_data<wf_shadow_margin_t>(SHADOW_MARGIN_DATA_KEY)
-        ->set_margins(margins);
-    } else
-    {
-        view->store_data(std::make_unique<wf_shadow_margin_t>(),
-            SHADOW_MARGIN_DATA_KEY);
-        view->get_data<wf_shadow_margin_t>(SHADOW_MARGIN_DATA_KEY)
-        ->set_margins(margins);
+        data->set_margins(margins);
+        return;
     }
+
+    // R3 (issue #1): no data — OR a FOREIGN custom-data type stored
+    // under the shared key. has_data() is type-agnostic, but
+    // get_data<T>() is a dynamic_cast: any type other than
+    // wf_shadow_margin_t (e.g. pixdecor's own, or another shadow
+    // plugin's) casts to nullptr, and dereferencing it was a
+    // segfault. The key is deliberately shared, so replace the
+    // foreign entry (store_data overwrites) and store ours — with the
+    // margins already set, so no second lookup is needed.
+    auto new_data = std::make_unique<wf_shadow_margin_t>();
+    new_data->set_margins(margins);
+    view->store_data(std::move(new_data), SHADOW_MARGIN_DATA_KEY);
 }
 } // namespace emeraldwf
 } // namespace wf
