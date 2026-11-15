@@ -445,29 +445,19 @@ void emeraldwf_plugin::toggle_shade(wayfire_view view)
         // CSD view: no decorator, but shade still works (spec 05 §5) —
         // the transformer is attached directly to the client surface with
         // the `csd_titlebar_height` option.
-        auto tmgr = view->get_transformed_node();
-        auto tr   = tmgr->get_transformer<wf::emeraldwf::emerald_shade_t>(
-            wf::emeraldwf::SHADE_TRANSFORMER_NAME);
-        if (tr)
-        {
-            tr->set_strip_h(int(csd_titlebar_height));
-            tr->init_animation(!tr->get_direction());
-        } else
-        {
-            // Finding 22: wire emeraldwf/shade_duration into the animation.
-            auto new_tr = std::make_shared<wf::emeraldwf::emerald_shade_t>(
-                toplevel, int(csd_titlebar_height), shade_duration);
-            // Review R4: re-export the shadow margins per tick — the CSD
-            // view has no decorator for the transformer's tick() to drive,
-            // so without this a shadow plugin would see the pre-shade
-            // margins for the whole animation. export_csd_shadow_margins
-            // reads the transformer's own progression.
-            new_tr->set_shadow_update(
-                [this, view] { export_csd_shadow_margins(view); });
-            tmgr->add_transformer(new_tr, wf::TRANSFORMER_2D,
-                wf::emeraldwf::SHADE_TRANSFORMER_NAME);
-            new_tr->init_animation(true);
-        }
+        // M19 (issue #1): get-or-create + the per-tick shadow-export
+        // registration (Review R4: the CSD view has no decorator for the
+        // transformer's tick() to drive, so without it a shadow plugin
+        // would see the pre-shade margins for the whole animation) go
+        // through the shared helper — the callback must be registered at
+        // EVERY creation branch (the S1 regression was a missed one).
+        auto tr = wf::emeraldwf::get_or_create_shade(
+            toplevel, int(csd_titlebar_height), shade_duration,
+            [this, view] { export_csd_shadow_margins(view); });
+        tr->set_strip_h(int(csd_titlebar_height));
+        // Fresh transformers start unshaded (direction false), so this is
+        // the same as the old create-branch's init_animation(true).
+        tr->init_animation(!tr->get_direction());
 
         export_csd_shadow_margins(view);
     }
@@ -506,34 +496,23 @@ void emeraldwf_plugin::scroll_shade(wayfire_view view, double delta)
         }
 
         const bool to_shade = scroll_shades(delta);
-        auto tmgr = view->get_transformed_node();
-        auto tr   = tmgr->get_transformer<wf::emeraldwf::emerald_shade_t>(
-            wf::emeraldwf::SHADE_TRANSFORMER_NAME);
-        if ((tr == nullptr) && !to_shade)
+        // Unshading a view with no transformer is a no-op — check BEFORE
+        // the helper (it would create one).
+        if ((view->get_transformed_node()
+                ->get_transformer<wf::emeraldwf::emerald_shade_t>(
+                    wf::emeraldwf::SHADE_TRANSFORMER_NAME) == nullptr)
+            && !to_shade)
         {
             return; // unshaded; nothing to unshade
         }
 
-        if (tr)
-        {
-            tr->set_strip_h(int(csd_titlebar_height));
-            tr->init_animation(to_shade);
-        } else
-        {
-            // Finding 22: wire emeraldwf/shade_duration into the animation.
-            auto new_tr = std::make_shared<wf::emeraldwf::emerald_shade_t>(
-                toplevel, int(csd_titlebar_height), shade_duration);
-            // Review S1: same per-tick shadow re-export as toggle_shade's
-            // creation site — the R4 callback must be registered at EVERY
-            // CSD transformer creation branch, or a wheel-shaded window
-            // would keep its pre-shade shadow margins for the whole
-            // animation (and stay stale afterwards).
-            new_tr->set_shadow_update(
-                [this, view] { export_csd_shadow_margins(view); });
-            tmgr->add_transformer(new_tr, wf::TRANSFORMER_2D,
-                wf::emeraldwf::SHADE_TRANSFORMER_NAME);
-            new_tr->init_animation(to_shade);
-        }
+        // M19 (issue #1): get-or-create + the per-tick shadow-export
+        // registration (Review S1) go through the shared helper.
+        auto tr = wf::emeraldwf::get_or_create_shade(
+            toplevel, int(csd_titlebar_height), shade_duration,
+            [this, view] { export_csd_shadow_margins(view); });
+        tr->set_strip_h(int(csd_titlebar_height));
+        tr->init_animation(to_shade);
 
         export_csd_shadow_margins(view);
     }

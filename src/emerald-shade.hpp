@@ -350,5 +350,42 @@ class emerald_shade_t : public wf::scene::view_2d_transformer_t
     // destructor (declared after view/output, so it is destroyed first).
     wf::signal::connection_t<view_set_output_signal> on_set_output;
 };
+
+// M19 (issue #1): the single get-or-create for the shade transformer.
+//
+// Pre-M19 this sequence (get_transformer → make_shared → add_transformer,
+// plus — for CSD views — the per-tick shadow-export registration) was
+// inlined at THREE sites: plugin.cpp's toggle_shade() and scroll_shade()
+// and emerald-decorator-shade.cpp's emerald_decorator_t::toggle_shade().
+// The codebase already regressed on that duplication once (Review S1: one
+// creation branch was missing the shadow-export callback, leaving a
+// wheel-shaded window with its pre-shade shadow margins for the whole
+// animation). Creation goes through this helper so the registration
+// invariant cannot be missed at a future branch.
+//
+// @shadow_update: per-tick shadow-margin export (Review R4), registered
+// ONLY on creation. CSD views pass it (they have no decorator to drive
+// the export); SSD views pass nothing (their decorator does).
+inline std::shared_ptr<emerald_shade_t> get_or_create_shade(
+    ::wayfire_toplevel_view view, int strip_h,
+    std::shared_ptr<wf::config::option_t<wf::animation_description_t>>
+    duration,
+    std::function<void()> shadow_update = nullptr)
+{
+    auto tmgr = view->get_transformed_node();
+    auto tr = tmgr->get_transformer<emerald_shade_t>(SHADE_TRANSFORMER_NAME);
+    if (tr == nullptr)
+    {
+        tr = std::make_shared<emerald_shade_t>(view, strip_h, duration);
+        if (shadow_update)
+        {
+            tr->set_shadow_update(std::move(shadow_update));
+        }
+
+        tmgr->add_transformer(tr, wf::TRANSFORMER_2D, SHADE_TRANSFORMER_NAME);
+    }
+
+    return tr;
+}
 } // namespace emeraldwf
 } // namespace wf

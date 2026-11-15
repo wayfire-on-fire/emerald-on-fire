@@ -276,10 +276,12 @@ void emerald_decorator_t::toggle_shade(bool shade)
 
     // Ensure a transformer exists; pixdecor attaches it on-demand and
     // detaches it when the animation finishes unshaded (see emerald-shade.cpp
-    // tick()).
-    auto tmgr = view->get_transformed_node();
+    // tick()). M19 (issue #1): via the shared get-or-create helper (no
+    // shadow callback — the SSD decorator drives the shadow export itself;
+    // the helper centralizes the R4/S1 registration invariant for the CSD
+    // branches).
     std::shared_ptr<emerald_shade_t> tr =
-        tmgr->get_transformer<emerald_shade_t>(SHADE_TRANSFORMER_NAME);
+        get_or_create_shade(view, strip, shade_duration_opt_);
     // Finding 54: is the window currently FULLY unshaded? (No transformer,
     // or one present only transiently — settled at p = 0 before tick()
     // removes it.) Only then is the pending geometry the original unshaded
@@ -293,15 +295,6 @@ void emerald_decorator_t::toggle_shade(bool shade)
     const bool fully_unshaded = (tr == nullptr) ||
         (!tr->get_direction() &&
             tr->get_progression() < SHADE_SETTLE_EPSILON);
-    if (tr == nullptr)
-    {
-        // Finding 22: wire emeraldwf/shade_duration into the animation —
-        // without this the transition ran with a null (instant) duration
-        // and the option was a no-op.
-        tr = std::make_shared<emerald_shade_t>(view, strip,
-            shade_duration_opt_);
-        tmgr->add_transformer(tr, wf::TRANSFORMER_2D, SHADE_TRANSFORMER_NAME);
-    }
 
     tr->set_strip_h(strip);
     tr->set_bottom_strip_h(bottom_strip);

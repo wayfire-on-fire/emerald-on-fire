@@ -89,4 +89,76 @@ TEST(PluginSource, FiniUnloadsEngineAfterRemovingDecorations)
         std::string::npos)
         << "the engine is unloaded exactly once in fini()";
 }
+
+// The body of a `emeraldwf_plugin::<fn>(...)` member (bracket-matched from
+// the first '{' after the signature).
+std::string fn_body(const std::string &src, const std::string &sig)
+{
+    const size_t at = src.find(sig);
+    if (at == std::string::npos)
+    {
+        return {};
+    }
+
+    const size_t open = src.find('{', at);
+    if (open == std::string::npos)
+    {
+        return {};
+    }
+
+    int depth = 0;
+    for (size_t i = open; i < src.size(); i++)
+    {
+        if (src[i] == '{')
+        {
+            depth++;
+        } else if (src[i] == '}')
+        {
+            depth--;
+            if (depth == 0)
+            {
+                return src.substr(open + 1, i - open - 1);
+            }
+        }
+    }
+
+    return {};
+}
+
+// M19 (issue #1): the CSD shade-transformer get-or-create sequence
+// (get_transformer → make_shared → add_transformer, plus the per-tick
+// shadow-export registration) was triplicated: toggle_shade(),
+// scroll_shade() here, and emerald_decorator_t::toggle_shade() in
+// emerald-decorator-shade.cpp. The codebase already regressed on this
+// duplication once (Review S1: the shadow-export callback was missing at
+// one creation branch, leaving a wheel-shaded window with pre-shade shadow
+// margins for the whole animation). All creation must go through the
+// single shared helper get_or_create_shade() (emerald-shade.hpp).
+TEST(PluginSource, CsdShadeCreationUsesSharedHelper)
+{
+    const std::string src =
+        read_file(std::string{EMERALDWF_TEST_SOURCE_ROOT} + "/src/plugin.cpp");
+    ASSERT_FALSE(src.empty()) << "src/plugin.cpp must be readable";
+
+    const std::string toggle_body =
+        fn_body(src, "void emeraldwf_plugin::toggle_shade(");
+    ASSERT_FALSE(toggle_body.empty()) << "could not locate toggle_shade()";
+    EXPECT_NE(toggle_body.find("get_or_create_shade("), std::string::npos)
+        << "toggle_shade()'s CSD branch must use the shared "
+           "get_or_create_shade() helper (M19) — pre-fix it had its own "
+           "inline get-or-create + shadow-export registration";
+
+    const std::string scroll_body =
+        fn_body(src, "void emeraldwf_plugin::scroll_shade(");
+    ASSERT_FALSE(scroll_body.empty()) << "could not locate scroll_shade()";
+    EXPECT_NE(scroll_body.find("get_or_create_shade("), std::string::npos)
+        << "scroll_shade()'s CSD branch must use the shared "
+           "get_or_create_shade() helper (M19) — pre-fix the Review S1 "
+           "regression lived in exactly this duplicated branch";
+
+    EXPECT_EQ(src.find("std::make_shared<wf::emeraldwf::emerald_shade_t>"),
+        std::string::npos)
+        << "plugin.cpp must not create the shade transformer directly "
+           "(M19) — creation is consolidated in get_or_create_shade()";
+}
 } // namespace

@@ -188,3 +188,47 @@ TEST(ShadeSource, StripHeightSettersAndCtorClamp)
     EXPECT_NE(init.find("1 << 20"), std::string::npos)
         << "the ctor clamp upper bound must be 1 << 20 (M18)";
 }
+
+// M19 (issue #1): the shade-transformer get-or-create sequence was
+// triplicated (plugin.cpp toggle_shade/scroll_shade +
+// emerald-decorator-shade.cpp toggle_shade) and the codebase already
+// regressed on that duplication once (Review S1: a creation branch missing
+// the shadow-export registration). All creation must go through the single
+// shared helper get_or_create_shade() in emerald-shade.hpp, which
+// registers the shadow-export callback on creation.
+TEST(ShadeSource, ShadeTransformerCreationConsolidatedInHelper)
+{
+    const std::string hpp = read_file(
+        std::string{EMERALDWF_TEST_SOURCE_ROOT} + "/src/emerald-shade.hpp");
+    ASSERT_FALSE(hpp.empty()) << "src/emerald-shade.hpp must be readable";
+
+    // The helper itself: get-or-create + shadow-export registration.
+    const std::string helper =
+        fn_body(hpp, "get_or_create_shade(");
+    ASSERT_FALSE(helper.empty())
+        << "get_or_create_shade() must exist in emerald-shade.hpp (M19) — "
+           "pre-fix the get-or-create was inlined at all three call sites";
+    EXPECT_NE(helper.find("get_transformer"), std::string::npos)
+        << "the helper must look up the existing transformer";
+    EXPECT_NE(helper.find("make_shared<emerald_shade_t>"), std::string::npos)
+        << "the helper must create the transformer when absent";
+    EXPECT_NE(helper.find("add_transformer"), std::string::npos)
+        << "the helper must register the transformer on the view";
+    EXPECT_NE(helper.find("set_shadow_update"), std::string::npos)
+        << "the helper must register the shadow-export callback on "
+           "creation (the S1 regression was a branch missing it)";
+
+    // The decorator-shade call site (SSD path; no shadow callback — the
+    // decorator drives the shadow export itself).
+    const std::string ds = read_file(
+        std::string{EMERALDWF_TEST_SOURCE_ROOT}
+        + "/src/emerald-decorator-shade.cpp");
+    ASSERT_FALSE(ds.empty())
+        << "src/emerald-decorator-shade.cpp must be readable";
+    EXPECT_NE(ds.find("get_or_create_shade("), std::string::npos)
+        << "emerald_decorator_t::toggle_shade() must use the shared "
+           "get_or_create_shade() helper (M19)";
+    EXPECT_EQ(ds.find("std::make_shared<emerald_shade_t>"), std::string::npos)
+        << "emerald-decorator-shade.cpp must not create the transformer "
+           "directly (M19) — creation is consolidated in the helper";
+}
