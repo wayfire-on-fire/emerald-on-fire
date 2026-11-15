@@ -43,6 +43,14 @@ inline bool is_valid_engine_name(const std::string & name)
 bool emerald_engine_load(const std::string & name, const std::string & system_dir);
 void emerald_engine_unload();
 
+// M1 (issue #1): bridge-state accessors. A failed load must leave the
+// previous engine observable as intact (the reload path keeps the
+// previous theme — the test asserts the engine survived), and a
+// "loaded" engine must be one the bridge can actually draw with
+// (handle + engine_draw_frame both live).
+std::string emerald_engine_active_name();
+bool emerald_engine_is_loaded();
+
 // Calls the loaded engine's init_engine(window_settings*) so the engine
 // allocates its private ws/fs (engine_ws / engine_fs). Must be called
 // after emerald_engine_load() and before load_engine_settings.

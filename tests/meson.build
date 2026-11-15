@@ -17,6 +17,9 @@ emerald_test_paths = configure_file(
         # The engine .so's build into <buildroot>/engines (subdir('engines'));
         # build_root() works in-tree AND out-of-tree.
         'ENGINE_DIR': meson.build_root() / 'engines',
+        # The fake engine .so's (M1-M3 loader tests) build into
+        # <buildroot>/tests, alongside this meson file's outputs.
+        'FAKE_ENGINE_DIR': meson.build_root() / 'tests',
         'METADATA_DIR': meson.project_source_root() / 'metadata',
     })
 emerald_test_inc = include_directories('.')
@@ -92,6 +95,21 @@ test('emeraldwf-layout-asan', emeraldwf_layout_asan)
 # the R5 fix (own Xvfb + exported DISPLAY, no hardcoded vendor path,
 # guarded screenshots, missing golden = SKIPPED).
 test('emeraldwf-e2e-script', find_program('../e2e/test_run.sh'))
+
+# ---- engine dlopen bridge (M1-M3, issue #1) ----
+# The fake engines are real .so's the bridge DLOPENS at runtime by name
+# (lib<name>.so) — NOT linked into the test. C files: the loader
+# dlsym()s unmangled names.
+fake_engine_ok = shared_library('fakeok', ['engine-fake-ok.c'],
+    name_prefix: 'lib')
+
+emeraldwf_engine_loader = executable('emeraldwf-engine-loader',
+    ['test_engine_loader.cpp', '../src/emerald-engine.cpp'],
+    include_directories: [src_inc, emerald_inc, emerald_test_inc],
+    dependencies: emerald_test_deps + [wayfire],
+    link_with: [emerald_theme_lib, libemeraldengine])
+test('emeraldwf-engine-loader', emeraldwf_engine_loader,
+    depends: [fake_engine_ok])
 
 # ---- part 04: scene node pure helpers (headless) ----
 # Compiles only the wayfire-free pure TU (emerald-node-pure.cpp) so the test

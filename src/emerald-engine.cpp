@@ -720,6 +720,42 @@ bool emerald_engine_load(const std::string & name, const std::string & system_di
     }
 
     std::string engine_ldname = "lib" + name + ".so";
+
+    // M1 (issue #1): transactional load — dlopen the CANDIDATE first,
+    // without touching the currently-loaded engine. Pre-fix the old
+    // engine was finis'd + dlclose'd here, before the replacement was
+    // known to load; when the dlopen failed (both primary and the
+    // legacy fallback in ThemeSettings::load), the "previous theme" the
+    // reload path claimed to keep was already engine-less:
+    // engine_handle == nullptr, engine frame silently lost until a
+    // successful reload.
+    dlerror(); /* clear errors */
+
+    // search order: ~/.emerald/engines/lib<name>.so then <system_dir>/lib<name>.so
+    std::string home_dir = g_get_home_dir();
+    std::string path     = home_dir + "/.emerald/engines/" + engine_ldname;
+
+    void *candidate = dlopen(path.c_str(), RTLD_NOW);
+
+    if (!candidate)
+    {
+        path = system_dir.empty() ? engine_ldname :
+            (system_dir + "/" + engine_ldname);
+        candidate = dlopen(path.c_str(), RTLD_NOW);
+
+        if (!candidate)
+        {
+            // The cstyleCast below is inside glib's g_warning() macro
+            // expansion (a --force configuration), not in this call.
+            // cppcheck-suppress cstyleCast
+            g_warning("emerald_engine_load: %s", dlerror());
+            // The currently-loaded engine is untouched — the reload
+            // caller can keep it (its log message is now true).
+            return false;
+        }
+    }
+
+    // The candidate is live: retire the previous engine, then publish.
     if (engine_handle)
     {
         if (e_fini && (e_ws != nullptr))
@@ -728,15 +764,6 @@ bool emerald_engine_load(const std::string & name, const std::string & system_di
         }
 
         e_ws = nullptr;
-        // Same engine (theme-only reload): keep the .so loaded — a
-        // dlopen/dlclose round-trip is pure churn and re-runs the engine's
-        // static initializers. The new ws is re-inited by
-        // emerald_engine_init_engine() after load().
-        if (active_engine_name == name)
-        {
-            return true;
-        }
-
         dlclose(engine_handle);
         engine_handle = nullptr;
         e_init = nullptr;
@@ -745,33 +772,13 @@ bool emerald_engine_load(const std::string & name, const std::string & system_di
         e_draw = nullptr;
     }
 
+    // Same-engine (theme-only reload): the candidate is the same .so
+    // (dlopen of an already-loaded path returns the same handle with a
+    // refcount bump; the dlclose above dropped it back), so the module
+    // stays loaded — no static-initializer churn. The new ws is
+    // re-inited by emerald_engine_init_engine() after load().
     active_engine_name = name;
-
-    dlerror(); /* clear errors */
-
-    // search order: ~/.emerald/engines/lib<name>.so then <system_dir>/lib<name>.so
-    std::string home_dir = g_get_home_dir();
-    std::string path     = home_dir + "/.emerald/engines/" + engine_ldname;
-
-    void *newengine = dlopen(path.c_str(), RTLD_NOW);
-
-    if (!newengine)
-    {
-        path = system_dir.empty() ? engine_ldname :
-            (system_dir + "/" + engine_ldname);
-        newengine = dlopen(path.c_str(), RTLD_NOW);
-
-        if (!newengine)
-        {
-            // The cstyleCast below is inside glib's g_warning() macro
-            // expansion (a --force configuration), not in this call.
-            // cppcheck-suppress cstyleCast
-            g_warning("emerald_engine_load: %s", dlerror());
-            return false;
-        }
-    }
-
-    engine_handle = newengine;
+    engine_handle = candidate;
 
     // dlsym() returns void*; reinterpret_cast is the C++-correct conversion
     // to a function pointer (a C-style cast here is flagged by cppcheck).
@@ -800,6 +807,19 @@ void emerald_engine_fini_engine(const window_settings *ws)
         e_fini(e_ws);
         e_ws = nullptr;
     }
+}
+
+std::string emerald_engine_active_name()
+{
+    return active_engine_name;
+}
+
+bool emerald_engine_is_loaded()
+{
+    // "Loaded" = the bridge can actually draw with it: a live handle AND
+    // a resolved engine_draw_frame (a phantom entry with e_draw == null
+    // is not loaded, whatever the name claims).
+    return engine_handle != nullptr && e_draw != nullptr;
 }
 
 void emerald_engine_unload()
