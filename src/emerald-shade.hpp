@@ -324,6 +324,16 @@ class emerald_shade_t : public wf::scene::view_2d_transformer_t
     ShadeState state;
     // Review R4: per-tick CSD shadow-margin export (see set_shadow_update).
     std::function<void()> shadow_update_;
+    // M17 (issue #1): re-derive the output from the view and migrate the
+    // tick hook if the view moved to a different output (or was unattached
+    // at construction). The constructor captured the output once; without
+    // this, a view that moves to another output mid-animation leaves the
+    // hook on the stale output — the animation freezes, the transformer is
+    // never removed (removal only happens in tick()), and tick_installed_
+    // stays true so init_animation() can never re-install. Called from
+    // init_animation() and tick().
+    wf::output_t *sync_output();
+
     wf::output_t *output = nullptr;
     wf::effect_hook_t tick_hook;
     // True while the pre-render tick hook is installed on the output.
@@ -331,6 +341,14 @@ class emerald_shade_t : public wf::scene::view_2d_transformer_t
     // only needed to drive the progression), so init_animation() must
     // re-install it for any subsequent animation.
     bool tick_installed_ = false;
+    // M17 (issue #1, ChatGPT follow-up): the view's set-output signal drives
+    // sync_output() IMMEDIATELY when the view moves to a different output —
+    // not only on the next tick()/init_animation(). If the old output stops
+    // rendering (no damage) after the move, tick() never runs again, so the
+    // migration must happen on the output change itself. (Wayfire's animate
+    // plugin uses the same pattern.) Auto-disconnected by the connection's
+    // destructor (declared after view/output, so it is destroyed first).
+    wf::signal::connection_t<view_set_output_signal> on_set_output;
 };
 } // namespace emeraldwf
 } // namespace wf

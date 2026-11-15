@@ -23,6 +23,18 @@ emerald_shade_t::emerald_shade_t(::wayfire_toplevel_view view_arg, int strip_h_a
     if (view_arg)
     {
         output = view_arg->get_output();
+
+        // M17 (issue #1, ChatGPT follow-up): re-sync the tick hook
+        // IMMEDIATELY when the view moves to a different output — not only
+        // on the next tick()/init_animation(). If the old output stops
+        // rendering (no damage) after the move, tick() never runs again and
+        // the animation would freeze on the stale output. (Wayfire's animate
+        // plugin uses the same pattern.)
+        on_set_output = [=] (view_set_output_signal *)
+        {
+            this->sync_output();
+        };
+        view_arg->connect(&on_set_output);
     }
 
     if (output)
@@ -45,6 +57,42 @@ emerald_shade_t::~emerald_shade_t()
     }
 }
 
+wf::output_t *emerald_shade_t::sync_output()
+{
+    if (view == nullptr)
+    {
+        return output;
+    }
+
+    auto *cur = view->get_output();
+    if ((cur == nullptr) || (cur == output))
+    {
+        // Unattached (mid-move) or unchanged: keep the current output so the
+        // hook keeps driving; re-sync when the view (re)attaches.
+        return output;
+    }
+
+    // M17 (issue #1): the view moved to a different output. Migrate the tick
+    // hook so the animation keeps being driven on the NEW output (and the
+    // transformer can still be removed when it settles there). Pre-M17 the
+    // hook stayed on the construction-time output: the animation froze, the
+    // transformer was never removed (removal only happens in tick()), and
+    // tick_installed_ stayed true so init_animation() could never re-install
+    // → leaked transformer + frozen shadow margins.
+    if (tick_installed_)
+    {
+        if (output != nullptr)
+        {
+            output->render->rem_effect(&tick_hook);
+        }
+
+        cur->render->add_effect(&tick_hook, wf::OUTPUT_EFFECT_PRE);
+    }
+
+    output = cur;
+    return output;
+}
+
 void emerald_shade_t::set_strip_h(int h)
 {
     strip_h = h;
@@ -57,6 +105,11 @@ void emerald_shade_t::set_bottom_strip_h(int h)
 
 void emerald_shade_t::init_animation(bool shade)
 {
+    // M17 (issue #1): re-derive the output from the view (it may have moved
+    // since the last animation, or been unattached at construction) and
+    // migrate the hook if it is installed.
+    sync_output();
+
     // The tick hook is only installed while an animation is live: tick()
     // drops it once the progression settles (both directions), so a fresh
     // animation on an existing transformer (unshading a shaded window,
@@ -80,6 +133,11 @@ void emerald_shade_t::tick()
     {
         return;
     }
+
+    // M17 (issue #1): re-derive the output (the view may have moved
+    // mid-animation) and migrate the hook so the animation keeps driving on
+    // the new output.
+    sync_output();
 
     // Advance the animation (duration_t advances its internal clock).
     // `progression.shade` now holds the smoothed value for this frame.

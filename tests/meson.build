@@ -159,6 +159,15 @@ emeraldwf_shade = executable('emeraldwf-shade',
     dependencies: emerald_test_extra + [gtest_main])
 test('emeraldwf-shade', emeraldwf_shade)
 
+# M17 (issue #1): source-structure test for the shade TU's output
+# re-derivation (sync_output in init_animation/tick). emerald-shade.cpp
+# cannot be linked headlessly (wayfire scene + output symbols).
+emeraldwf_shade_source = executable('emeraldwf-shade-source',
+    ['test_shade_source.cpp'],
+    include_directories: [emerald_test_inc],
+    dependencies: [gtest, gtest_main])
+test('emeraldwf-shade-source', emeraldwf_shade_source)
+
 # ---- part 07: engine pane / engine module lifetime (findings 46/47) ----
 # Regression for the "Round Top Left Corner" SEGV_MAPERR: append_engine's
 # dlclose unmapped the engine .so (static-vendored libemeraldengine) while
