@@ -3,7 +3,9 @@
 
 #include <glib.h>
 
+#include <fstream>
 #include <optional>
+#include <sstream>
 
 namespace wf
 {
@@ -11,6 +13,102 @@ namespace emeraldwf
 {
 namespace
 {
+// Strip leading/trailing ASCII whitespace (wf-config
+// ignore_leading_trailing_whitespace).
+std::string trim(const std::string & s)
+{
+    const size_t b = s.find_first_not_of(" \t\r\n");
+    if (b == std::string::npos)
+    {
+        return {};
+    }
+
+    const size_t e = s.find_last_not_of(" \t\r\n");
+    return s.substr(b, e - b + 1);
+}
+
+// M21 (issue #1): mirror wf-config's remove_comments +
+// remove_escaped_sharps in one pass: cut at the first UNescaped '#'
+// (a '\' escapes it); consume the escape backslash before any '#' so
+// the value keeps the '#' as a plain character — GKeyFile rejects a raw
+// '\' in an UNQUOTED value, so the escape must be resolved here, not by
+// GKeyFile.
+std::string strip_comment(const std::string & line)
+{
+    std::string out;
+    out.reserve(line.size());
+    bool prev_backslash = false;
+    for (char ch : line)
+    {
+        if (ch == '#')
+        {
+            if (prev_backslash)
+            {
+                out.pop_back(); // consume the escape backslash
+                out += '#';
+            } else
+            {
+                break; // an unescaped '#' starts a comment
+            }
+        } else
+        {
+            out += ch;
+        }
+
+        prev_backslash = (ch == '\\');
+    }
+
+    return out;
+}
+
+// M21 (issue #1): sanitize ini content the way wayfire's own LENIENT
+// parser treats it (wf-config file.cpp: strip '#' comments, trim
+// whitespace, skip lines without '=', log-and-continue). GKeyFile is
+// STRICT: a UTF-8 BOM, a ';' comment line, a 'key: value' line, or ANY
+// single malformed line fails the WHOLE file. A perfectly normal
+// wayfire.ini (wayfire parses it fine) would then kill the entire live
+// option sync silently. Keep only what GKeyFile accepts: section
+// headers and trimmed key=value lines.
+std::string sanitize_ini(const std::string & content)
+{
+    std::string out;
+    std::istringstream lines(content);
+    std::string line;
+    while (std::getline(lines, line))
+    {
+        line = strip_comment(line);
+        line = trim(line);
+        if (line.empty())
+        {
+            continue;
+        }
+
+        if ((line[0] == '[') && (line.back() == ']'))
+        {
+            out += line + "\n";
+            continue;
+        }
+
+        // ';' comments and any line without '=' are skipped by
+        // wayfire's parser (wrong format → log + continue).
+        const size_t eq = line.find('=');
+        if ((eq == std::string::npos) || (line[0] == ';'))
+        {
+            continue;
+        }
+
+        const std::string key = trim(line.substr(0, eq));
+        if (key.empty())
+        {
+            continue; // "=value" — no option name
+        }
+
+        out += key + "=" + trim(line.substr(eq + 1)) + "\n";
+    }
+
+    return out;
+}
+
 // Parse one ini key into a typed option and push it into the in-memory
 // config manager when the value differs. Returns true if the option changed.
 template<typename T>
@@ -50,12 +148,43 @@ bool sync_one(GKeyFile *kf, const char *key,
 bool sync_emeraldwf_options_from_config(const std::string & ini_path,
     emerald_config_options_t & opts)
 {
+    // M21 (issue #1): read the file ourselves (g_key_file_load_from_file
+    // is strict — see sanitize_ini) and strip a UTF-8 BOM, which GKeyFile
+    // rejects but wayfire's parser tolerates.
+    std::ifstream in(ini_path);
+    if (!in)
+    {
+        // M21: log, don't fail silently — the poller retries on every
+        // mtime change, so a silent failure is invisible. (glib logger,
+        // not wayfire LOGW: this TU is headless-pure.)
+        g_warning("emeraldwf: cannot read config file %s",
+            ini_path.c_str());
+        return false;
+    }
+
+    std::string content((std::istreambuf_iterator<char>(in)),
+        std::istreambuf_iterator<char>());
+    if ((content.size() >= 3) &&
+        (static_cast<unsigned char>(content[0]) == 0xEF) &&
+        (static_cast<unsigned char>(content[1]) == 0xBB) &&
+        (static_cast<unsigned char>(content[2]) == 0xBF))
+    {
+        content = content.substr(3); // UTF-8 BOM
+    }
+
+    const std::string data = sanitize_ini(content);
+
     GKeyFile *kf = g_key_file_new();
     GError *err  = nullptr;
-    if (!g_key_file_load_from_file(kf, ini_path.c_str(), G_KEY_FILE_NONE, &err))
+    if (!g_key_file_load_from_data(kf, data.c_str(), data.size(),
+        G_KEY_FILE_NONE, &err))
     {
         if (err != nullptr)
         {
+            // M21: log the parse failure (pre-fix: a strict GKeyFile
+            // rejection of a normal wayfire.ini was silent).
+            g_warning("emeraldwf: failed to parse config file %s: %s",
+                ini_path.c_str(), err->message);
             g_error_free(err);
         }
 

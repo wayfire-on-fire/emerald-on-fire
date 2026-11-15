@@ -2158,6 +2158,117 @@ TEST_F(ConfigSyncTest, MissingFileReturnsFalse)
     EXPECT_EQ(cb, 0);
 }
 
+// M21 (issue #1): GKeyFile is STRICT — a UTF-8 BOM, a ';' comment line, a
+// 'key: value' line, or ANY single malformed line fails the whole
+// g_key_file_load_from_file, while wayfire's own lenient parser (wf-config
+// file.cpp) skips bad lines and trims whitespace. A perfectly normal
+// wayfire.ini (wayfire parses it fine) would kill the ENTIRE live option
+// sync silently — all 21 options stop going live, and the poller keeps
+// re-calling sync on every mtime change, getting false, doing nothing.
+// The sync must read the file itself, sanitize it the wf-config way, and
+// parse with g_key_file_load_from_data.
+TEST_F(ConfigSyncTest, ToleratesBomSemicolonCommentsAndMalformedLines)
+{
+    auto tb    = make_opt<int>("emeraldwf/csd_titlebar_height", 17);
+    auto shade = make_opt<bool>("emeraldwf/enable_shade", true);
+
+    // BOM + ';' comment + '#' comment + 'key: value' + no-'=' line +
+    // trailing spaces — all tolerated by wayfire's parser.
+    write_ini(std::string("\xEF\xBB\xBF") +
+        "; a plain semicolon comment line\n"
+        "# a hash comment line\n"
+        "[emeraldwf]\n"
+        "bogus_option: colon syntax line\n"
+        "this line has no equals sign\n"
+        "csd_titlebar_height = 33   \n"
+        "enable_shade = false\n");
+
+    emerald_config_options_t targets;
+    targets.csd_titlebar_height = tb;
+    targets.enable_shade        = shade;
+    EXPECT_TRUE(sync_emeraldwf_options_from_config(ini_path_, targets))
+        << "a normal wayfire.ini (BOM, ';' comment, malformed lines) must "
+           "not kill the whole sync (M21) — pre-fix GKeyFile rejected the "
+           "entire file, silently";
+    EXPECT_EQ(tb->get_value(), 33)
+        << "trailing spaces in the value must be trimmed (wf-config "
+           "behavior) — GKeyFile preserves them and the int parse fails";
+    EXPECT_FALSE(shade->get_value());
+}
+
+// M21 (ChatGPT follow-up): sanitizer edge cases matching wf-config
+// semantics — inline '#' comments, escaped '#', empty keys, empty
+// values, CRLF endings.
+TEST_F(ConfigSyncTest, SanitizerEdgeCasesMatchWfConfig)
+{
+    auto tb  = make_opt<int>("emeraldwf/csd_titlebar_height", 17);
+    auto dir = make_opt<std::string>("emeraldwf/theme_dir", "");
+    emerald_config_options_t targets;
+    targets.csd_titlebar_height = tb;
+    targets.theme_dir           = dir;
+
+    // Inline '#' comment stripped + CRLF line endings.
+    write_ini("[emeraldwf]\r\n"
+               "csd_titlebar_height = 33 # inline comment\r\n");
+    EXPECT_TRUE(sync_emeraldwf_options_from_config(ini_path_, targets));
+    EXPECT_EQ(tb->get_value(), 33)
+        << "inline '#' comments must be stripped (wf-config "
+           "remove_comments) and CRLF endings tolerated";
+
+    // Escaped '#' is a value character, not a comment: wf-config
+    // (remove_escaped_sharps) and GKeyFile both consume the backslash
+    // -> "a#b".
+    write_ini("[emeraldwf]\n"
+               "theme_dir = a\\#b\n");
+    EXPECT_TRUE(sync_emeraldwf_options_from_config(ini_path_, targets));
+    EXPECT_EQ(dir->get_value(), "a#b")
+        << "an escaped '#' must survive as a value character (M21, "
+           "wf-config escape semantics)";
+
+    // Empty key dropped; the following valid line is still applied.
+    write_ini("[emeraldwf]\n"
+               "=value\n"
+               "theme_dir = kept\n");
+    EXPECT_TRUE(sync_emeraldwf_options_from_config(ini_path_, targets));
+    EXPECT_EQ(dir->get_value(), "kept");
+
+    // Empty value KEPT (option-level validation decides): an int option
+    // leaves its value alone, a string option becomes "".
+    tb->set_value(17);
+    write_ini("[emeraldwf]\n"
+               "csd_titlebar_height=\n"
+               "theme_dir=\n");
+    EXPECT_TRUE(sync_emeraldwf_options_from_config(ini_path_, targets));
+    EXPECT_EQ(tb->get_value(), 17)
+        << "an empty (unparseable) int value must leave the option alone";
+    EXPECT_EQ(dir->get_value(), "")
+        << "an empty string value is applied";
+}
+
+// M21 (issue #1): a load failure must be LOGGED, not silent — the poller
+// retries on every mtime change, so a silent rejection is invisible (the
+// 'finding 24' bug silently re-introduced). The sync TU is headless-pure
+// (no wayfire core symbols), so it logs via glib (g_warning), not LOGW.
+TEST_F(ConfigSyncTest, LoadFailureIsLogged)
+{
+    auto shade = make_opt<bool>("emeraldwf/enable_shade", true);
+    emerald_config_options_t targets;
+    targets.enable_shade = shade;
+
+    int warnings = 0;
+    const auto id = g_log_set_handler(nullptr, G_LOG_LEVEL_WARNING,
+        [] (const char *, GLogLevelFlags, const char *, gpointer ud) -> void
+        {
+            *static_cast<int *>(ud) += 1;
+        }, &warnings);
+    EXPECT_FALSE(sync_emeraldwf_options_from_config(
+        "/nonexistent/emeraldwf/wayfire.ini", targets));
+    g_log_remove_handler(nullptr, id);
+    EXPECT_GT(warnings, 0)
+        << "a failed config load must be logged (M21) — pre-fix it was "
+           "silent";
+}
+
 // ---- R1 (issue #1): the pixmap-asset probe must match the files the
 // pixmap engine ACTUALLY loads (pixmap.c p_types[]: 11 `active_` textures,
 // plus 11 `inactive_` ones when [pixmap_settings]
