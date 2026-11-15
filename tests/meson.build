@@ -115,6 +115,15 @@ emeraldwf_engine_loader = executable('emeraldwf-engine-loader',
 test('emeraldwf-engine-loader', emeraldwf_engine_loader,
     depends: [fake_engine_ok, fake_engine_alt, fake_engine_nodraw])
 
+# M4 (issue #1): source-structure test for the plugin TU (fini() must
+# unload the engine after the decoration-removal loop). plugin.cpp
+# cannot be linked headlessly (wayfire core symbols).
+emeraldwf_plugin_source = executable('emeraldwf-plugin-source',
+    ['test_plugin_source.cpp'],
+    include_directories: [emerald_test_inc],
+    dependencies: [gtest, gtest_main])
+test('emeraldwf-plugin-source', emeraldwf_plugin_source)
+
 # ---- part 04: scene node pure helpers (headless) ----
 # Compiles only the wayfire-free pure TU (emerald-node-pure.cpp) so the test
 # links without wayfire core symbols (libwayfire is not a linkable shared

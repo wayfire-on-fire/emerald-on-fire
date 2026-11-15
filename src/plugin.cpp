@@ -31,6 +31,7 @@
 
 #include "emerald-config-sync.hpp"
 #include "emerald-decorator.hpp"
+#include "emerald-engine.hpp"
 #include "emerald-file-stamp.hpp"
 #include "emerald-settings.hpp"
 #include "emerald-shade.hpp"
@@ -1256,6 +1257,13 @@ void emeraldwf_plugin::fini()
             wf::get_core().tx_manager->schedule_object(toplevel->toplevel());
         }
     }
+
+    // 4. M4 (issue #1): unload the engine. Pre-fix this never happened:
+    // the engine .so (and libemeraldengine) stayed mapped for the life
+    // of the wayfire process on plugin unload. AFTER the loop on
+    // purpose — the decorators/nodes use the engine's draw callback
+    // while they live.
+    emerald_engine_unload();
 }
 } // namespace emeraldwf
 } // namespace wf
