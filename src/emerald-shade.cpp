@@ -17,7 +17,9 @@ emerald_shade_t::emerald_shade_t(::wayfire_toplevel_view view_arg, int strip_h_a
     duration_opt) :
     wf::scene::view_2d_transformer_t(view_arg)
     , view(view_arg)
-    , strip_h(strip_h_arg)
+    // M18 (issue #1): the member-init bypasses set_strip_h(), so clamp
+    // here too (see set_strip_h for why).
+    , strip_h(std::clamp(strip_h_arg, 0, 1 << 20))
     , state(duration_opt)
 {
     if (view_arg)
@@ -93,14 +95,21 @@ wf::output_t *emerald_shade_t::sync_output()
     return output;
 }
 
+// M18 (issue #1): strip_h is fed by the WCM-editable csd_titlebar_height
+// option for CSD views (runtime-editable, no validation upstream). Clamp:
+// a NEGATIVE value makes the shaded CSD window render nothing (all
+// draw_band calls have dh <= 0 → the window vanishes but stays in the
+// scene, hit-testing finds no node); a value near INT_MAX maps the whole
+// client into the "strip" band. 1<<20 px is ~1000x the largest real
+// titlebar — any real value passes through unchanged.
 void emerald_shade_t::set_strip_h(int h)
 {
-    strip_h = h;
+    strip_h = std::clamp(h, 0, 1 << 20);
 }
 
 void emerald_shade_t::set_bottom_strip_h(int h)
 {
-    bottom_strip_h = h;
+    bottom_strip_h = std::clamp(h, 0, 1 << 20);
 }
 
 void emerald_shade_t::init_animation(bool shade)

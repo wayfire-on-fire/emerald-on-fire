@@ -336,6 +336,31 @@ TEST_F(ShadeTest, MakeMarginsInputNullViewHasSteadyMargins)
     EXPECT_DOUBLE_EQ(m.top, 21.0);
 }
 
+// M18 (issue #1): set_titlebar_height() must clamp its input. It is fed by
+// the WCM-editable csd_titlebar_height option (runtime-editable, no
+// validation upstream). A NEGATIVE value makes the shaded CSD window render
+// nothing (all draw_band calls have dh <= 0 → the window vanishes but stays
+// in the scene, hit-testing finds no node); a value near INT_MAX overflows
+// the int margin sums in margins_for() (top_space + extra_top +
+// titlebar_height is computed in int before the double cast).
+TEST_F(ShadeTest, TitlebarHeightClamped)
+{
+    emerald_decorator_t deco(nullptr, nullptr);
+    deco.set_titlebar_height(-5);
+    EXPECT_EQ(deco.get_titlebar_height(), 0)
+        << "negative titlebar height must clamp to 0 — pre-M18 it was "
+           "stored as-is (shaded CSD window renders nothing)";
+    deco.set_titlebar_height(1 << 20);
+    EXPECT_EQ(deco.get_titlebar_height(), 1 << 20);
+    deco.set_titlebar_height((1 << 20) + 1000);
+    EXPECT_EQ(deco.get_titlebar_height(), 1 << 20)
+        << "huge titlebar height must clamp — pre-M18 it overflowed the "
+           "int margin sums in margins_for()";
+    deco.set_titlebar_height(32);
+    EXPECT_EQ(deco.get_titlebar_height(), 32)
+        << "in-range values must pass through unchanged";
+}
+
 // ── Finding 53 (successor): the steady client never dips below the hint ──
 //
 // The old Finding-53 regression was that the p = 1 bottom margin implied a

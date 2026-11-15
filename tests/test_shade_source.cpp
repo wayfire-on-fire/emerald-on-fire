@@ -140,3 +140,51 @@ TEST(ShadeSource, InitAnimationAndTickResyncOutput)
     EXPECT_NE(ctor_body.find("sync_output()"), std::string::npos)
         << "the set-output handler must call sync_output()";
 }
+
+// M18 (issue #1): the strip-height setters and the constructor must clamp
+// their input (std::clamp). strip_h is fed by the WCM-editable
+// csd_titlebar_height option for CSD views (runtime-editable, no validation
+// upstream): a NEGATIVE value makes the shaded CSD window render nothing
+// (all draw_band calls have dh <= 0 → the window vanishes but stays in the
+// scene, hit-testing finds no node); a huge value maps the whole client
+// into the "strip" band. The constructor's member-init bypasses the setter,
+// so it must clamp strip_h_arg too.
+TEST(ShadeSource, StripHeightSettersAndCtorClamp)
+{
+    const std::string src = read_file(
+        std::string{EMERALDWF_TEST_SOURCE_ROOT} + "/src/emerald-shade.cpp");
+    ASSERT_FALSE(src.empty()) << "src/emerald-shade.cpp must be readable";
+
+    // ChatGPT follow-up: pin the actual BOUNDS (0 and 1 << 20), not merely
+    // the presence of std::clamp.
+    const std::string strip_body =
+        fn_body(src, "void emerald_shade_t::set_strip_h(");
+    ASSERT_FALSE(strip_body.empty()) << "could not locate set_strip_h()";
+    EXPECT_NE(strip_body.find("std::clamp"), std::string::npos)
+        << "set_strip_h() must clamp its input (M18) — pre-fix it stored "
+           "the raw value (negative → shaded CSD window renders nothing; "
+           "huge → whole client in the strip band)";
+    EXPECT_NE(strip_body.find("1 << 20"), std::string::npos)
+        << "the clamp upper bound must be 1 << 20 (M18)";
+
+    const std::string bottom_body =
+        fn_body(src, "void emerald_shade_t::set_bottom_strip_h(");
+    ASSERT_FALSE(bottom_body.empty()) << "could not locate set_bottom_strip_h()";
+    EXPECT_NE(bottom_body.find("std::clamp"), std::string::npos)
+        << "set_bottom_strip_h() must clamp its input (M18)";
+    EXPECT_NE(bottom_body.find("1 << 20"), std::string::npos)
+        << "the clamp upper bound must be 1 << 20 (M18)";
+
+    // The member-init list sits BETWEEN the signature and the body's '{'
+    // (fn_body would miss it) — check that region directly.
+    const size_t at = src.find("emerald_shade_t::emerald_shade_t(");
+    ASSERT_NE(at, std::string::npos) << "could not locate the constructor";
+    const size_t open = src.find('{', at);
+    ASSERT_NE(open, std::string::npos);
+    const std::string init = src.substr(at, open - at);
+    EXPECT_NE(init.find("std::clamp"), std::string::npos)
+        << "the constructor must clamp strip_h_arg (M18) — the member-init "
+           "bypasses set_strip_h()";
+    EXPECT_NE(init.find("1 << 20"), std::string::npos)
+        << "the ctor clamp upper bound must be 1 << 20 (M18)";
+}

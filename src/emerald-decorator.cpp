@@ -77,11 +77,19 @@ wf::decoration_margins_t emerald_decorator_t::margins_for(const MarginsInput & i
     // right  = right_space  + extra_right
     // bottom = bottom_space + extra_bottom
     // top    = top_space    + extra_top + titlebar_height
-    const double t     = static_cast<double>(in.left_space + in.extra_left);
-    const double right = static_cast<double>(in.right_space + in.extra_right);
-    const double bot   = static_cast<double>(in.bottom_space + in.extra_bottom);
-    const double top   = static_cast<double>(in.top_space + in.extra_top) +
-        static_cast<double>(in.titlebar_height);
+    // M18 (issue #1, ChatGPT follow-up): sum in int64 — titlebar_height is
+    // clamped to [0, 1<<20], but the overflow defense must not depend on
+    // the other operands' bounds (top_space/extra_extents come from the
+    // theme; the int sum used to overflow before the double cast).
+    const double t     =
+        static_cast<double>(static_cast<int64_t>(in.left_space) + in.extra_left);
+    const double right =
+        static_cast<double>(static_cast<int64_t>(in.right_space) + in.extra_right);
+    const double bot   =
+        static_cast<double>(static_cast<int64_t>(in.bottom_space) + in.extra_bottom);
+    const double top   =
+        static_cast<double>(static_cast<int64_t>(in.top_space) + in.extra_top
+        + in.titlebar_height);
 
     const bool maximized = (in.tiled_edges == TILED_EDGES_ALL);
     if (maximized)
@@ -96,22 +104,24 @@ wf::decoration_margins_t emerald_decorator_t::margins_for(const MarginsInput & i
         // translate, so the engine's full-extent coordinates stay valid.
         // Review F2 (-Wshadow): `left`, not `t` — the outer non-maximized
         // margin above is also named `t`.
-        const double left = (in.left_space + in.extra_left) -
+        // M18 (issue #1, ChatGPT follow-up): margin sums in int64 (see the
+        // non-maximized sums above).
+        const double left = (static_cast<int64_t>(in.left_space) + in.extra_left) -
             maximized_crop_side(in.left_space, in.win_ext_left,
             in.extra_left,
             in.maximized_borders,
             in.maximized_shadows);
-        const double r = (in.right_space + in.extra_right) -
+        const double r = (static_cast<int64_t>(in.right_space) + in.extra_right) -
             maximized_crop_side(in.right_space, in.win_ext_right,
             in.extra_right,
             in.maximized_borders,
             in.maximized_shadows);
-        const double b = (in.bottom_space + in.extra_bottom) -
+        const double b = (static_cast<int64_t>(in.bottom_space) + in.extra_bottom) -
             maximized_crop_side(in.bottom_space, in.win_ext_bottom,
             in.extra_bottom,
             in.maximized_borders,
             in.maximized_shadows);
-        const double tp = (in.top_space + in.extra_top) -
+        const double tp = (static_cast<int64_t>(in.top_space) + in.extra_top) -
             maximized_crop_side(in.top_space, in.win_ext_top,
             in.extra_top,
             in.maximized_borders,
@@ -192,9 +202,16 @@ int emerald_decorator_t::get_titlebar_height() const
     return titlebar_height;
 }
 
+// M18 (issue #1): fed by the WCM-editable csd_titlebar_height option
+// (runtime-editable, no validation upstream). Clamp: a negative value
+// makes the shaded CSD window render nothing (all draw_band calls have
+// dh <= 0); a value near INT_MAX overflows the int margin sums in
+// margins_for() (top_space + extra_top + titlebar_height is computed in
+// int before the double cast). 1<<20 px is ~1000x the largest real
+// titlebar — any real value passes through unchanged.
 void emerald_decorator_t::set_titlebar_height(int height)
 {
-    titlebar_height = height;
+    titlebar_height = std::clamp(height, 0, 1 << 20);
 }
 
 void emerald_decorator_t::set_maximized_borders(bool on)
