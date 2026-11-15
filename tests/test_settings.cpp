@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <vector>
 
 #include <cairo.h>
 
@@ -317,6 +318,79 @@ class SettingsTest : public ::testing::Test
 
     fs::path tmp_dir_;
 };
+
+// M5 (issue #1): the pixmap/zootreeves engines resolve their pixmaps
+// via the vendored make_filename() (third_party/emerald/libengine/
+// emerald.c:66), which HARDCODES ~/.emerald/theme. With a non-default
+// theme_dir the bridge probes the right dir but the engine loads from
+// the wrong one — load() must warn. The decision is factored into a
+// pure function so it is testable without a full theme load.
+TEST(ThemeDirMismatch, OnlyPixmapEnginesMismatch)
+{
+    const std::string def =
+        std::string{g_get_home_dir()} + "/.emerald/theme";
+    const std::string alt = "/tmp/emeraldwf-alt-theme";
+
+    EXPECT_FALSE(theme_dir_mismatched_for_engine("pixmap", def))
+        << "the default theme dir is NOT a mismatch";
+    EXPECT_TRUE(theme_dir_mismatched_for_engine("pixmap", alt));
+    EXPECT_TRUE(theme_dir_mismatched_for_engine("zootreeves", alt));
+    EXPECT_FALSE(theme_dir_mismatched_for_engine("oxygen", alt))
+        << "only make_filename-based engines (pixmap/zootreeves) "
+           "resolve pixmaps from the hardcoded dir";
+    EXPECT_FALSE(theme_dir_mismatched_for_engine("legacy", alt));
+}
+
+// M5 (issue #1) INTEGRATION: loading a pixmap theme from a NON-default
+// dir must emit a load-time warning (captured via g_log_set_handler).
+// The fixture's theme (default dir) is copied to an alt dir; the
+// engine still loads its textures from the (hardcoded) default dir, so
+// the load succeeds — the warning is the observable.
+TEST_F(PixmapIntegrationTest, NonDefaultThemeDir_WarnsForPixmapEngine)
+{
+    const auto alt_dir = home_ / "alt-theme";
+    fs::copy(theme_dir_, alt_dir,
+        fs::copy_options::recursive);
+
+    // glib: an installed handler REPLACES the default (GLogFunc returns
+    // void). Capture the warnings; remove the handler by ID (RAII, so an
+    // early assertion failure cannot leave it installed).
+    std::vector<std::string> warnings;
+    auto capture = +[] (const gchar *, GLogLevelFlags, const gchar *msg,
+        gpointer ud)
+    {
+        static_cast<std::vector<std::string> *>(ud)->emplace_back(msg);
+    };
+    const guint handler_id =
+        g_log_set_handler(nullptr, G_LOG_LEVEL_WARNING, capture, &warnings);
+    struct HandlerGuard
+    {
+        guint id;
+        ~HandlerGuard()
+        {
+            g_log_remove_handler(nullptr, id);
+        }
+    } guard{handler_id};
+
+    ThemeSettings ts;
+    const bool ok = ts.load(
+        (home_ / ".emerald" / "settings.ini").string(),
+        alt_dir.string(), "");
+
+    ASSERT_TRUE(ok) << "the pixmap load from the alt dir must succeed "
+        "(the engine's textures live in the hardcoded default dir)";
+
+    const bool warned = std::any_of(warnings.begin(), warnings.end(),
+        [&] (const std::string & w)
+        {
+            return w.find(alt_dir.string()) != std::string::npos &&
+                w.find("pixmap") != std::string::npos;
+        });
+    EXPECT_TRUE(warned)
+        << "load() must warn that the pixmap engine resolves its "
+           "pixmaps from the hardcoded ~/.emerald/theme; captured: "
+        << (warnings.empty() ? "(none)" : warnings.front());
+}
 
 TEST_F(SettingsTest, ShadowRadiusClampedAtLoad)
 {

@@ -72,6 +72,15 @@ void emerald_engine_fini_engine(const window_settings *ws);
 // Pure (filesystem + GKeyFile only) so it is testable headlessly.
 bool theme_has_pixmap_assets(const std::string &theme_dir);
 
+// M5 (issue #1): the pixmap/zootreeves engines resolve their pixmaps
+// via the vendored make_filename() (third_party/emerald/libengine/
+// emerald.c:66), which HARDCODES ~/.emerald/theme. With a non-default
+// theme_dir the bridge probes the right dir but the engine loads from
+// the wrong one — ThemeSettings::load() warns at load time. Pure
+// (string + home dir) so it is testable headlessly.
+bool theme_dir_mismatched_for_engine(const std::string & engine,
+    const std::string & theme_dir);
+
 // Renders the COMPLETE frame (shadow background + engine frame + title
 // text w/ halo + icon + button glows/backgrounds) into an ARGB32
 // cairo_image_surface of size frame_width x frame_height (D7).

@@ -1409,6 +1409,26 @@ bool ThemeSettings::load(const std::string & settings_ini,
         }
     }
 
+    // M5 (issue #1): the pixmap/zootreeves engines resolve their
+    // pixmaps via the vendored make_filename() (third_party/emerald/
+    // libengine/emerald.c:66), which HARDCODES ~/.emerald/theme. With a
+    // non-default theme_dir the bridge probes the right dir (R1) but the
+    // engine loads from the wrong one — the pixmaps are missing there
+    // (or stale from another theme). Warn at load time; the vendored
+    // engine is not modified, so this is documented-by-warning.
+    if (theme_dir_mismatched_for_engine(engine_, theme_dir_))
+    {
+        // The cstyleCast below is inside glib's g_warning() macro
+        // expansion (a --force configuration), not in this call.
+        // cppcheck-suppress cstyleCast
+        g_warning("ThemeSettings: theme dir '%s' is not the default "
+                  "~/.emerald/theme, but the '%s' engine resolves its "
+                  "pixmaps from ~/.emerald/theme (hardcoded in the "
+                  "vendored engine, make_filename) — it will not see "
+                  "this theme's pixmaps",
+            theme_dir_.c_str(), engine_.c_str());
+    }
+
     // LFACSS(text/titlebar, text_halo/titlebar, button/buttons, button_halo/buttons)
     // LFACSS equivalents (explicit, to avoid the macro's `ws` name clash).
     // f holds the user theme (normal) or emerald's default theme

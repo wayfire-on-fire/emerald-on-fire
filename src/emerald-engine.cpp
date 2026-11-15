@@ -638,6 +638,20 @@ bool wf::emeraldwf::theme_has_pixmap_assets(const std::string &theme_dir)
     return true;
 }
 
+bool wf::emeraldwf::theme_dir_mismatched_for_engine(const std::string & engine,
+    const std::string & theme_dir)
+{
+    // Only these engines load pixmaps through make_filename().
+    if (engine != "pixmap" && engine != "zootreeves")
+    {
+        return false;
+    }
+
+    const std::string default_dir =
+        std::string{g_get_home_dir()} + "/.emerald/theme";
+    return theme_dir != default_dir;
+}
+
 extern "C"
 {
 // port of main.c:1608-1652 (draw_buttons_without_fade) plus the fade path
