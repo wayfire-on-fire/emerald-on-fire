@@ -359,10 +359,14 @@ struct crop_ws_t
 TEST(MarginsCrop, DecompositionPerSide)
 {
     // crop = (shadows off ? shadow spread : 0) + (borders off ? border part : 0)
-    // left (17,4,2): margin 19 = shadow 11 + border 8
+    // M15 (issue #1): space = border + shadow (NO extra); extra is the
+    // separate outer strip the margin adds. shadow = space - win_ext, so
+    // left (17,4,2): margin 19 = shadow 13 + border 6 (pre-M15 the shadow
+    // was space - win_ext - extra = 11 and the border 8 — double-counting
+    // extra in the "shadows off" crop).
     EXPECT_EQ(maximized_crop_side(17, 4, 2, true, true), 0);
-    EXPECT_EQ(maximized_crop_side(17, 4, 2, false, true), 8); // borders off
-    EXPECT_EQ(maximized_crop_side(17, 4, 2, true, false), 11); // shadows off
+    EXPECT_EQ(maximized_crop_side(17, 4, 2, false, true), 6); // borders off
+    EXPECT_EQ(maximized_crop_side(17, 4, 2, true, false), 13); // shadows off
     EXPECT_EQ(maximized_crop_side(17, 4, 2, false, false), 19); // both off
 }
 

@@ -80,13 +80,15 @@ class EmeraldLayout
 
     // 3x3 band table (port of update_window_extents, main.c:309).
     //
-    // COORDINATE CONVENTION (finding 13 — read before editing): the table
-    // is in ORIGINAL emerald FRAME coords — the frame window's top-left is
-    // the origin and the client is inset by (l_ext, t_ext_nott), the BORDER
-    // thickness (the event windows are children of the frame window,
-    // main.c:3451). The port's frame adds the SHADOW inside the margins, so
-    // resize_edges()/cursor_region() must shift by the shadow spread
-    // (*_space - win_extents - extra) before applying the table.
+    // COORDINATE CONVENTION (finding 13, M15 issue #1 — read before
+    // editing): the table is in ORIGINAL emerald FRAME coords — the frame
+    // window's top-left is the origin and the client is inset by
+    // (l_ext, t_ext_nott + tt_h), where l_ext/t_ext_nott include the
+    // extra grab strip (the event windows are children of the frame
+    // window, main.c:3451). The port's frame adds the SHADOW inside the
+    // margins, so resize_edges()/cursor_region() must shift by the shadow
+    // spread (*_space - win_extents, NO extra — space = border + shadow
+    // per update_shadow) before applying the table.
     // Derived per call, never stored — keeps the class stateless.
     static pos_t band_table(const window_settings *ws, int i, int j)
     {

@@ -187,7 +187,14 @@ struct decor_crop_parts_t
 inline decor_crop_parts_t maximized_crop_parts(int space, int win_ext,
     int extra)
 {
-    int shadow = space - win_ext - extra;
+    // M15 (issue #1): space = border + shadow (update_shadow: space =
+    // win_ext + spread, NO extra); extra is the SEPARATE outer strip the
+    // margin adds on top (margin = space + extra). So the shadow spread
+    // is space - win_ext — NOT space - win_ext - extra, which
+    // double-subtracted extra and made the "no shadows" maximized margin
+    // come out win_ext + 2*extra (instead of win_ext + extra) and the
+    // engine's shadow draw extra px too narrow for [extra_grab] themes.
+    int shadow = space - win_ext;
     if (shadow < 0)
     {
         shadow = 0;

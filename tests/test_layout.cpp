@@ -739,34 +739,105 @@ TEST_F(LayoutFixture, in_titlebar)
     EXPECT_FALSE(layout.in_titlebar(ctx, 200, 21)); // below band (client)
 }
 
-// M14 (issue #1): the titlebar band must start at top_space, NOT at
-// top_space + extra_extents.top. top_space already includes the extents
-// (update_shadow: top_space = win_extents.top + spread - offset_y), and the
-// port-coord conversion of the band table's titlebar row
-// ([t_ext_nott_orig, t_ext_nott_orig + tt_h), t_ext_nott_orig =
-// win_extents.top + extra_top; shadow_top = top_space - (win_extents.top +
-// extra_top)) lands exactly at [top_space, top_space + tt_h). Pre-M14,
-// in_titlebar() added extra_extents.top on top of that: for [extra_grab]
-// themes the band was shifted DOWN by extra px — double-click action,
-// move-arming, middle-click and wheel-shade missed the top extra px of the
-// titlebar, and falsely triggered on the top extra px of the CLIENT.
+// M15 (issue #1, correcting M14): the titlebar band is
+// [top_space + extra_top, top_space + extra_top + tt_h). The margin
+// (emerald-decorator.cpp) places the client at
+// top_space + extra_top + tt_h from the frame top, and the titlebar is the
+// tt_h strip directly above the client. top_space = border + shadow
+// (update_shadow, NO extra); the extra grab strip sits between the shadow
+// and the border, so the band starts at top_space + extra_top.
+//
+// M14 had removed the extra term, based on a faulty band-table conversion
+// (shadow_top = top_space - win_extents.top - extra_top). The conversion's
+// shadow spread is top_space - win_extents.top (the band table is in
+// original-frame coords where the client inset is win_extents.top +
+// extra_top + tt_h) — see resize_edges/cursor_region. With the correct
+// conversion the pre-M14 band was right; M15 fixes the conversion and
+// restores it.
 TEST_F(LayoutFixture, in_titlebar_with_extra_extents_top)
 {
     ws->extra_extents.top = 3; // [extra_grab]-style theme
     DecorContext ctx = make_ctx(400, 300, 100);
     layout.build(ws, ctx);
 
-    // The band is [top_space, top_space + tt_h) = [4, 21) — extra must NOT
-    // shift it (pre-M14 it was [7, 24)).
-    EXPECT_TRUE(layout.in_titlebar(ctx, 200, 4))
-        << "top px of the titlebar (the band's first row) must be in the "
-           "band — pre-M14 the top extra_top px were missed";
-    EXPECT_TRUE(layout.in_titlebar(ctx, 200, 5));
-    EXPECT_TRUE(layout.in_titlebar(ctx, 200, 20));
-    EXPECT_FALSE(layout.in_titlebar(ctx, 200, 3)); // above band
-    EXPECT_FALSE(layout.in_titlebar(ctx, 200, 21))
-        << "the first client row must NOT be in the band — pre-M14 the "
-           "band extended extra_top px into the client";
+    // The band is [top_space + extra_top, top_space + extra_top + tt_h)
+    // = [7, 24) — the client starts at the margin (4 + 3 + 17 = 24).
+    EXPECT_TRUE(layout.in_titlebar(ctx, 200, 7))
+        << "the band's first row (top_space + extra_top) must be titlebar";
+    EXPECT_TRUE(layout.in_titlebar(ctx, 200, 10));
+    EXPECT_TRUE(layout.in_titlebar(ctx, 200, 23));
+    EXPECT_FALSE(layout.in_titlebar(ctx, 200, 6))
+        << "the border/extra strip above the titlebar is not titlebar "
+           "(M14's band [4, 21) misclassified it)";
+    EXPECT_FALSE(layout.in_titlebar(ctx, 200, 24))
+        << "the client (margin top = 24) is not titlebar — the band must "
+           "end exactly where the client begins";
+}
+
+// M15 (issue #1): the resize bands must be aligned with the MARGIN (the
+// ground truth for client placement: emerald-decorator.cpp places the
+// client at top_space + extra_top + tt_h from the frame top). Pre-M15 the
+// band conversion used shadow_top = top_space - win_extents.top -
+// extra_top, which placed the client at top_space + tt_h — off by
+// extra_top px for [extra_grab] themes (the top resize band was extra_top
+// px too narrow and the titlebar row spilled extra_top px into the client).
+TEST_F(LayoutFixture, resize_bands_aligned_with_margins)
+{
+    ws->extra_extents.top = 3;
+    DecorContext ctx = make_ctx(400, 300, 100);
+    layout.build(ws, ctx);
+
+    // Margin top = top_space + extra_top + tt_h = 4 + 3 + 17 = 24.
+    // Top resize band = [top_space - win_extents.top,
+    // top_space + extra_top) = [0, 7); titlebar row (move, no resize) =
+    // [7, 24).
+    EXPECT_EQ(layout.resize_edges(ctx, 200, 2), EMERALDWF_EDGE_TOP);
+    EXPECT_EQ(layout.resize_edges(ctx, 200, 6), EMERALDWF_EDGE_TOP)
+        << "the border/extra strip [0, 7) resizes the top edge — pre-M15 "
+           "the band ended at [0, 4) and this row was the titlebar";
+    EXPECT_EQ(layout.resize_edges(ctx, 200, 7), 0u) << "titlebar row";
+    EXPECT_EQ(layout.resize_edges(ctx, 200, 23), 0u) << "titlebar row";
+    EXPECT_EQ(layout.resize_edges(ctx, 200, 24), 0u) << "client (margin)";
+}
+
+// M15 (issue #1): cursor_region uses the same band conversion — with
+// extra_top the top band (region 1) and the titlebar row (region 4) must
+// sit at [0, 7) and [7, 24) respectively.
+TEST_F(LayoutFixture, cursor_region_with_extra_extents_top)
+{
+    ws->extra_extents.top = 3;
+    DecorContext ctx = make_ctx(400, 300, 100);
+    layout.build(ws, ctx);
+
+    EXPECT_EQ(layout.cursor_region(ctx, 200, 5), 1)
+        << "y=5 is in the top resize band [0, 7) — pre-M15 it fell in the "
+           "titlebar row (the band was shifted down by extra_top)";
+    EXPECT_EQ(layout.cursor_region(ctx, 200, 10), 4) << "titlebar row";
+}
+
+// M15 (issue #1): maximized_crop_parts() decomposes a side's margin
+// (space + extra) into shadow + border. space = border + shadow
+// (update_shadow, NO extra) and extra is the separate outer strip the
+// margin adds — so shadow = space - win_ext, NOT space - win_ext - extra
+// (which double-subtracted extra: the "no shadows" maximized margin came
+// out ext + 2*extra instead of ext + extra, and the engine's shadow draw
+// was extra px too narrow for [extra_grab] themes).
+TEST(M15Test, CropPartsDecompositionConsistentWithMargin)
+{
+    // space = 9 = border(4) + shadow(5); extra = 3 → margin = 12.
+    const auto p = maximized_crop_parts(9, 4, 3);
+    EXPECT_EQ(p.shadow, 5)
+        << "shadow spread = space - win_ext — pre-M15 it was "
+           "space - win_ext - extra (= 2)";
+    EXPECT_EQ(p.border, 7) << "border part = win_ext + extra";
+    EXPECT_EQ(p.shadow + p.border, 12)
+        << "shadow + border must equal the margin (space + extra)";
+
+    // extra == 0: the decomposition is unchanged by M15.
+    const auto q = maximized_crop_parts(9, 4, 0);
+    EXPECT_EQ(q.shadow, 5);
+    EXPECT_EQ(q.border, 4);
+    EXPECT_EQ(q.shadow + q.border, 9);
 }
 
 // ── 8. click actions ─────────────────────────────────────────────────────

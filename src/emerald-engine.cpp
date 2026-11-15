@@ -1169,9 +1169,10 @@ cairo_surface_t *emeraldwf_render_frame(const ThemeSettings & ts,
         cairo_restore(crs);
     };
 
-    // Shadow spread per side (maximized_crop_parts: shadow = space − ext
-    // − extra) — the zone boundaries sit at the band edges in surface
-    // coordinates (surface x + offset = full-extent x).
+    // Shadow spread per side (maximized_crop_parts: shadow = space − ext,
+    // NO extra — space = border + shadow, extra is the separate outer
+    // strip; M15 issue #1) — the zone boundaries sit at the band edges in
+    // surface coordinates (surface x + offset = full-extent x).
     const double sl = (double)maximized_crop_parts(ws->left_space,
         ws->win_extents.left, ws->extra_extents.left).shadow;
     const double sr = (double)maximized_crop_parts(ws->right_space,

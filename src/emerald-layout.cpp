@@ -509,18 +509,24 @@ uint32_t EmeraldLayout::resize_edges(const DecorContext & ctx, int x,
     // surrounding the client; the titlebar row is move, not resize
     // (t_ext_nott boundary, main.c:324).
     //
-    // NOTE (finding 13): the band table is in ORIGINAL emerald FRAME
-    // coords (frame window origin; the client is inset by the BORDER
-    // thickness l_ext/t_ext_nott — the event windows are children of the
-    // frame window, main.c:3451). Hit-test coordinates here are PORT frame
-    // coords, where the shadow sits between the frame edge and the border.
-    // Convert by subtracting the SHADOW SPREAD only (*_space - border):
-    // shadow_left = left_space - (win_extents.left + extra_left)
-    // Subtracting the full *_space (the old code) shifted the bands into
-    // the client / the shadow — the left border band landed inside the
-    // client (invisible to the pointer: the client surface node wins the
-    // hit test there), which is why the left edge never showed a resize
-    // cursor while the bottom (still outside the client) did.
+    // NOTE (finding 13, M15 issue #1): the band table is in ORIGINAL
+    // emerald FRAME coords (frame window origin; the client is inset by
+    // l_ext/t_ext_nott — the event windows are children of the frame
+    // window, main.c:3451). Hit-test coordinates here are PORT frame
+    // coords, where the shadow sits between the frame edge and the
+    // border. Convert by subtracting the SHADOW SPREAD only:
+    // shadow_left = left_space - win_extents.left
+    // (space = border + shadow, per update_shadow — NO extra; the extra
+    // grab strip is a separate outer band the margin adds on top, so the
+    // table's client inset l_ext = win_extents + extra already covers
+    // it). Subtracting the full *_space (the finding-13 pre-fix code)
+    // shifted the bands into the client / the shadow — the left border
+    // band landed inside the client (invisible to the pointer: the
+    // client surface node wins the hit test there), which is why the
+    // left edge never showed a resize cursor while the bottom (still
+    // outside the client) did. Pre-M15, subtracting
+    // win_extents + extra double-subtracted extra: for [extra_grab]
+    // themes the bands sat extra px off the margin-placed client.
     const window_settings *ws = ctx.fs ? ctx.fs->ws : nullptr;
     if (!ws)
     {
@@ -534,10 +540,8 @@ uint32_t EmeraldLayout::resize_edges(const DecorContext & ctx, int x,
         h = 0;
     }
 
-    const int shadow_left =
-        ws->left_space - (ws->win_extents.left + ws->extra_extents.left);
-    const int shadow_top =
-        ws->top_space - (ws->win_extents.top + ws->extra_extents.top);
+    const int shadow_left = ws->left_space - ws->win_extents.left;
+    const int shadow_top = ws->top_space - ws->win_extents.top;
 
     const int cx = x - shadow_left; // original-frame coords
     const int cy = y - shadow_top;
@@ -640,18 +644,24 @@ bool EmeraldLayout::in_titlebar(const DecorContext & ctx, int /*x*/, int y) cons
         return false;
     }
 
-    // M14 (issue #1): the band starts at top_space — NOT top_space +
-    // extra_extents.top. top_space already includes the extents
-    // (update_shadow: top_space = win_extents.top + spread - offset_y), and
-    // the band table's titlebar row ([t_ext_nott_orig, t_ext_nott_orig +
-    // tt_h), t_ext_nott_orig = win_extents.top + extra_top) converts to
-    // port coords via shadow_top = top_space - (win_extents.top +
-    // extra_top) — i.e. exactly [top_space, top_space + tt_h). Adding
-    // extra_extents.top here double-counted it: for [extra_grab] themes the
-    // band shifted DOWN by extra px (double-click / move-arming /
-    // middle-click / wheel-shade missed the top extra px of the titlebar
-    // and falsely triggered on the top extra px of the client).
-    int t_ext_nott = ws->top_space;
+    // M15 (issue #1, correcting M14): the band is [top_space +
+    // extra_extents.top, top_space + extra_extents.top + tt_h). The margin
+    // (emerald-decorator.cpp) places the client at
+    // top_space + extra_top + tt_h from the frame top, and the titlebar is
+    // the tt_h strip directly above the client. top_space = border +
+    // shadow (update_shadow, NO extra); the extra grab strip sits between
+    // the shadow and the border, so the band starts at top_space +
+    // extra_top.
+    //
+    // M14 removed the extra term, based on the faulty band-table
+    // conversion (shadow_top = top_space - win_extents.top - extra_top).
+    // The conversion's shadow spread is top_space - win_extents.top (the
+    // band table is in original-frame coords where the client inset is
+    // win_extents.top + extra_top + tt_h — see resize_edges), which maps
+    // the table's titlebar row to exactly [top_space + extra_top,
+    // top_space + extra_top + tt_h). Pre-M15, the conversion (and M14's
+    // band) both sat extra_top px off the margin for [extra_grab] themes.
+    int t_ext_nott = ws->top_space + ws->extra_extents.top;
     int t_ext = t_ext_nott + ws->titlebar_height;
 
     return y >= t_ext_nott && y < t_ext;
@@ -663,9 +673,11 @@ int EmeraldLayout::cursor_region(const DecorContext & ctx, int x, int y) const
     // update_event_windows, main.c:3033+). Part 04 maps the index to a
     // cursor shape; the middle cell is move.
     //
-    // NOTE (finding 13): the band table is in ORIGINAL emerald FRAME coords
-    // (see band_table). Hit-test coordinates are PORT frame coords, so
-    // subtract the SHADOW SPREAD only (not the full *_space):
+    // NOTE (finding 13, M15 issue #1): the band table is in ORIGINAL
+    // emerald FRAME coords (see band_table). Hit-test coordinates are PORT
+    // frame coords, so subtract the SHADOW SPREAD only (not the full
+    // *_space, and NOT win_extents + extra — space has no extra, see
+    // resize_edges):
     // client_x = frame_x - shadow_left, client_y = frame_y - shadow_top.
     const window_settings *ws = ctx.fs ? ctx.fs->ws : nullptr;
     if (!ws)
@@ -680,10 +692,8 @@ int EmeraldLayout::cursor_region(const DecorContext & ctx, int x, int y) const
         h = 0;
     }
 
-    const int shadow_left =
-        ws->left_space - (ws->win_extents.left + ws->extra_extents.left);
-    const int shadow_top =
-        ws->top_space - (ws->win_extents.top + ws->extra_extents.top);
+    const int shadow_left = ws->left_space - ws->win_extents.left;
+    const int shadow_top = ws->top_space - ws->win_extents.top;
 
     const int cx = x - shadow_left;
     const int cy = y - shadow_top;
