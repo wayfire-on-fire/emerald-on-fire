@@ -168,6 +168,11 @@ emeraldwf_shade_source = executable('emeraldwf-shade-source',
     dependencies: [gtest, gtest_main])
 test('emeraldwf-shade-source', emeraldwf_shade_source)
 
+# M22 (issue #1): install.sh's sudo home resolution (shell-level test:
+# extracts the resolve_user_home() block from install.sh and exercises
+# it; the script itself builds first, so it is not run whole).
+test('emeraldwf-install-home', find_program('test_install_home.sh'))
+
 # ---- part 07: engine pane / engine module lifetime (findings 46/47) ----
 # Regression for the "Round Top Left Corner" SEGV_MAPERR: append_engine's
 # dlclose unmapped the engine .so (static-vendored libemeraldengine) while

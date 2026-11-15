@@ -66,6 +66,33 @@ for arg in "$@"; do
     esac
 done
 
+# ── 0. user home for user-state placement ────────────────────────────────────
+# BEGIN M22-user-home
+# M22 (issue #1): under `sudo`, HOME is /root — but the user's emerald
+# state (the ~/.emerald seed, the settings.ini -> wayfire.ini migration,
+# the XDG / .local/bin fallbacks) belongs to the INVOKING user, not to
+# root. This script's FATAL messages push users to `sudo $0`, so resolve
+# SUDO_USER's home when running as root. Non-root: no change. Root without
+# sudo (a real root session): keeps its own home. SUDO_USER set but
+# UNresolvable: fail visibly — silently targeting /root would recreate
+# the very bug this resolves (ChatGPT follow-up).
+resolve_user_home() {  # euid sudo_user home -> prints the resolved home
+    local euid="$1" sudo_user="$2" home="$3" resolved
+    if [ "$euid" -eq 0 ] && [ -n "$sudo_user" ]; then
+        resolved=$(getent passwd "$sudo_user" | cut -d: -f6)
+        if [ -z "$resolved" ]; then
+            printf 'FATAL: cannot resolve home for sudo user %s\n' \
+                "$sudo_user" >&2
+            return 1
+        fi
+        printf '%s\n' "$resolved"
+        return 0
+    fi
+    printf '%s\n' "$home"
+}
+# END M22-user-home
+USER_HOME="$(resolve_user_home "$EUID" "${SUDO_USER:-}" "$HOME")" || exit 1
+
 BUILD=build
 DEFAULTS=third_party/emerald/defaults
 
@@ -189,9 +216,9 @@ if [ -d "$WF_PLUGDIR" ] && [ -w "$WF_PLUGDIR" ]; then
     cp -r "$DEFAULTS/theme" "$WF_PLUGDIR/emeraldwf-defaults/theme"
     echo "==> default theme → $WF_PLUGDIR/emeraldwf-defaults/theme"
 else
-    rm -rf "${XDG_DATA_HOME:-$HOME/.local/share}/emeraldwf/defaults"
-    mkdir -p "${XDG_DATA_HOME:-$HOME/.local/share}/emeraldwf/defaults"
-    cp -r "$DEFAULTS/theme" "${XDG_DATA_HOME:-$HOME/.local/share}/emeraldwf/defaults/theme"
+    rm -rf "${XDG_DATA_HOME:-$USER_HOME/.local/share}/emeraldwf/defaults"
+    mkdir -p "${XDG_DATA_HOME:-$USER_HOME/.local/share}/emeraldwf/defaults"
+    cp -r "$DEFAULTS/theme" "${XDG_DATA_HOME:-$USER_HOME/.local/share}/emeraldwf/defaults/theme"
     echo "==> $WF_PLUGDIR not writable — default theme → ~/.local/share/emeraldwf/defaults/theme"
 fi
 
@@ -217,7 +244,7 @@ elif install -d "$ICONDIR" 2>/dev/null && [ -w "$ICONDIR" ]; then
     install_icon "$ICONDIR"
 else
     echo "==> system icon dir not writable ($ICONDIR) — using user dir"
-    install_icon "${XDG_DATA_HOME:-$HOME/.local/share}/wayfire/icons"
+    install_icon "${XDG_DATA_HOME:-$USER_HOME/.local/share}/wayfire/icons"
 fi
 
 # ── 4b. emerald-theme-manager (theme editor): system dirs, user-dir fallback ─
@@ -226,7 +253,7 @@ fi
 #   $XDG_DATA_HOME/emeraldwf/themes/      (user "system" tier)
 #   ~/.emerald/themes/                    (user themes, editable)
 # so the user-dir fallbacks below are first-class, not degraded.
-XDG="${XDG_DATA_HOME:-$HOME/.local/share}"
+XDG="${XDG_DATA_HOME:-$USER_HOME/.local/share}"
 
 install_file() {  # src dest-dir — temp + rename: overwriting a binary
                  # that is CURRENTLY RUNNING fails with ETXTBSY (the
@@ -246,15 +273,15 @@ install_file() {  # src dest-dir — temp + rename: overwriting a binary
 
 # binary (remove the previous name — part 07 was shipped as
 # "emerald-on-fire" for one release; do not leave a stale duplicate)
-rm -f "$HOME/.local/bin/emerald-on-fire" "$XDG/applications/emerald-on-fire.desktop"
+rm -f "$USER_HOME/.local/bin/emerald-on-fire" "$XDG/applications/emerald-on-fire.desktop"
 if [ -w /usr/bin ]; then
     install_file "$BUILD/themer/emerald-theme-manager" /usr/bin
     BIN_DEST=/usr/bin/emerald-theme-manager
     rm -f /usr/bin/emerald-on-fire /usr/share/applications/emerald-on-fire.desktop
     echo "==> emerald-theme-manager → /usr/bin"
 else
-    install_file "$BUILD/themer/emerald-theme-manager" "$HOME/.local/bin"
-    BIN_DEST="$HOME/.local/bin/emerald-theme-manager"
+    install_file "$BUILD/themer/emerald-theme-manager" "$USER_HOME/.local/bin"
+    BIN_DEST="$USER_HOME/.local/bin/emerald-theme-manager"
     echo "==> /usr/bin not writable — emerald-theme-manager → ~/.local/bin"
 fi
 
@@ -299,7 +326,7 @@ done
 
 # ── 5. seed ~/.emerald (never overwrite) ────────────────────────────────────
 if [ "$SEED" -eq 1 ]; then
-    EMERALD_DIR="$HOME/.emerald"
+    EMERALD_DIR="$USER_HOME/.emerald"
     if [ ! -f "$EMERALD_DIR/settings.ini" ]; then
         mkdir -p "$EMERALD_DIR"
         cp "$DEFAULTS/settings.ini" "$EMERALD_DIR/settings.ini"
@@ -314,6 +341,13 @@ if [ "$SEED" -eq 1 ]; then
     else
         echo "==> $EMERALD_DIR/theme already present — left untouched"
     fi
+    # M22 (issue #1, ChatGPT follow-up): under sudo the seed files are
+    # root-owned — the invoking user could not edit their theme/settings.
+    # Hand the dir back to them (a plain run already creates everything
+    # as the user, so this is a no-op there).
+    if [ "$EUID" -eq 0 ] && [ -n "${SUDO_USER:-}" ]; then
+        chown -R "$SUDO_USER": "$EMERALD_DIR"
+    fi
 fi
 
 # ── 5b. part 08: migrate the global emerald settings to the wayfire config ─
@@ -322,10 +356,10 @@ fi
 # present in settings.ini, append it to the active wayfire config if the
 # [emeraldwf] section does not define it yet.
 if [ "$SEED" -eq 1 ]; then
-    ESET="$HOME/.emerald/settings.ini"
+    ESET="$USER_HOME/.emerald/settings.ini"
     WF_INI=""
-    for cand in "$HOME/.config/lxqt/wayland/lxqt-wayfire.ini" \
-                "$HOME/.config/wayfire.ini"; do
+    for cand in "$USER_HOME/.config/lxqt/wayland/lxqt-wayfire.ini" \
+                "$USER_HOME/.config/wayfire.ini"; do
         if [ -f "$cand" ]; then
             WF_INI="$cand"
             break
@@ -367,6 +401,12 @@ if [ "$SEED" -eq 1 ]; then
         done
         if [ "$migrated" -gt 0 ]; then
             echo "==> migrated $migrated emerald settings: settings.ini → $WF_INI ([emeraldwf])"
+            # M22 (issue #1, ChatGPT follow-up): the awk tmp + mv made the
+            # file root-owned under sudo — hand it back so the invoking
+            # user can still edit their wayfire config.
+            if [ "$EUID" -eq 0 ] && [ -n "${SUDO_USER:-}" ]; then
+                chown "$SUDO_USER": "$WF_INI"
+            fi
         fi
     fi
 fi
