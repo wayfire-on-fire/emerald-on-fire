@@ -102,6 +102,10 @@ test('emeraldwf-e2e-script', find_program('../e2e/test_run.sh'))
 # dlsym()s unmangled names.
 fake_engine_ok = shared_library('fakeok', ['engine-fake-ok.c'],
     name_prefix: 'lib')
+fake_engine_alt = shared_library('fakealt', ['engine-fake-alt.c'],
+    name_prefix: 'lib')
+fake_engine_nodraw = shared_library('fakenodraw', ['engine-fake-nodraw.c'],
+    name_prefix: 'lib')
 
 emeraldwf_engine_loader = executable('emeraldwf-engine-loader',
     ['test_engine_loader.cpp', '../src/emerald-engine.cpp'],
@@ -109,7 +113,7 @@ emeraldwf_engine_loader = executable('emeraldwf-engine-loader',
     dependencies: emerald_test_deps + [wayfire],
     link_with: [emerald_theme_lib, libemeraldengine])
 test('emeraldwf-engine-loader', emeraldwf_engine_loader,
-    depends: [fake_engine_ok])
+    depends: [fake_engine_ok, fake_engine_alt, fake_engine_nodraw])
 
 # ---- part 04: scene node pure helpers (headless) ----
 # Compiles only the wayfire-free pure TU (emerald-node-pure.cpp) so the test

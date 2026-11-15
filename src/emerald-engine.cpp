@@ -755,7 +755,40 @@ bool emerald_engine_load(const std::string & name, const std::string & system_di
         }
     }
 
-    // The candidate is live: retire the previous engine, then publish.
+    // The candidate is live: validate its symbols BEFORE retiring the
+    // previous engine. M2 (issue #1): pre-fix the handle + name were
+    // published and the old engine retired BEFORE the dlsym
+    // validation, so a .so missing the required engine_draw_frame
+    // left a half-published bridge (handle + name set, e_draw null) —
+    // and the NEXT load of the same name hit the same-engine fast
+    // path and returned true with e_draw still null: "loaded" forever,
+    // drew nothing, handle leaked. Resolve into locals, validate,
+    // dlclose the candidate on failure, publish only after.
+    // dlsym() returns void*; reinterpret_cast is the C++-correct
+    // conversion to a function pointer (a C-style cast here is flagged
+    // by cppcheck).
+    auto cand_init  = reinterpret_cast<init_engine_proc>(
+        dlsym(candidate, "init_engine"));
+    auto cand_fini  = reinterpret_cast<fini_engine_proc>(
+        dlsym(candidate, "fini_engine"));
+    auto cand_load  = reinterpret_cast<load_settings_proc>(
+        dlsym(candidate, "load_engine_settings"));
+    auto cand_draw  = reinterpret_cast<draw_frame_proc>(
+        dlsym(candidate, "engine_draw_frame"));
+
+    if (cand_draw == nullptr)
+    {
+        // The cstyleCast below is inside glib's g_warning() macro
+        // expansion (a --force configuration), not in this call.
+        // cppcheck-suppress cstyleCast
+        g_warning("emerald_engine_load: '%s' is missing the required "
+                  "engine_draw_frame symbol; not loading", name.c_str());
+        dlclose(candidate);
+        // The currently-loaded engine is untouched.
+        return false;
+    }
+
+    // Fully validated: retire the previous engine, then publish.
     if (engine_handle)
     {
         if (e_fini && (e_ws != nullptr))
@@ -779,15 +812,12 @@ bool emerald_engine_load(const std::string & name, const std::string & system_di
     // re-inited by emerald_engine_init_engine() after load().
     active_engine_name = name;
     engine_handle = candidate;
+    e_init = cand_init;
+    e_fini = cand_fini;
+    e_load = cand_load;
+    e_draw = cand_draw;
 
-    // dlsym() returns void*; reinterpret_cast is the C++-correct conversion
-    // to a function pointer (a C-style cast here is flagged by cppcheck).
-    e_init = reinterpret_cast<init_engine_proc>(dlsym(engine_handle, "init_engine"));
-    e_fini = reinterpret_cast<fini_engine_proc>(dlsym(engine_handle, "fini_engine"));
-    e_load = reinterpret_cast<load_settings_proc>(dlsym(engine_handle, "load_engine_settings"));
-    e_draw = reinterpret_cast<draw_frame_proc>(dlsym(engine_handle, "engine_draw_frame"));
-
-    return e_draw != nullptr;
+    return true;
 }
 
 void emerald_engine_init_engine(window_settings *ws)
