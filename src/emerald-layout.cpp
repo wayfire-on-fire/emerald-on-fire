@@ -685,12 +685,18 @@ int EmeraldLayout::cursor_region(const DecorContext & ctx, int x, int y) const
         return 4;
     }
 
-    int w = ctx.client_width;
-    int h = ctx.client_height;
+    // M16 (issue #1): a shaded window shows only the titlebar — the client
+    // is hidden, so no resize band exists. Every point maps to move (4).
+    // (resize_edges handles shading by collapsing h to 0; an early return
+    // here keeps the band loop and the fallback from reporting resize
+    // regions over the collapsed rows.)
     if (ctx.state & EWS_SHADED)
     {
-        h = 0;
+        return 4;
     }
+
+    const int w = ctx.client_width;
+    const int h = ctx.client_height;
 
     const int shadow_left = ws->left_space - ws->win_extents.left;
     const int shadow_top = ws->top_space - ws->win_extents.top;
@@ -719,13 +725,24 @@ int EmeraldLayout::cursor_region(const DecorContext & ctx, int x, int y) const
         }
     }
 
-    // no band hit (e.g. the client area): clamp into the 3x3 grid so the
-    // index stays 0..8 — part 04 maps the middle cell to the move cursor.
-    // (cx/cy are table coords: the client spans x[l_ext, l_ext + w).)
+    // M16 (issue #1): no band hit. The only in-frame hole in the band grid
+    // is the CLIENT rect (x[l_ext, l_ext + w), y[t_ext, t_ext + h) in table
+    // coords) — it maps to the center cell (4, move), per the spec and the
+    // note below. Pre-M16 the fallback clamped the client into the bottom
+    // row (region 7), contradicting both. Points OUTSIDE the frame keep the
+    // clamped edge region.
     const int l_ext = ws->win_extents.left + ws->extra_extents.left;
     const int t_ext_nott = ws->win_extents.top + ws->extra_extents.top;
-    int t_ext = t_ext_nott + ws->titlebar_height;
+    const int t_ext = t_ext_nott + ws->titlebar_height;
 
+    if ((cx >= l_ext) && (cx < l_ext + w) &&
+        (cy >= t_ext) && (cy < t_ext + h))
+    {
+        return 4; // client area → move
+    }
+
+    // Outside the frame: clamp into the 3x3 grid so the index stays 0..8 —
+    // part 04 maps the middle cell to the move cursor.
     int row = (cy < 0) ? 0 : (cy >= t_ext ? 2 : 1);
     int col = (cx < 0) ? 0 : (cx >= l_ext + w ? 2 : 1);
     return row * 3 + col;

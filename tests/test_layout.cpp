@@ -815,6 +815,83 @@ TEST_F(LayoutFixture, cursor_region_with_extra_extents_top)
     EXPECT_EQ(layout.cursor_region(ctx, 200, 10), 4) << "titlebar row";
 }
 
+// M16 (issue #1, part a): the client rect is the only in-frame hole in the
+// band grid and must map to the center cell (4, move) — pre-M16 the
+// fallback clamped it into the bottom row (region 7), contradicting the
+// function's own comment and the spec.
+TEST_F(LayoutFixture, cursor_region_client_area_is_move)
+{
+    DecorContext ctx = make_ctx(400, 300, 100);
+    layout.build(ws, ctx);
+
+    // Client rect (fixture, extra=0): x[6, 406), y[21, 321) port coords.
+    EXPECT_EQ(layout.cursor_region(ctx, 200, 100), 4)
+        << "the client area is the move region (4) — pre-M16 the fallback "
+           "mapped it to the bottom row (7)";
+    EXPECT_EQ(layout.cursor_region(ctx, 50, 250), 4);
+    EXPECT_EQ(layout.cursor_region(ctx, 390, 320), 4);
+}
+
+// M16 (issue #1, part b): a shaded window shows only the titlebar — no
+// resize band exists, so every point maps to move (4). Pre-M16 the top /
+// corner bands were still reported over the collapsed rows.
+TEST_F(LayoutFixture, cursor_region_shaded_is_move)
+{
+    DecorContext ctx = make_ctx(400, 300, 100);
+    ctx.state = EWS_SHADED;
+    layout.build(ws, ctx);
+
+    EXPECT_EQ(layout.cursor_region(ctx, 200, 2), 4)
+        << "shaded: no top resize band — pre-M16 this was region 1";
+    EXPECT_EQ(layout.cursor_region(ctx, 2, 10), 4)
+        << "shaded: no corner resize — pre-M16 this was region 0";
+    EXPECT_EQ(layout.cursor_region(ctx, 200, 10), 4) << "titlebar";
+    EXPECT_EQ(layout.cursor_region(ctx, 200, 100), 4) << "hidden client";
+}
+
+// M16 regression: the non-client, non-shaded band regions are unchanged.
+// (Fixture: left/top space = win_extents, so port == table coords;
+// l_ext=6, t_ext_nott=4, t_ext=21, w=400, h=300.)
+TEST_F(LayoutFixture, cursor_region_bands_unchanged)
+{
+    DecorContext ctx = make_ctx(400, 300, 100);
+    layout.build(ws, ctx);
+
+    EXPECT_EQ(layout.cursor_region(ctx, 2, 2), 0) << "top-left";
+    EXPECT_EQ(layout.cursor_region(ctx, 200, 2), 1) << "top";
+    EXPECT_EQ(layout.cursor_region(ctx, 410, 2), 2) << "top-right";
+    EXPECT_EQ(layout.cursor_region(ctx, 2, 25), 3) << "left (below titlebar)";
+    EXPECT_EQ(layout.cursor_region(ctx, 200, 10), 4) << "titlebar (move)";
+    EXPECT_EQ(layout.cursor_region(ctx, 410, 25), 5) << "right (below titlebar)";
+    EXPECT_EQ(layout.cursor_region(ctx, 2, 325), 6) << "bottom-left";
+    EXPECT_EQ(layout.cursor_region(ctx, 200, 325), 7) << "bottom";
+    EXPECT_EQ(layout.cursor_region(ctx, 410, 325), 8) << "bottom-right";
+}
+
+// M16 (ChatGPT follow-up): the client-rect fallback must stay correct when
+// port coords differ from table coords (nonzero shadow spread + extra, per
+// the M15 convention). shadow_left = 10 - 6 = 4, shadow_top = 8 - 4 = 4.
+TEST_F(LayoutFixture, cursor_region_client_fallback_with_shadow_and_extra)
+{
+    ws->left_space = 10;
+    ws->top_space = 8;
+    ws->extra_extents.left = 2;
+    ws->extra_extents.top = 3;
+    DecorContext ctx = make_ctx(400, 300, 100);
+    layout.build(ws, ctx);
+
+    // l_ext = 8, t_ext_nott = 7, t_ext = 24 (table coords).
+    // Client rect in PORT coords: x[12, 412), y[28, 328).
+    EXPECT_EQ(layout.cursor_region(ctx, 200, 150), 4)
+        << "client area maps to move even when port != table coords "
+           "(pre-M16 the fallback gave the bottom row, 7)";
+    // Top resize band in port coords: [shadow_top, shadow_top + t_ext_nott)
+    // = [4, 11).
+    EXPECT_EQ(layout.cursor_region(ctx, 200, 6), 1) << "top band";
+    // Titlebar row in port coords: [11, 28).
+    EXPECT_EQ(layout.cursor_region(ctx, 200, 20), 4) << "titlebar (move)";
+}
+
 // M15 (issue #1): maximized_crop_parts() decomposes a side's margin
 // (space + extra) into shadow + border. space = border + shadow
 // (update_shadow, NO extra) and extra is the separate outer strip the
