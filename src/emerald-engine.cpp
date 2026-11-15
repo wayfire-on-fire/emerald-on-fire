@@ -873,6 +873,13 @@ void emerald_engine_unload()
     e_fini = nullptr;
     e_load = nullptr;
     e_draw = nullptr;
+    // M3 (issue #1): the name must not outlive the engine — pre-fix the
+    // global survived the dlclose, so the bridge kept claiming an engine
+    // that is no longer mapped (consumers of the name, e.g. the pixmap
+    // asset guard, could act on a phantom engine). The other half of M3
+    // — the name is published only on a successful, validated load —
+    // is in emerald_engine_load (M1/M2).
+    active_engine_name.clear();
 }
 
 cairo_surface_t *emeraldwf_render_frame(const ThemeSettings & ts,

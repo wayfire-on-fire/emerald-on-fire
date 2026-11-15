@@ -141,6 +141,32 @@ TEST_F(EngineLoaderTest, FailedSymbolResolutionKeepsWorkingEngine)
            "candidate (log: " << log << ")";
 }
 
+// M3 (issue #1): emerald_engine_unload() must clear the active engine
+// name. Pre-fix the global survived the unload, so the bridge kept
+// claiming an engine that is no longer mapped (pixmap_theme_has_pixmaps
+// and any consumer of the name could act on a phantom engine). The
+// other half of M3 — the name is published only on a successful,
+// validated load — is established by M1/M2 (FailedReload... and
+// FailedSymbolResolution... assert the name is unchanged after a
+// failed load).
+TEST_F(EngineLoaderTest, UnloadClearsActiveName)
+{
+    ASSERT_TRUE(emerald_engine_load("fakeok", fake_engine_dir()));
+    EXPECT_EQ(emerald_engine_active_name(), "fakeok");
+
+    emerald_engine_unload();
+
+    EXPECT_TRUE(emerald_engine_active_name().empty())
+        << "unload must clear the active engine name (pre-fix: the "
+           "global survived the dlclose)";
+    EXPECT_FALSE(emerald_engine_is_loaded());
+
+    // Idempotent: a second unload must not fail or resurrect state.
+    emerald_engine_unload();
+    EXPECT_TRUE(emerald_engine_active_name().empty());
+    EXPECT_FALSE(emerald_engine_is_loaded());
+}
+
 // M1/M2 (issue #1): a SUCCESSFUL swap between two distinct engines is
 // transactional in the other direction — the old engine is finalized
 // (exactly once, at the retire point) and only then is the new engine
