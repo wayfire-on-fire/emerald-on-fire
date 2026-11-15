@@ -400,6 +400,42 @@ TEST_F(PixmapIntegrationTest, NonDefaultThemeDir_WarnsForPixmapEngine)
 // (The missing-theme.ini case takes the same GError path, but is covered
 // by the M8 seeding change instead — a missing file is re-seeded, not
 // warned about.)
+// M7 (issue #1): signed overflow in the button-fade pulse derivation.
+// `num * (100 - min_opacity)` is int arithmetic; with
+// button_fade_total_duration = INT_MAX and step = 50 (both reachable via
+// wayfire.ini + config sync), num = INT_MAX/50 = 42949672, and
+// num * 100 = 4294967200 overflows INT_MAX — UB, a bogus step count.
+// The fix uses an int64_t intermediate.
+TEST(ButtonFadeOverflow, HugeDurationPulseDerivationDoesNotOverflow)
+{
+    auto *ws = new window_settings{};
+
+    emeraldwf_apply_button_fade(ws, true, true, INT_MAX, 50, 0, 0);
+    const int num = INT_MAX / 50; // 42949672
+    ASSERT_EQ(ws->button_fade_num_steps, num);
+    EXPECT_EQ(ws->button_fade_pulse_len_steps, num)
+        << "min_opacity=0 -> pulse_len == num; pre-fix num * 100 "
+           "overflowed int (UB, wrapped to a garbage value)";
+    delete ws;
+}
+
+TEST(ButtonFadeOverflow, PulseDerivationFormulaUnchanged)
+{
+    auto *ws = new window_settings{};
+
+    // Sanity: the int64_t intermediate must not change the derivation
+    // for in-range values. num = 1000/50 = 20; min_opacity = 50 ->
+    // pulse_len = 20 * 50 / 100 = 10.
+    emeraldwf_apply_button_fade(ws, true, true, 1000, 50, 0, 50);
+    EXPECT_EQ(ws->button_fade_num_steps, 20);
+    EXPECT_EQ(ws->button_fade_pulse_len_steps, 10);
+
+    // min_opacity = 100 -> pulse_len = 0 (pulse cycle empty).
+    emeraldwf_apply_button_fade(ws, true, true, 1000, 50, 0, 100);
+    EXPECT_EQ(ws->button_fade_pulse_len_steps, 0);
+    delete ws;
+}
+
 TEST_F(SettingsTest, CorruptThemeIniWarnsWithPathAndStaysTolerant)
 {
     const fs::path dir = tmp_dir_ / "m6-corrupt";

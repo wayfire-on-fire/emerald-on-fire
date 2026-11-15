@@ -1701,8 +1701,13 @@ void wf::emeraldwf::emeraldwf_apply_button_fade(window_settings *ws,
         const int min_opacity =
             (pulse_min_opacity_pct < 0) ? 0 :
             (pulse_min_opacity_pct > 100) ? 100 : pulse_min_opacity_pct;
+        // M7 (issue #1): int64_t intermediate — `num * (100 -
+        // min_opacity)` overflows int for reachable values
+        // (button_fade_total_duration = INT_MAX, step = 50 ->
+        // num = 42949672, num * 100 = 4294967200 > INT_MAX): UB and a
+        // bogus step count. Both inputs are WCM/ini-editable.
         ws->button_fade_pulse_len_steps =
-            num * (100 - min_opacity) / 100;
+            (int)((int64_t)num * (100 - min_opacity) / 100);
         ws->button_fade_pulse_wait_steps =
             (pulse_wait_ms > 0) ? pulse_wait_ms / step : 0;
     } else
