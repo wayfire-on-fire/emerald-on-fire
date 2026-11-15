@@ -86,6 +86,13 @@ emeraldwf_layout_asan = executable('emeraldwf-layout-asan',
     link_args: ['-fsanitize=address'])
 test('emeraldwf-layout-asan', emeraldwf_layout_asan)
 
+# R5 (issue #1): static/script-logic tests for e2e/run.sh (no Xvfb on
+# CI boxes): bash -n, the pure helpers sourced via run.sh's source
+# guard (imgcmp/golden/vendor_check), and the structural contracts of
+# the R5 fix (own Xvfb + exported DISPLAY, no hardcoded vendor path,
+# guarded screenshots, missing golden = SKIPPED).
+test('emeraldwf-e2e-script', find_program('../e2e/test_run.sh'))
+
 # ---- part 04: scene node pure helpers (headless) ----
 # Compiles only the wayfire-free pure TU (emerald-node-pure.cpp) so the test
 # links without wayfire core symbols (libwayfire is not a linkable shared
