@@ -640,7 +640,18 @@ bool EmeraldLayout::in_titlebar(const DecorContext & ctx, int /*x*/, int y) cons
         return false;
     }
 
-    int t_ext_nott = ws->top_space + ws->extra_extents.top;
+    // M14 (issue #1): the band starts at top_space — NOT top_space +
+    // extra_extents.top. top_space already includes the extents
+    // (update_shadow: top_space = win_extents.top + spread - offset_y), and
+    // the band table's titlebar row ([t_ext_nott_orig, t_ext_nott_orig +
+    // tt_h), t_ext_nott_orig = win_extents.top + extra_top) converts to
+    // port coords via shadow_top = top_space - (win_extents.top +
+    // extra_top) — i.e. exactly [top_space, top_space + tt_h). Adding
+    // extra_extents.top here double-counted it: for [extra_grab] themes the
+    // band shifted DOWN by extra px (double-click / move-arming /
+    // middle-click / wheel-shade missed the top extra px of the titlebar
+    // and falsely triggered on the top extra px of the client).
+    int t_ext_nott = ws->top_space;
     int t_ext = t_ext_nott + ws->titlebar_height;
 
     return y >= t_ext_nott && y < t_ext;

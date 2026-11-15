@@ -739,6 +739,36 @@ TEST_F(LayoutFixture, in_titlebar)
     EXPECT_FALSE(layout.in_titlebar(ctx, 200, 21)); // below band (client)
 }
 
+// M14 (issue #1): the titlebar band must start at top_space, NOT at
+// top_space + extra_extents.top. top_space already includes the extents
+// (update_shadow: top_space = win_extents.top + spread - offset_y), and the
+// port-coord conversion of the band table's titlebar row
+// ([t_ext_nott_orig, t_ext_nott_orig + tt_h), t_ext_nott_orig =
+// win_extents.top + extra_top; shadow_top = top_space - (win_extents.top +
+// extra_top)) lands exactly at [top_space, top_space + tt_h). Pre-M14,
+// in_titlebar() added extra_extents.top on top of that: for [extra_grab]
+// themes the band was shifted DOWN by extra px — double-click action,
+// move-arming, middle-click and wheel-shade missed the top extra px of the
+// titlebar, and falsely triggered on the top extra px of the CLIENT.
+TEST_F(LayoutFixture, in_titlebar_with_extra_extents_top)
+{
+    ws->extra_extents.top = 3; // [extra_grab]-style theme
+    DecorContext ctx = make_ctx(400, 300, 100);
+    layout.build(ws, ctx);
+
+    // The band is [top_space, top_space + tt_h) = [4, 21) — extra must NOT
+    // shift it (pre-M14 it was [7, 24)).
+    EXPECT_TRUE(layout.in_titlebar(ctx, 200, 4))
+        << "top px of the titlebar (the band's first row) must be in the "
+           "band — pre-M14 the top extra_top px were missed";
+    EXPECT_TRUE(layout.in_titlebar(ctx, 200, 5));
+    EXPECT_TRUE(layout.in_titlebar(ctx, 200, 20));
+    EXPECT_FALSE(layout.in_titlebar(ctx, 200, 3)); // above band
+    EXPECT_FALSE(layout.in_titlebar(ctx, 200, 21))
+        << "the first client row must NOT be in the band — pre-M14 the "
+           "band extended extra_top px into the client";
+}
+
 // ── 8. click actions ─────────────────────────────────────────────────────
 
 TEST_F(LayoutFixture, click_actions)
