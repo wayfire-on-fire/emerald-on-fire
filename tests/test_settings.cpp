@@ -392,6 +392,60 @@ TEST_F(PixmapIntegrationTest, NonDefaultThemeDir_WarnsForPixmapEngine)
         << (warnings.empty() ? "(none)" : warnings.front());
 }
 
+// M6 (issue #1): a corrupt theme.ini used to load into an EMPTY GKeyFile
+// with NO diagnostic — g_key_file_load_from_file() got a nullptr GError,
+// so the theme silently ran on bare defaults while engine-load failures
+// were loud. Now load() passes a GError*, g_warning's the path, and
+// keeps the tolerant behavior (the load continues with defaults).
+// (The missing-theme.ini case takes the same GError path, but is covered
+// by the M8 seeding change instead — a missing file is re-seeded, not
+// warned about.)
+TEST_F(SettingsTest, CorruptThemeIniWarnsWithPathAndStaysTolerant)
+{
+    const fs::path dir = tmp_dir_ / "m6-corrupt";
+    fs::create_directories(dir / "theme");
+    std::ofstream(dir / "theme" / "theme.ini")
+        << "this is not a keyfile [[[ {{{\n";
+    std::ofstream(dir / "settings.ini") << "# test\n";
+
+    // Capture glib warnings (handler replaced by ID; RAII removal).
+    std::vector<std::string> warnings;
+    auto capture = +[] (const gchar *, GLogLevelFlags, const gchar *msg,
+        gpointer ud)
+    {
+        static_cast<std::vector<std::string> *>(ud)->emplace_back(msg);
+    };
+    const guint handler_id =
+        g_log_set_handler(nullptr, G_LOG_LEVEL_WARNING, capture, &warnings);
+    struct HandlerGuard
+    {
+        guint id;
+        ~HandlerGuard()
+        {
+            g_log_remove_handler(nullptr, id);
+        }
+    } guard{handler_id};
+
+    ThemeSettings ts;
+    const bool ok = ts.load((dir / "settings.ini").string(),
+        (dir / "theme").string());
+    ASSERT_TRUE(ok)
+        << "a corrupt theme.ini must not kill the load (tolerant: bare "
+           "defaults)";
+
+    const std::string theme_ini_path =
+        (dir / "theme" / "theme.ini").string();
+    const bool warned = std::any_of(warnings.begin(), warnings.end(),
+        [&] (const std::string & w)
+        {
+            return w.find(theme_ini_path) != std::string::npos;
+        });
+    EXPECT_TRUE(warned)
+        << "load() must warn with the theme.ini path on a GKeyFile "
+           "failure; captured: "
+        << (warnings.empty() ? "(none)" : warnings.front());
+}
+
 TEST_F(SettingsTest, ShadowRadiusClampedAtLoad)
 {
     const fs::path dir = tmp_dir_ / "shadow-clamp-huge";

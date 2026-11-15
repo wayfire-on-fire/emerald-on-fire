@@ -1284,8 +1284,21 @@ bool ThemeSettings::load(const std::string & settings_ini,
     gchar *theme_eng = nullptr;
     {
         GKeyFile *tf = g_key_file_new();
-        g_key_file_load_from_file(tf, theme_ini.c_str(), G_KEY_FILE_NONE,
-            nullptr);
+        // M6 (issue #1): a missing/corrupt theme.ini used to load into an
+        // EMPTY keyfile with no diagnostic (nullptr GError) — the theme
+        // silently ran on bare defaults. Warn with the path; keep the
+        // tolerant behavior (theme_eng stays nullptr → default engine).
+        GError *err = nullptr;
+        if (!g_key_file_load_from_file(tf, theme_ini.c_str(),
+            G_KEY_FILE_NONE, &err))
+        {
+            // The cstyleCast below is inside glib's g_warning() macro
+            // expansion (a --force configuration), not in this call.
+            // cppcheck-suppress cstyleCast
+            g_warning("ThemeSettings: cannot read theme engine from %s: "
+                      "%s", theme_ini.c_str(), err->message);
+            g_error_free(err);
+        }
         theme_eng = g_key_file_get_string(tf, "engine", "engine", nullptr);
         g_key_file_free(tf);
     }
@@ -1304,16 +1317,39 @@ bool ThemeSettings::load(const std::string & settings_ini,
     const std::string sections_dir =
         load_theme ? theme_dir : default_theme_dir;
     GKeyFile *f = g_key_file_new();
+    // M6 (issue #1): warn (with the path) if the theme keyfile cannot be
+    // read — pre-fix the failure was silently swallowed (nullptr GError)
+    // and the theme ran on bare defaults. Tolerant behavior is kept:
+    // an empty keyfile means every setting falls back to its default.
+    GError *theme_err = nullptr;
     if (!load_theme)
     {
         engine_ = engine_override;
-        g_key_file_load_from_file(f,
+        if (!g_key_file_load_from_file(f,
             (sections_dir + "/theme.ini").c_str(),
-            G_KEY_FILE_NONE, nullptr);
+            G_KEY_FILE_NONE, &theme_err))
+        {
+            // The cstyleCast below is inside glib's g_warning() macro
+            // expansion (a --force configuration), not in this call.
+            // cppcheck-suppress cstyleCast
+            g_warning("ThemeSettings: cannot read theme %s: %s",
+                (sections_dir + "/theme.ini").c_str(), theme_err->message);
+            g_error_free(theme_err);
+            theme_err = nullptr;
+        }
     } else
     {
-        g_key_file_load_from_file(f, theme_ini.c_str(), G_KEY_FILE_NONE,
-            nullptr);
+        if (!g_key_file_load_from_file(f, theme_ini.c_str(),
+            G_KEY_FILE_NONE, &theme_err))
+        {
+            // The cstyleCast below is inside glib's g_warning() macro
+            // expansion (a --force configuration), not in this call.
+            // cppcheck-suppress cstyleCast
+            g_warning("ThemeSettings: cannot read theme %s: %s",
+                theme_ini.c_str(), theme_err->message);
+            g_error_free(theme_err);
+            theme_err = nullptr;
+        }
         if (!engine_override.empty())
         {
             engine_ = engine_override;
