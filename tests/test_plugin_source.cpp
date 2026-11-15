@@ -91,7 +91,9 @@ TEST(PluginSource, FiniUnloadsEngineAfterRemovingDecorations)
 }
 
 // The body of a `emeraldwf_plugin::<fn>(...)` member (bracket-matched from
-// the first '{' after the signature).
+// the first '{' after the signature), with // comments stripped (position
+// assertions must not match identifiers quoted in comments — the M20 fix's
+// own comment mentions adjust_new_decorations()).
 std::string fn_body(const std::string &src, const std::string &sig)
 {
     const size_t at = src.find(sig);
@@ -107,6 +109,7 @@ std::string fn_body(const std::string &src, const std::string &sig)
     }
 
     int depth = 0;
+    size_t end = open;
     for (size_t i = open; i < src.size(); i++)
     {
         if (src[i] == '{')
@@ -117,12 +120,32 @@ std::string fn_body(const std::string &src, const std::string &sig)
             depth--;
             if (depth == 0)
             {
-                return src.substr(open + 1, i - open - 1);
+                end = i;
+                break;
             }
         }
     }
 
-    return {};
+    std::string body = src.substr(open + 1, end - open - 1);
+    std::string out;
+    for (size_t i = 0; i < body.size(); i++)
+    {
+        if (body[i] == '/' && i + 1 < body.size() && body[i + 1] == '/')
+        {
+            while (i < body.size() && body[i] != '\n')
+            {
+                i++;
+            }
+            if (i < body.size())
+            {
+                out += '\n';
+            }
+            continue;
+        }
+        out += body[i];
+    }
+
+    return out;
 }
 
 // M19 (issue #1): the CSD shade-transformer get-or-create sequence
@@ -160,5 +183,44 @@ TEST(PluginSource, CsdShadeCreationUsesSharedHelper)
         std::string::npos)
         << "plugin.cpp must not create the shade transformer directly "
            "(M19) — creation is consolidated in get_or_create_shade()";
+}
+
+// M20 (issue #1): recreate() (option-change driven: maximized_borders /
+// maximized_shadows) must only (re)decorate views should_decorate_view()
+// accepts. Pre-fix it ran remove_decoration + adjust_new_decorations for
+// EVERY toplevel, so a WCM checkbox / ini edit / config sync gave CSD
+// windows and ignore_views-matched views full emerald frames, persisting
+// until the next matcher change.
+TEST(PluginSource, RecreateSkipsViewsTheMatcherRejects)
+{
+    const std::string src =
+        read_file(std::string{EMERALDWF_TEST_SOURCE_ROOT} + "/src/plugin.cpp");
+    ASSERT_FALSE(src.empty()) << "src/plugin.cpp must be readable";
+
+    const std::string body = fn_body(src, "void emeraldwf_plugin::recreate()");
+    ASSERT_FALSE(body.empty()) << "could not locate recreate()";
+
+    // ChatGPT follow-up: pin the NEGATED guard and the rejection branch's
+    // continue — a bare should_decorate_view() call before an
+    // adjust_new_decorations() call would satisfy a positional check
+    // without fixing the bug.
+    const size_t guard = body.find("!should_decorate_view(");
+    ASSERT_NE(guard, std::string::npos)
+        << "recreate() must skip the views should_decorate_view() "
+           "REJECTS (M20) — pre-fix it decorated every toplevel, so CSD / "
+           "ignore_views-matched views got emerald frames on an option "
+           "change";
+
+    const size_t cont = body.find("continue", guard);
+    ASSERT_NE(cont, std::string::npos)
+        << "the rejection branch must continue (skip the view)";
+
+    const size_t adjust = body.find("adjust_new_decorations(");
+    ASSERT_NE(adjust, std::string::npos)
+        << "recreate() must (re)create the decoration on accepted views "
+           "(that is what propagates the new option values)";
+    EXPECT_LT(cont, adjust)
+        << "the rejection branch must skip BEFORE any "
+           "adjust_new_decorations() call (M20)";
 }
 } // namespace

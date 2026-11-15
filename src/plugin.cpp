@@ -410,11 +410,34 @@ void emeraldwf_plugin::update_view_decoration(wayfire_view view)
 // ── Option change: recreate decorations (part 04 stubs the real work) ──────
 void emeraldwf_plugin::recreate()
 {
+    // M20 (issue #1): recreate only the views should_decorate_view()
+    // ACCEPTS. Pre-M20 the remove+adjust ran for EVERY toplevel, so
+    // toggling maximized_borders/maximized_shadows (WCM checkbox, ini
+    // edit, config sync) gave CSD windows and ignore_views-matched views
+    // full emerald frames, persisting until the next matcher change. The
+    // quadrant handling mirrors update_view_decoration():
+    // - rejected views: never decorated; a stale decoration (if any) is
+    //   removed, so a rejected view cannot keep an emerald frame;
+    // - accepted views: forced remove+re-adjust — that is what
+    //   propagates the new option values to the fresh decorator
+    //   (adjust_new_decorations() sets maximized_borders/shadows).
     for (const auto & view : wf::get_core().get_all_views())
     {
         auto toplevel = wf::toplevel_cast(view);
         if (!toplevel)
         {
+            continue;
+        }
+
+        if (!should_decorate_view(toplevel))
+        {
+            if (toplevel->toplevel()->get_data<emerald_decorator_t>())
+            {
+                remove_decoration(toplevel);
+                wf::get_core().tx_manager->schedule_object(
+                    toplevel->toplevel());
+            }
+
             continue;
         }
 
