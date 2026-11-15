@@ -212,6 +212,36 @@ void on_button_release(titlebar_input_state_t & state)
     state.pending_move = false;
 }
 
+// ── Touch-up button gate (M12, issue #1) ───────────────────────────────────
+void on_touch_down(touch_state_t & state, int finger_id,
+    int frame_local_x, int frame_local_y)
+{
+    state.down_active = true;
+    state.down_finger = finger_id;
+    state.down_x      = frame_local_x;
+    state.down_y      = frame_local_y;
+}
+
+touch_up_result on_touch_up(touch_state_t & state, int finger_id,
+    int down_button, int up_button)
+{
+    // Only a lift-off by the finger that pressed down can fire an action,
+    // and only when the down and the lift-off landed on the SAME button
+    // (up_button >= 0: a down+up with no button under either is a plain
+    // tap, not a button press).
+    if (state.down_active && (state.down_finger == finger_id))
+    {
+        const bool action = (down_button == up_button) && (up_button >= 0);
+        // The down is consumed either way (a matching-finger lift-off ends
+        // that touch, whatever the outcome).
+        state.down_active = false;
+        state.down_finger = -1;
+        return action ? touch_up_result::ACTION : touch_up_result::NO_ACTION;
+    }
+
+    return touch_up_result::NO_ACTION;
+}
+
 // ── Titlebar action → WM request mapping (finding 21) ─────────────────────
 titlebar_action_request map_titlebar_action(int emerald_action)
 {

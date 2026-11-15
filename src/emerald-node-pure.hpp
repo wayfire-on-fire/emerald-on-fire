@@ -234,6 +234,40 @@ bool on_titlebar_motion(titlebar_input_state_t & state,
 // press-release-press within the window is exactly a double-click.
 void on_button_release(titlebar_input_state_t & state);
 
+// ── Touch-up button gate (M12, issue #1) ───────────────────────────────────
+//
+// A touch-up must only fire a button action when a MATCHING touch-down
+// (same finger) started on the SAME button. Pre-M12 the node fired
+// handle_button() on any lift-off over a button, remembering neither the
+// down position nor the finger: a swipe ending on the close button closed
+// the window.
+//
+// The state records the active touch-down (finger + frame-local position).
+// The gate is pure: the node computes the button index under the down
+// position and under the lift-off position (same ctx, so the comparison is
+// consistent) and passes both in.
+struct touch_state_t
+{
+    bool down_active = false;
+    int down_finger  = -1;
+    int down_x = 0, down_y = 0; // frame-local position of the down
+};
+
+enum class touch_up_result
+{
+    NO_ACTION, // no matching down, or down/up not on the same button
+    ACTION, // fire the button (up_button)
+};
+
+void on_touch_down(touch_state_t & state, int finger_id,
+    int frame_local_x, int frame_local_y);
+
+// `down_button`/`up_button`: hit_button() results (-1 when no button) at
+// the stored down position and the lift-off position. The down is
+// consumed on a matching-finger up regardless of the outcome.
+touch_up_result on_touch_up(touch_state_t & state, int finger_id,
+    int down_button, int up_button);
+
 // ── Titlebar action → WM request mapping (finding 21) ─────────────────────
 //
 // Emerald's titlebar.h DOUBLE_CLICK_* enum (0 shade, 1 maximize, 2

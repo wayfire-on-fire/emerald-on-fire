@@ -187,6 +187,11 @@ class emerald_node_t : public wf::scene::node_t,
     // events carry no position, so the node tracks it from enter/motion.
     wf::pointf_t last_pointer_pos{0, 0};
 
+    // M12 (issue #1): touch-down state — a touch-up fires a button action
+    // only when the SAME finger pressed down on the SAME button (see
+    // on_touch_up in emerald-node-pure.hpp).
+    touch_state_t touch_state_;
+
     // Finding 43: button fade state (one per button; see
     // emerald-button-fade.hpp for the semantics).
     ButtonFadeState button_fade_state[B_T_COUNT] = {};

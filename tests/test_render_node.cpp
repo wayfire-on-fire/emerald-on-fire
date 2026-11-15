@@ -605,6 +605,76 @@ TEST(TitlebarInputTest, ReleaseWithoutPressIsANoop)
     EXPECT_EQ(st.dbl.last_press_ms, 0u);
 }
 
+// ── Touch-up button gate (M12, issue #1) ───────────────────────────────────
+//
+// Regression: a touch-up fired handle_button() on ANY lift-off over a
+// button — the node remembered neither the down position nor the finger.
+// A swipe ending on the close button closed the window. The gate: a
+// touch-up acts only when the SAME finger pressed down on the SAME
+// button.
+TEST(TouchUpGateTest, LiftOffWithoutDown_NoAction)
+{
+    touch_state_t st;
+    // A lift-off on button 0 with no recorded down must do nothing.
+    EXPECT_EQ(on_touch_up(st, 1, 0, 0), touch_up_result::NO_ACTION);
+}
+
+TEST(TouchUpGateTest, SameButtonDownAndUp_Action)
+{
+    touch_state_t st;
+    on_touch_down(st, 3, 10, 10);
+    // Down on button 0, lift-off on button 0, same finger → fire.
+    EXPECT_EQ(on_touch_up(st, 3, 0, 0), touch_up_result::ACTION);
+}
+
+// THE regression: a swipe that starts off-button (e.g. on the titlebar)
+// and ENDS on the close button. Down hits no button (-1), up hits button
+// 0 → no action (pre-M12 this closed the window).
+TEST(TouchUpGateTest, SwipeEndingOnButton_NoAction)
+{
+    touch_state_t st;
+    on_touch_down(st, 3, 200, 5); // titlebar area: no button under the down
+    EXPECT_EQ(on_touch_up(st, 3, -1, 0), touch_up_result::NO_ACTION);
+}
+
+TEST(TouchUpGateTest, DownAndUpOnDifferentButtons_NoAction)
+{
+    touch_state_t st;
+    on_touch_down(st, 3, 10, 10);
+    EXPECT_EQ(on_touch_up(st, 3, 0, 1), touch_up_result::NO_ACTION);
+}
+
+TEST(TouchUpGateTest, WrongFinger_NoActionAndDownSurvives)
+{
+    touch_state_t st;
+    on_touch_down(st, 3, 10, 10);
+    // A different finger lifting off must not consume finger 3's down.
+    EXPECT_EQ(on_touch_up(st, 4, 0, 0), touch_up_result::NO_ACTION);
+    EXPECT_TRUE(st.down_active)
+        << "a non-matching finger must not consume the recorded down";
+    // Finger 3's own lift-off still fires.
+    EXPECT_EQ(on_touch_up(st, 3, 0, 0), touch_up_result::ACTION);
+}
+
+TEST(TouchUpGateTest, DownConsumedAfterMatchingUp)
+{
+    touch_state_t st;
+    on_touch_down(st, 3, 10, 10);
+    EXPECT_EQ(on_touch_up(st, 3, 0, 0), touch_up_result::ACTION);
+    // The down is consumed: a second lift-off (same finger, same button)
+    // has no matching down anymore.
+    EXPECT_EQ(on_touch_up(st, 3, 0, 0), touch_up_result::NO_ACTION);
+}
+
+TEST(TouchUpGateTest, TapWithoutAnyButton_NoAction)
+{
+    touch_state_t st;
+    on_touch_down(st, 3, 200, 5);
+    // Down and up both off-button (-1 == -1, but up_button >= 0 fails):
+    // a plain tap is not a button press.
+    EXPECT_EQ(on_touch_up(st, 3, -1, -1), touch_up_result::NO_ACTION);
+}
+
 // ── Titlebar action → WM request mapping (finding 21) ─────────────────────
 //
 // Regression: the old raw switch in handle_click_action() had no `case 3`,

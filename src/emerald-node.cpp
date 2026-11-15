@@ -1070,32 +1070,50 @@ void emerald_node_t::handle_pointer_axis(const wlr_pointer_axis_event& event)
     }
 }
 
-// Review F2 (-Wall): `time_ms`/`finger_id` are unused by the node (no
-// per-finger state); unnamed in the definitions, named in the header.
-void emerald_node_t::handle_touch_down(uint32_t /*time_ms*/, int /*finger_id*/,
+// Review F2 (-Wall): `time_ms` is unused by the node; unnamed in the
+// definitions, named in the header. `finger_id` is now used (M12).
+void emerald_node_t::handle_touch_down(uint32_t /*time_ms*/, int finger_id,
     wf::pointf_t position)
 {
     last_pointer_pos = position;
-    update_hover(to_local_full_extent(position));
+    auto local = to_local_full_extent(position);
+    // M12 (issue #1): remember the down (finger + frame-local position) —
+    // a touch-up may only act when it is the same finger on the same
+    // button.
+    on_touch_down(touch_state_, finger_id, (int)local.x, (int)local.y);
+    update_hover(local);
 }
 
-void emerald_node_t::handle_touch_up(uint32_t /*time_ms*/, int /*finger_id*/,
+void emerald_node_t::handle_touch_up(uint32_t /*time_ms*/, int finger_id,
     wf::pointf_t lift_off_position)
 {
     auto local = to_local_full_extent(lift_off_position);
     if (auto view = view_of())
     {
-        int x = (int)local.x, y = (int)local.y;
-        int b = layout.hit_button(deco->ctx(), x, y, view->activated);
-        if (b >= 0)
+        int up_x = (int)local.x, up_y = (int)local.y;
+        const int up_button =
+            layout.hit_button(deco->ctx(), up_x, up_y, view->activated);
+        // M12 (issue #1): pre-fix, ANY lift-off over a button fired
+        // handle_button() — a swipe ending on the close button closed the
+        // window. Now the button under the STORED down position is hit
+        // with the same ctx (consistent comparison) and the pure gate
+        // requires the same finger AND the same button.
+        int down_button = -1;
+        if (touch_state_.down_active)
         {
-            handle_button(b);
+            down_button = layout.hit_button(deco->ctx(),
+                touch_state_.down_x, touch_state_.down_y, view->activated);
+        }
+        if (on_touch_up(touch_state_, finger_id, down_button, up_button)
+            == touch_up_result::ACTION)
+        {
+            handle_button(up_button);
         }
     }
 }
 
-void emerald_node_t::handle_touch_motion(uint32_t /*time_ms*/, int /*finger_id*/,
-    wf::pointf_t position)
+void emerald_node_t::handle_touch_motion(uint32_t /*time_ms*/,
+    int /*finger_id*/, wf::pointf_t position)
 {
     last_pointer_pos = position;
     update_hover(to_local_full_extent(position));
