@@ -55,11 +55,21 @@ class ThemeSettings
     const std::string& theme_dir() const;
     bool valid() const;
 
+    // R1 (issue #1): does this theme ship the pixmap assets the pixmap
+    // engine will dereference (11 active_*.png + 11 inactive_*.png when
+    // [pixmap_settings] inactive_use_active_pixmaps is not true)? Cached
+    // once per load() — the render path must not stat the theme dir per
+    // frame, and the gate must be true only for a COMPLETE set (the
+    // engine dereferences each surface without a NULL check).
+    // true for non-pixmap engines (they do not load these files).
+    bool has_pixmap_assets() const;
+
   private:
     window_settings *ws_ = nullptr;
     frame_settings *fs_act_ = nullptr, *fs_inact_ = nullptr;
     std::string engine_ = "legacy";
     bool valid_ = false;
+    bool has_pixmap_assets_ = true;
 
     // paths in effect for this load (used by copy-from-defaults fallback)
     std::string settings_path_;

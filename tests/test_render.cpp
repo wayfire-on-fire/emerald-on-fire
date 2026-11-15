@@ -188,8 +188,25 @@ static const char *kEngines[] = {"legacy", "truglass", "vrunner", "oxygen",
 
 TEST_F(RenderTest, Structural)
 {
+    const std::string settings_path =
+        project_root() + "/third_party/emerald/defaults/settings.ini";
+    const std::string theme_path =
+        project_root() + "/third_party/emerald/defaults/theme";
+
     for (const char *engine : kEngines)
     {
+        // R1 (issue #1): load the theme WITH this engine — the plugin's
+        // flow — so the per-load pixmap-asset gate matches the engine
+        // that is actually loaded. The pre-R1 test swapped the engine
+        // .so under a fixed ThemeSettings: with the pixmap engine
+        // loaded, the gate (derived from the theme's own engine at load
+        // time) still said "has assets" and the engine dereferenced
+        // NULL surfaces → SEGV.
+        ThemeSettings ts;
+        ASSERT_TRUE(ts.load(settings_path, theme_path, engine)) <<
+            engine;
+        ts_ = std::make_shared<const ThemeSettings>(std::move(ts));
+
         for (bool active : {true, false})
         {
             for (bool maximized : {true, false})
@@ -197,13 +214,6 @@ TEST_F(RenderTest, Structural)
                 std::string mode  = maximized ? "max" : "win";
                 std::string state = active ? "active" : "inactive";
                 DecorContext ctx  = make_ctx(*ts_, active, maximized);
-
-                // reload the engine for each combination
-                ASSERT_TRUE(emerald_engine_load(
-                    engine, EMERALDWF_TEST_ENGINE_DIR)) <<
-                    engine;
-                // Allocate the engine's private ws/fs for this ws.
-                emerald_engine_init_engine(ts_->ws());
 
                 cairo_surface_t *surf = emeraldwf_render_frame(*ts_, ctx);
                 ASSERT_NE(surf, nullptr) <<
@@ -237,9 +247,9 @@ TEST_F(RenderTest, Structural)
                 }
 
                 cairo_surface_destroy(surf);
-                emerald_engine_unload();
             }
         }
+        emerald_engine_unload();
     }
 }
 

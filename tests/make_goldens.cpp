@@ -85,27 +85,25 @@ int main()
     fs::path golden  = fs::path(root) / "tests" / "golden";
     fs::create_directories(golden);
 
-    ThemeSettings ts;
-    if (!ts.load(root + "/third_party/emerald/defaults/settings.ini",
-        root + "/third_party/emerald/defaults/theme"))
-    {
-        fprintf(stderr, "failed to load defaults\n");
-        return 1;
-    }
-
     const char *engines[] = {"legacy", "truglass", "vrunner", "oxygen",
         "zootreeves", "pixmap", "line"};
     for (const char *engine : engines)
     {
-        const std::string engine_dir = EMERALDWF_TEST_ENGINE_DIR;
-        if (!emerald_engine_load(engine, engine_dir))
+        // R1 (issue #1): load the theme WITH this engine — the plugin's
+        // flow — so the per-load pixmap-asset gate (and the engine's
+        // [<engine>_settings] section) match the engine that is actually
+        // loaded. The pre-R1 flow swapped the engine .so under one fixed
+        // ThemeSettings: it left the gate stale (pixmap engine SEGV'd on
+        // NULL surfaces) and rendered every engine with bare init
+        // defaults, ignoring the theme's [<engine>_settings].
+        ThemeSettings ts;
+        if (!ts.load(root + "/third_party/emerald/defaults/settings.ini",
+            root + "/third_party/emerald/defaults/theme", engine))
         {
-            fprintf(stderr, "FAILED to load engine %s\n", engine);
+            fprintf(stderr, "FAILED to load defaults for %s\n", engine);
             continue;
         }
 
-        // Allocate the engine's private ws/fs for this window_settings.
-        emerald_engine_init_engine(ts.ws());
         for (bool active : {true, false})
         {
             for (bool maximized : {true, false})

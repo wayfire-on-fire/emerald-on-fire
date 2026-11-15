@@ -431,29 +431,6 @@ static void draw_button_with_glow_alpha_bstate(gint b_t, const decor_t *d,
     }
 }
 
-// The pixmap engine's engine_draw_frame dereferences pfs->pixmaps[i].surface,
-// which is only populated when the theme ships pixmaps.*.png files. Without
-// them (e.g. the default theme) the surfaces are NULL and cairo crashes.
-// Detect that case and skip the engine frame (draw a plain background), so
-// the bridge stays robust for any emerald theme.
-static bool pixmap_theme_has_pixmaps(const wf::emeraldwf::ThemeSettings & ts)
-{
-    if (active_engine_name != "pixmap")
-    {
-        return true;
-    }
-
-    const std::string dir = ts.theme_dir();
-    const char *names[]   = {"top", "left", "right", "bottom", "title"};
-    return std::any_of(std::begin(names), std::end(names),
-        [&dir] (const char *n)
-    {
-        std::error_code ec;
-        return std::filesystem::exists(
-            dir + "/pixmaps." + n + ".png", ec);
-    });
-}
-
 // port of main.c:879-984 (draw_shadow_background)
 static void draw_shadow_background(const decor_t *d, cairo_t *cr)
 {
@@ -599,6 +576,66 @@ static void draw_shadow_background(const decor_t *d, cairo_t *cr)
     cairo_rectangle(cr, x2, y2, right, bottom);
     cairo_fill(cr);
 }
+}
+
+// R1 (issue #1): see the header. The probe must match the engine's REAL
+// load set exactly — no more (a partial set lets the engine dereference
+// NULL surfaces → compositor segfault) and no less (the pre-fix probe
+// checked five filenames no theme ships, `pixmaps.top.png` vs the
+// engine's `pixmaps.active_top.png`, so the guard was permanently false
+// and every correctly-packaged pixmap theme drew the gray fallback).
+bool wf::emeraldwf::theme_has_pixmap_assets(const std::string &theme_dir)
+{
+    // The 11 pixmap types the engine loads (pixmap.c p_types[]).
+    static const char *const p_types[] = {
+        "top", "top_left", "top_right", "left", "right",
+        "bottom", "bottom_left", "bottom_right",
+        "title", "title_left", "title_right"};
+
+    auto has = [&theme_dir] (const std::string &name)
+    {
+        std::error_code ec;
+        return std::filesystem::exists(
+            theme_dir + "/pixmaps." + name + ".png", ec);
+    };
+
+    // The active set is always loaded (pixmap.c:451-453) and every
+    // surface is dereferenced without a NULL check (pixmap.c:250) —
+    // ALL eleven must be present.
+    for (auto t : p_types)
+    {
+        if (!has(std::string("active_") + t))
+        {
+            return false;
+        }
+    }
+
+    // The inactive set is loaded when [pixmap_settings]
+    // inactive_use_active_pixmaps is not true (pixmap.c:470-478). The
+    // engine's private struct is zero-initialized, so the key — or the
+    // whole section, or theme.ini itself — absent → false → the
+    // inactive set IS required.
+    GKeyFile *f = g_key_file_new();
+    g_key_file_load_from_file(f, (theme_dir + "/theme.ini").c_str(),
+        G_KEY_FILE_NONE, nullptr);
+    const gboolean reuse = g_key_file_get_boolean(f, "pixmap_settings",
+        "inactive_use_active_pixmaps", nullptr);
+    g_key_file_free(f);
+
+    if (reuse)
+    {
+        return true;
+    }
+
+    for (auto t : p_types)
+    {
+        if (!has(std::string("inactive_") + t))
+        {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 extern "C"
@@ -933,7 +970,7 @@ cairo_surface_t *emeraldwf_render_frame(const ThemeSettings & ts,
         cairo_set_line_width(cr, 1.0);
         cairo_save(cr);
         draw_shadow_background(&d, cr);
-        if (pixmap_theme_has_pixmaps(ts))
+        if (ts.has_pixmap_assets())
         {
             call_engine_draw_frame(&d, cr);
         } else

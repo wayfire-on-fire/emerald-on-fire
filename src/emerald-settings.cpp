@@ -1030,6 +1030,7 @@ ThemeSettings::ThemeSettings()
 ThemeSettings::ThemeSettings(ThemeSettings && other) noexcept :
     ws_(other.ws_), fs_act_(other.fs_act_), fs_inact_(other.fs_inact_),
     engine_(std::move(other.engine_)), valid_(other.valid_),
+    has_pixmap_assets_(other.has_pixmap_assets_),
     settings_path_(std::move(other.settings_path_)),
     theme_dir_(std::move(other.theme_dir_))
 {
@@ -1065,6 +1066,7 @@ ThemeSettings& ThemeSettings::operator =(ThemeSettings && other) noexcept
         fs_inact_ = other.fs_inact_;
         engine_   = std::move(other.engine_);
         valid_    = other.valid_;
+        has_pixmap_assets_ = other.has_pixmap_assets_;
         settings_path_ = std::move(other.settings_path_);
         theme_dir_     = std::move(other.theme_dir_);
 
@@ -1474,6 +1476,14 @@ bool ThemeSettings::load(const std::string & settings_ini,
 
     g_key_file_free(f);
 
+    // R1 (issue #1): cache the pixmap-asset probe ONCE per load. The
+    // probe checks sections_dir — the dir whose theme.ini the engine's
+    // [pixmap_settings] came from (theme_dir normally; emerald's default
+    // theme dir on an engine-override mismatch, where the engine runs on
+    // the default theme). Non-pixmap engines never load these files.
+    has_pixmap_assets_ = (engine_ != "pixmap") ||
+        theme_has_pixmap_assets(sections_dir);
+
     // Review R1: the theme's font, "Sans 10" only when the key is absent
     // (emerald's main.c defaults). Runs after the min_titlebar_height read
     // above: titlebar_height floors at min_titlebar_height.
@@ -1517,6 +1527,11 @@ const std::string& ThemeSettings::theme_dir() const
 bool ThemeSettings::valid() const
 {
     return valid_;
+}
+
+bool ThemeSettings::has_pixmap_assets() const
+{
+    return has_pixmap_assets_;
 }
 
 std::optional<int> wf::emeraldwf::parse_titlebar_action(const std::string & name)

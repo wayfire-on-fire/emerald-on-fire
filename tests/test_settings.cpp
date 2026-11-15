@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -21,6 +22,7 @@
 #include "emerald-config-sync.hpp"
 #include "emerald-engine.hpp"
 #include "emerald-file-stamp.hpp"
+#include "emerald-layout.hpp"
 #include "emerald-settings.hpp"
 // Review R2: fixture paths forwarded by meson (configure_file) — the
 ///proc/self/exe heuristic broke for out-of-tree builds, where the engine
@@ -40,6 +42,217 @@ std::string project_root()
 std::string defaults_dir()
 {
     return project_root() + "/third_party/emerald/defaults";
+}
+
+// The 11 pixmap types the pixmap engine loads (pixmap.c p_types[]).
+const char *PIXMAP_TYPES[] = {
+    "top", "top_left", "top_right", "left", "right",
+    "bottom", "bottom_left", "bottom_right",
+    "title", "title_left", "title_right"};
+
+// R1 (issue #1) INTEGRATION: a fully packaged pixmap theme must actually
+// RENDER — the gate must open (has_pixmap_assets) AND the pixmap engine
+// must draw its textures (not the gray fallback). This is the regression
+// test for the original bug: pre-R1 the gate was permanently false for
+// correct themes, so this render path never ran and the pixmap engine
+// was silently dead.
+//
+// The pixmap engine loads its textures from a HARDCODED ~/.emerald/theme
+// (make_filename, third_party/emerald/libengine/emerald.c:66 — finding
+// M5), so this test controls HOME. It must run before any other test in
+// this binary: g_get_home_dir() caches on first use, so the setenv must
+// precede the first glib home query process-wide. (Registered first
+// below; gtest runs in registration order.)
+class PixmapIntegrationTest : public ::testing::Test
+{
+  protected:
+    static void make_png(const fs::path &p, int r, int g, int b)
+    {
+        cairo_surface_t *s = cairo_image_surface_create(
+            CAIRO_FORMAT_ARGB32, 16, 16);
+        cairo_t *cr = cairo_create(s);
+        cairo_set_source_rgb(cr, r / 255.0, g / 255.0, b / 255.0);
+        cairo_paint(cr);
+        cairo_destroy(cr);
+        cairo_surface_write_to_png(s, p.string().c_str());
+        cairo_surface_destroy(s);
+    }
+
+    void SetUp() override
+    {
+        const char *h = std::getenv("HOME");
+        old_home_ = (h != nullptr) ? std::string(h) : "";
+        home_ = fs::temp_directory_path() /
+            (fs::path("emeraldwf-pixmap-int") / std::to_string(::getpid()));
+        theme_dir_ = home_ / ".emerald" / "theme";
+        fs::create_directories(theme_dir_);
+        ::setenv("HOME", home_.string().c_str(), 1);
+
+        // settings.ini — content is irrelevant to emeraldwf (part 08:
+        // no keys are read from it); its presence skips the first-run
+        // seed into our temp HOME.
+        std::ofstream(home_ / ".emerald" / "settings.ini") << "# test\n";
+
+        // theme.ini — the vendored defaults with engine=pixmap and the
+        // inactive set REQUIRED (inactive_use_active_pixmaps=false), so
+        // both the probe and the engine expect all 22 textures.
+        {
+            std::ifstream in(defaults_dir() + "/theme/theme.ini");
+            std::string ini((std::istreambuf_iterator<char>(in)),
+                std::istreambuf_iterator<char>());
+            const auto p1 = ini.find("engine=vrunner");
+            const auto p2 = ini.find("inactive_use_active_pixmaps=true");
+            ASSERT_NE(p1, std::string::npos) <<
+                "vendored theme.ini no longer pins engine=vrunner?";
+            ASSERT_NE(p2, std::string::npos) <<
+                "vendored theme.ini no longer pins inactive_use_active_pixmaps?";
+            ini.replace(p1, strlen("engine=vrunner"), "engine=pixmap");
+            ini.replace(p2,
+                strlen("inactive_use_active_pixmaps=true"),
+                "inactive_use_active_pixmaps=false");
+            std::ofstream(theme_dir_ / "theme.ini") << ini;
+        }
+
+        // button PNGs — the defaults theme sets use_pixmap_buttons=true.
+        for (const auto &entry :
+            fs::directory_iterator(defaults_dir() + "/theme"))
+        {
+            const std::string name = entry.path().filename().string();
+            if (name.rfind("buttons.", 0) == 0)
+            {
+                fs::copy_file(entry.path(),
+                    theme_dir_ / entry.path().filename(),
+                    fs::copy_options::overwrite_existing);
+            }
+        }
+
+        // the 22 pixmap textures: active_top is a distinctive RED — the
+        // engine draws the `top` texture as the WHOLE titlebar band
+        // (pixmap.c "top bar"), so a red band proves the engine rendered;
+        // the gray fallback would put (153,153,153,204) there. (The
+        // `title` texture only spans the Pango title width, which is
+        // zero in this port's decor_t — d.layout is unset — so it is not
+        // a reliable marker.) Everything else is neutral.
+        for (auto t : PIXMAP_TYPES)
+        {
+            const bool red = (std::string(t) == "top");
+            make_png(theme_dir_ /
+                (std::string("pixmaps.active_") + t + ".png"),
+                red ? 255 : 120, red ? 0 : 120, red ? 0 : 120);
+            make_png(theme_dir_ /
+                (std::string("pixmaps.inactive_") + t + ".png"),
+                red ? 192 : 120, red ? 0 : 120, red ? 0 : 120);
+        }
+    }
+
+    void TearDown() override
+    {
+        emerald_engine_unload();
+        if (!old_home_.empty())
+        {
+            ::setenv("HOME", old_home_.c_str(), 1);
+        } else
+        {
+            ::unsetenv("HOME");
+        }
+        fs::remove_all(home_);
+    }
+
+    std::string old_home_;
+    fs::path home_;
+    fs::path theme_dir_;
+};
+
+TEST_F(PixmapIntegrationTest, FullyPackagedTheme_RendersPixmapNotFallback)
+{
+    ThemeSettings ts;
+    ASSERT_TRUE(ts.load(home_ / ".emerald" / "settings.ini",
+        theme_dir_.string()))
+        << "loading a fully packaged pixmap theme must succeed";
+    EXPECT_EQ(ts.engine(), "pixmap");
+    EXPECT_TRUE(ts.has_pixmap_assets())
+        << "a complete 22-file asset set must open the gate";
+
+    // windowed, active — same ctx shape as the render suite
+    const int client_w = 400, client_h = 300;
+    window_settings *ws = ts.ws();
+    DecorContext ctx;
+    ctx.client_width  = client_w;
+    ctx.client_height = client_h;
+    ctx.width  = frame_width(*ws, client_w);
+    ctx.height = frame_height(*ws, client_w, client_h);
+    ctx.active = true;
+    ctx.fs     = ts.fs_active();
+    ctx.state  = 0;
+    ctx.actions = EWA_CLOSE | EWA_MAXIMIZE | EWA_MINIMIZE;
+    for (int i = 0; i < 11; i++)
+    {
+        ctx.tobj_item_state[i] = 3;
+    }
+
+    for (int i = 0; i < 9; i++)
+    {
+        ctx.button_states[i] = 0;
+    }
+
+    cairo_surface_t *surf = emeraldwf_render_frame(ts, ctx);
+    ASSERT_NE(surf, nullptr);
+
+    const int w       = cairo_image_surface_get_width(surf);
+    const int stride  = cairo_image_surface_get_stride(surf);
+    const unsigned char *data =
+        (const unsigned char*)cairo_image_surface_get_data(surf);
+
+    // Sample the titlebar center strip: [w/2-50, w/2+50] at the titlebar
+    // mid row (top_space already includes the top border; the titlebar
+    // band is [top_space, top_space + titlebar_height)). The `top`
+    // texture is pure red — the gray fallback would put exactly
+    // (153,153,153,204) here.
+    //
+    // The assertions are MAJORITY-based, not exact-pixel: the strip
+    // avoids the corners and the right-side buttons, but antialiasing /
+    // edge blending and the title halo can tint a few pixels, so
+    // "most of the strip is the red texture" (and "not most of it the
+    // fallback gray") is the stable contract.
+    const int y = ws->top_space + ws->titlebar_height / 2;
+    int red_px  = 0;
+    int gray_px = 0;
+    int total   = 0;
+    for (int x = w / 2 - 50; x <= w / 2 + 50; x++)
+    {
+        if (x < 0 || x >= w)
+        {
+            continue;
+        }
+
+        const unsigned char *px = data + y * stride + x * 4;
+        // ARGB32, premultiplied: B, G, R, A little-endian
+        const int r = px[2], g = px[1], b = px[0], a = px[3];
+        total++;
+        if ((r > 150) && (g < 120) && (b < 120))
+        {
+            red_px++;
+        }
+
+        // the fallback fill is exactly (153,153,153,204)
+        if ((r == 153) && (g == 153) && (b == 153) && (a == 204))
+        {
+            gray_px++;
+        }
+    }
+
+    EXPECT_GT(total, 0);
+    EXPECT_GT(red_px, total / 2)
+        << "the titlebar center must be the RED `top` texture"
+        << " (pixmap engine rendered); red=" << red_px
+        << "/" << total
+        << " — a gray titlebar means the fallback path ran and the"
+        << " pixmap engine was never invoked (the pre-R1 bug)";
+    EXPECT_LE(gray_px, total / 10)
+        << "the titlebar center must not be the gray fallback fill"
+        << " (153,153,153,204); gray=" << gray_px << "/" << total;
+
+    cairo_surface_destroy(surf);
 }
 
 class SettingsTest : public ::testing::Test
@@ -1587,5 +1800,106 @@ TEST_F(ConfigSyncTest, MissingFileReturnsFalse)
         "/nonexistent/emeraldwf/wayfire.ini", targets));
     EXPECT_TRUE(shade->get_value());
     EXPECT_EQ(cb, 0);
+}
+
+// ---- R1 (issue #1): the pixmap-asset probe must match the files the
+// pixmap engine ACTUALLY loads (pixmap.c p_types[]: 11 `active_` textures,
+// plus 11 `inactive_` ones when [pixmap_settings]
+// inactive_use_active_pixmaps is not true — the engine's private struct is
+// zero-initialized, so the key absent → the inactive set is required).
+// The pre-fix probe checked five filenames no theme ships (pixmaps.top.png
+// vs the engine's pixmaps.active_top.png) with any_of: permanently false
+// for correct themes (pixmap engine dead → gray fallback) and, even if
+// "fixed" to the right names, any_of would let a PARTIAL set through and
+// the engine would dereference NULL surfaces (compositor segfault). ----
+namespace
+{
+class PixmapAssetsTest : public ::testing::Test
+{
+  protected:
+    void SetUp() override
+    {
+        const auto name =
+            testing::UnitTest::GetInstance()->current_test_info()->name();
+        dir_ = fs::temp_directory_path() /
+            (fs::path("emeraldwf-pixmaps") / std::to_string(::getpid()) /
+                name);
+        fs::create_directories(dir_);
+    }
+
+    void TearDown() override
+    {
+        fs::remove_all(dir_);
+    }
+
+    void touch(const std::string &name)
+    {
+        std::ofstream(dir_ / ("pixmaps." + name + ".png")) << "png";
+    }
+
+    void make_set(const char *prefix)
+    {
+        for (auto t : PIXMAP_TYPES)
+        {
+            touch(std::string(prefix) + t);
+        }
+    }
+
+    void write_theme_ini(const std::string &content)
+    {
+        std::ofstream(dir_ / "theme.ini") << content;
+    }
+
+    fs::path dir_;
+};
+
+TEST_F(PixmapAssetsTest, BothSetsComplete_ReturnsTrue)
+{
+    make_set("active_");
+    make_set("inactive_");
+    EXPECT_TRUE(theme_has_pixmap_assets(dir_.string()));
+}
+
+TEST_F(PixmapAssetsTest, FullActiveSet_WithoutInactive_ReturnsFalse)
+{
+    // The engine's private struct is zero-initialized, so a theme with
+    // only the active set (no [pixmap_settings]) still loads the
+    // inactive set — and would dereference NULL surfaces for it.
+    make_set("active_");
+    EXPECT_FALSE(theme_has_pixmap_assets(dir_.string()));
+}
+
+TEST_F(PixmapAssetsTest, PartialActiveSet_ReturnsFalse)
+{
+    // Exactly the five names the pre-fix probe checked: with any_of they
+    // pass, but the engine needs all eleven and would dereference the
+    // six missing surfaces.
+    for (const char *t : {"top", "left", "right", "bottom", "title"})
+    {
+        touch(std::string("active_") + t);
+    }
+    EXPECT_FALSE(theme_has_pixmap_assets(dir_.string()));
+}
+
+TEST_F(PixmapAssetsTest, InactiveSetRequired_OneMissingFile)
+{
+    make_set("active_");
+    make_set("inactive_");
+    fs::remove(dir_ / "pixmaps.inactive_title.png");
+    EXPECT_FALSE(theme_has_pixmap_assets(dir_.string()));
+}
+
+TEST_F(PixmapAssetsTest, InactiveSetNotRequired_WhenReusingActive)
+{
+    make_set("active_");
+    write_theme_ini(
+        "[pixmap_settings]\ninactive_use_active_pixmaps=true\n");
+    EXPECT_TRUE(theme_has_pixmap_assets(dir_.string()));
+}
+
+TEST_F(PixmapAssetsTest, EmptyDir_ReturnsFalse)
+{
+    EXPECT_FALSE(theme_has_pixmap_assets(dir_.string()));
+}
 }
 }

@@ -52,6 +52,18 @@ void emerald_engine_init_engine(window_settings *ws);
 // engine-private state. Must be called before freeing the window_settings.
 void emerald_engine_fini_engine(const window_settings *ws);
 
+// R1 (issue #1): probe the theme dir for the pixmap assets the pixmap
+// engine loads. The engine (third_party/emerald/engines/pixmap.c) loads
+// 11 `pixmaps.active_<type>.png` textures — and 11
+// `pixmaps.inactive_<type>.png` when [pixmap_settings]
+// inactive_use_active_pixmaps is not true (its private struct is
+// zero-initialized, so the key absent → false → the inactive set is
+// required). The bridge must not invoke engine_draw_frame unless every
+// file the engine will dereference exists: the pixmap engine reads its
+// textures with no NULL check (pixmap.c:250 → compositor segfault).
+// Pure (filesystem + GKeyFile only) so it is testable headlessly.
+bool theme_has_pixmap_assets(const std::string &theme_dir);
+
 // Renders the COMPLETE frame (shadow background + engine frame + title
 // text w/ halo + icon + button glows/backgrounds) into an ARGB32
 // cairo_image_surface of size frame_width x frame_height (D7).
