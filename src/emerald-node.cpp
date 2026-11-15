@@ -786,6 +786,30 @@ void emerald_node_t::render_frame(
 
         auto surface_tex = wf::owned_texture_t{surface};
         tex = surface_tex.get_texture();
+        // M11 (issue #1): wlr_texture_from_pixels() returns NULL on a GL
+        // failure, and owned_texture_t wraps it UNCONDITIONALLY — the
+        // resulting texture_t is non-null but wraps a null wlr_texture.
+        // Recording that as the entry's texture would make
+        // pick_frame_texture() report a cache hit forever (null blit →
+        // crash) and make the defensive-recreate path
+        // (entry.texture == nullptr) unreachable. Verify the GL object is
+        // live; on failure destroy the surface and record NO entry for
+        // this scale, so the next pass retries (and the defensive path
+        // works).
+        if ((tex == nullptr) || (tex->get_wlr_texture() == nullptr))
+        {
+            static bool logged_glfail = false;
+            if (!logged_glfail)
+            {
+                LOGW("emeraldwf: render_frame: GL texture creation failed "
+                     "(wlr_texture_from_pixels returned NULL) — frame not "
+                     "composited this pass; retrying next pass");
+                logged_glfail = true;
+            }
+
+            cairo_surface_destroy(surface);
+            return;
+        }
 
         // M10 (issue #1): per-scale cache bookkeeping. A key change makes
         // every existing per-scale entry stale (rendered with the old
@@ -851,8 +875,20 @@ void emerald_node_t::render_frame(
             // creation failed on the render) — recreate it.
             auto surface_tex = wf::owned_texture_t{entry.surface};
             tex = surface_tex.get_texture();
-            entry.texture = tex.get();
-            cache_textures[data.target.scale] = tex;
+            // M11 (issue #1): same GL-failure validation as the render
+            // branch. On failure keep the entry (the surface is valid)
+            // with entry.texture == nullptr, so the NEXT pass retries
+            // this branch — never record a texture wrapping a null
+            // wlr_texture (that would be a permanent "cache hit" blitting
+            // nothing).
+            if ((tex == nullptr) || (tex->get_wlr_texture() == nullptr))
+            {
+                tex = nullptr;
+            } else
+            {
+                entry.texture = tex.get();
+                cache_textures[data.target.scale] = tex;
+            }
         } else
         {
             tex = cache_textures.at(data.target.scale);
