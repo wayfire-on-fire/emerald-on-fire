@@ -255,6 +255,50 @@ TEST_F(PixmapIntegrationTest, FullyPackagedTheme_RendersPixmapNotFallback)
     cairo_surface_destroy(surf);
 }
 
+// R2 (issue #1): theme.ini is user-editable and the 500 ms poller
+// live-reloads it — an out-of-range shadow_radius must be clamped at
+// load, never reaching the quadratic shadow allocations in
+// create_large_shadow_surface() (pre-fix: radius 100000 -> frame
+// ~2*200002 px -> ~640 GB vector -> std::bad_alloc, uncaught in the
+// wl_timer callback -> std::terminate killed wayfire; a negative radius
+// with non-zero offsets bypassed the "no shadow" early return and
+// wrapped the size_t extents the same way).
+namespace
+{
+void write_shadow_theme(const fs::path &dir, const std::string &radius,
+    const std::string &offset_x = "0",
+    const std::string &offset_y = "0")
+{
+    fs::create_directories(dir / "theme");
+    std::ifstream in(defaults_dir() + "/theme/theme.ini");
+    std::string ini((std::istreambuf_iterator<char>(in)),
+        std::istreambuf_iterator<char>());
+    struct
+    {
+        const char *key;
+        std::string value;
+    } subs[] = {
+        {"shadow_radius=11.5", "shadow_radius=" + radius},
+        {"shadow_offset_x=0", "shadow_offset_x=" + offset_x},
+        {"shadow_offset_y=0", "shadow_offset_y=" + offset_y},
+    };
+    for (auto &s : subs)
+    {
+        const auto p = ini.find(s.key);
+        if (p != std::string::npos)
+        {
+            ini.replace(p, strlen(s.key), s.value);
+        }
+    }
+
+    std::ofstream(dir / "theme" / "theme.ini") << ini;
+    std::ifstream s(defaults_dir() + "/settings.ini");
+    std::string sc((std::istreambuf_iterator<char>(s)),
+        std::istreambuf_iterator<char>());
+    std::ofstream(dir / "settings.ini") << sc;
+}
+}
+
 class SettingsTest : public ::testing::Test
 {
   public:
@@ -273,6 +317,84 @@ class SettingsTest : public ::testing::Test
 
     fs::path tmp_dir_;
 };
+
+TEST_F(SettingsTest, ShadowRadiusClampedAtLoad)
+{
+    const fs::path dir = tmp_dir_ / "shadow-clamp-huge";
+    write_shadow_theme(dir, "100000");
+
+    ThemeSettings ts;
+    ASSERT_TRUE(ts.load((dir / "settings.ini").string(),
+        (dir / "theme").string()))
+        << "a huge shadow_radius must not kill the load"
+        << " (pre-fix: ~640 GB allocation -> bad_alloc -> terminate)";
+    EXPECT_EQ(ts.ws()->shadow_radius, 200.0)
+        << "out-of-range shadow_radius must be clamped at load";
+}
+
+TEST_F(SettingsTest, ShadowRadiusNegativeClampedToZero)
+{
+    // negative radius + non-zero offset: pre-fix this bypassed the
+    // "no shadow" early return (which requires ALL THREE zero) and
+    // reached the allocations with negative extents (size_t wrap).
+    const fs::path dir = tmp_dir_ / "shadow-clamp-negative";
+    write_shadow_theme(dir, "-50", "0", "10");
+
+    ThemeSettings ts;
+    ASSERT_TRUE(ts.load((dir / "settings.ini").string(),
+        (dir / "theme").string()))
+        << "a negative shadow_radius must not kill the load";
+    EXPECT_EQ(ts.ws()->shadow_radius, 0.0)
+        << "negative shadow_radius must clamp to 0";
+}
+
+TEST_F(SettingsTest, ShadowRadiusNaNNormalizedToZero)
+{
+    // GKeyFile parses "nan"/"inf" strings; std::clamp alone lets NaN
+    // through (every comparison with NaN is false) and the later
+    // double->int conversion is UB.
+    const fs::path dir = tmp_dir_ / "shadow-clamp-nan";
+    write_shadow_theme(dir, "nan");
+
+    ThemeSettings ts;
+    ASSERT_TRUE(ts.load((dir / "settings.ini").string(),
+        (dir / "theme").string()))
+        << "a non-finite shadow_radius must not kill the load";
+    EXPECT_EQ(ts.ws()->shadow_radius, 0.0)
+        << "NaN shadow_radius must normalize to 0";
+}
+
+TEST_F(SettingsTest, ShadowRadiusBoundaryClamped)
+{
+    const fs::path dir = tmp_dir_ / "shadow-clamp-boundary";
+    write_shadow_theme(dir, "200.1");
+
+    ThemeSettings ts;
+    ASSERT_TRUE(ts.load((dir / "settings.ini").string(),
+        (dir / "theme").string()));
+    EXPECT_EQ(ts.ws()->shadow_radius, 200.0)
+        << "just above the cap must clamp to it";
+}
+
+TEST_F(SettingsTest, ShadowOffsetsClamped)
+{
+    // The offsets are an independent DoS vector:
+    // shadow_right_space / shadow_*_corner_space are max(0, size ±
+    // offset) — an unclamped 2e9 offset balloons the frame to ~2e9 px
+    // and the quadratic allocations with it (radius 0 + non-zero
+    // offset also bypasses the "no shadow" early return).
+    const fs::path dir = tmp_dir_ / "shadow-clamp-offsets";
+    write_shadow_theme(dir, "11.5", "2000000000", "-2000000000");
+
+    ThemeSettings ts;
+    ASSERT_TRUE(ts.load((dir / "settings.ini").string(),
+        (dir / "theme").string()))
+        << "huge shadow offsets must not kill the load"
+        << " (pre-fix: ~2e9 px frame -> quadratic allocation)";
+    EXPECT_EQ(ts.ws()->shadow_offset_x, 200);
+    EXPECT_EQ(ts.ws()->shadow_offset_y, -200);
+}
+
 
 TEST_F(SettingsTest, DefaultSettings)
 {

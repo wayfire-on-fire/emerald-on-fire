@@ -17,6 +17,7 @@
 #include "emerald-engine.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <dlfcn.h>
@@ -702,6 +703,15 @@ void create_large_shadow_surface(ThemeSettings & ts)
         cairo_image_surface_create(CAIRO_FORMAT_ARGB32, d_width, d_height);
 
     const int size = static_cast<int>(ws->shadow_radius * 2 + 2) / 2;
+    if (size < 1)
+    {
+        // R2 (issue #1): defensive — the load-time clamp keeps the radius
+        // in [0, 200], but a negative radius with non-zero offsets would
+        // otherwise reach the quadratic allocations below with negative
+        // extents (size_t wrap).
+        cairo_surface_destroy(surface);
+        return;
+    }
 
     // The silhouette is the window as the engine ACTUALLY draws it — border
     // width, per-corner rounding (the engine's corner radius + round flags),
@@ -1458,6 +1468,31 @@ bool ThemeSettings::load(const std::string & settings_ini,
     load_int_setting(f, &ws_->shadow_offset_x, "shadow_offset_x", "shadow");
     load_int_setting(f, &ws_->shadow_offset_y, "shadow_offset_y", "shadow");
     load_float_setting(f, &ws_->shadow_radius, "shadow_radius", "shadow");
+    // R2 (issue #1): theme.ini is user-editable and the 500 ms poller
+    // live-reloads it — out-of-range shadow values must not reach the
+    // quadratic shadow allocations in create_large_shadow_surface():
+    // radius 100000 -> frame ~2*200002 px -> ~640 GB vector ->
+    // std::bad_alloc (uncaught in the wl_timer callback) ->
+    // std::terminate kills wayfire. A negative radius with non-zero
+    // offsets likewise bypasses the "no shadow" early return and wraps
+    // the size_t extents. The OFFSETS are an independent DoS vector:
+    // shadow_right_space / shadow_*_corner_space are max(0, size ±
+    // offset) — an unclamped offset_x = 2e9 balloons the frame width to
+    // ~2e9 px and the same quadratic allocations. 200 px is far beyond
+    // any sensible shadow (emerald's default radius is 11.5) and bounds
+    // the worst-case allocation to a few dozen MB.
+    //
+    // std::clamp alone does NOT normalize NaN (every comparison with
+    // NaN is false, so NaN survives and the later double->int
+    // conversion is UB) — GKeyFile happily parses "nan"/"inf" strings.
+    if (!std::isfinite(ws_->shadow_radius))
+    {
+        ws_->shadow_radius = 0.0;
+    }
+
+    ws_->shadow_radius = std::clamp(ws_->shadow_radius, 0.0, 200.0);
+    ws_->shadow_offset_x = std::clamp(ws_->shadow_offset_x, -200, 200);
+    ws_->shadow_offset_y = std::clamp(ws_->shadow_offset_y, -200, 200);
     load_float_setting(f, &ws_->shadow_opacity, "shadow_opacity", "shadow");
     load_string_setting(f, &ws_->tobj_layout, "title_object_layout",
         "titlebar");
