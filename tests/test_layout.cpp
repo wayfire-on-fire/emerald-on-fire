@@ -269,6 +269,51 @@ TEST_F(LayoutFixture, default_layout_zones)
     EXPECT_EQ(ctx.tobj_pos[2], 400 - 72 + ctx.tobj_pos[0]);
 }
 
+// R4 (issue #1): an unknown titlebar_layout char must be SKIPPED in pass 2
+// as well — pass 1 already tolerates it (width 0), but pass 2 wrote
+// tobj_item_pos[title_object_type(c)] with type == -2: an out-of-bounds
+// index that lands on the ADJACENT struct fields (tobj_size[1] via
+// tobj_item_pos[-2], tobj_item_pos[10] via tobj_item_state[-2]) — silent
+// DecorContext corruption, reachable from a user-editable theme.ini
+// ([titlebar] titlebar_layout = "CCX?CC"). Contract: a layout with
+// unknown chars must lay out EXACTLY like the same layout with those
+// chars removed. (The emeraldwf-layout-asan target re-runs this suite
+// under ASan: if the struct layout ever changes so the index escapes the
+// struct, it becomes a hard abort there.)
+TEST_F(LayoutFixture, build_skips_unknown_layout_chars)
+{
+    // C ? N : X ? — known and unknown chars, two zones.
+    std::strncpy(layout_str, "C?N:X?", sizeof(layout_str));
+    DecorContext ctx_dirty = make_ctx(400, 300, 100);
+    layout.build(ws, ctx_dirty);
+
+    // The same layout with the unknown chars removed.
+    std::strncpy(layout_str, "CN:X", sizeof(layout_str));
+    DecorContext ctx_clean = make_ctx(400, 300, 100);
+    layout.build(ws, ctx_clean);
+
+    // Pre-fix, pass 2's tobj_item_pos[-2] / tobj_item_state[-2] writes
+    // corrupted the adjacent fields (tobj_size[1], tobj_item_pos[10]):
+    // the dirty context must be field-identical to the clean one.
+    for (int z = 0; z < 3; z++)
+    {
+        EXPECT_EQ(ctx_dirty.tobj_pos[z], ctx_clean.tobj_pos[z])
+            << "tobj_pos[" << z << "]";
+        EXPECT_EQ(ctx_dirty.tobj_size[z], ctx_clean.tobj_size[z])
+            << "tobj_size[" << z << "]";
+    }
+
+    for (int t = 0; t < TBT_COUNT; t++)
+    {
+        EXPECT_EQ(ctx_dirty.tobj_item_pos[t], ctx_clean.tobj_item_pos[t])
+            << "tobj_item_pos[" << t << "]";
+        EXPECT_EQ(ctx_dirty.tobj_item_state[t], ctx_clean.tobj_item_state[t])
+            << "tobj_item_state[" << t << "]";
+        EXPECT_EQ(ctx_dirty.tobj_item_width[t], ctx_clean.tobj_item_width[t])
+            << "tobj_item_width[" << t << "]";
+    }
+}
+
 TEST_F(LayoutFixture, DISABLED_layout_replacement)
 {
     // "CNX:IT:M" — zones re-placed: left = C N X, center = I T, right = M

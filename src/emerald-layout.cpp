@@ -170,8 +170,20 @@ void EmeraldLayout::place_objects(const window_settings *ws,
             continue;
         }
 
-        int owidth = title_object_width(ws, ctx, layout[i]);
-        if (owidth == -1)
+        const int otype = title_object_type(layout[i]);
+        if ((otype != -1) && ((otype < 0) || (otype >= TBT_COUNT)))
+        {
+            // R4 (issue #1): unknown object char (title_object_type
+            // returns -2) — skip it entirely: no width contribution
+            // AND no zone_width reset (a width-0 entry would zero the
+            // zone's last-object width, which pass 2 copies into
+            // tobj_item_width). The guard is a full valid-index check
+            // (not just == -2) so a future title_object_type change
+            // cannot reintroduce an invalid index.
+            continue;
+        }
+
+        if (otype == -1)
         {
             state++;
             if (state > 2)
@@ -180,6 +192,7 @@ void EmeraldLayout::place_objects(const window_settings *ws,
             }
         } else
         {
+            int owidth = title_object_width(ws, ctx, layout[i]);
             ctx.tobj_size[state] += owidth;
             zone_width[state]     = owidth;  // (main.c:2991)
         }
@@ -220,7 +233,22 @@ void EmeraldLayout::place_objects(const window_settings *ws,
             continue;
         }
 
-        if (title_object_type(layout[i]) == -1)
+        const int otype = title_object_type(layout[i]);
+        if ((otype != -1) && ((otype < 0) || (otype >= TBT_COUNT)))
+        {
+            // R4 (issue #1): unknown object char (title_object_type
+            // returns -2). Pre-fix this fell into the placement branch
+            // and wrote tobj_item_pos[-2] / tobj_item_state[-2]:
+            // out-of-bounds indices that land on the ADJACENT
+            // DecorContext fields (tobj_size[1] via tobj_item_pos[-2],
+            // tobj_item_pos[10] via tobj_item_state[-2]) — silent
+            // corruption, reachable from a user-editable theme.ini
+            // ([titlebar] titlebar_layout = "CCX?CC"). Full valid-index
+            // guard (not just == -2), as above.
+            continue;
+        }
+
+        if (otype == -1)
         {
             state++;
             if (state > 2)
@@ -242,9 +270,8 @@ void EmeraldLayout::place_objects(const window_settings *ws,
             // (main.c:2991) per-zone last-object width — use the value
             // computed in pass 1, which is authoritative.
             ctx.tobj_item_width[state] = zone_width[state];
-            ctx.tobj_item_pos[title_object_type(layout[i])] =
-                x - ctx.tobj_pos[state];
-            ctx.tobj_item_state[title_object_type(layout[i])] = state;
+            ctx.tobj_item_pos[otype] = x - ctx.tobj_pos[state];
+            ctx.tobj_item_state[otype] = state;
             x += w;
         }
     }

@@ -73,6 +73,19 @@ emeraldwf_layout = executable('emeraldwf-layout',
     dependencies: emerald_test_extra + [gtest_main])
 test('emeraldwf-layout', emeraldwf_layout)
 
+# R4 (issue #1): ASan build of the layout suite. An unknown
+# titlebar_layout char made pass 2 write tobj_item_pos[-2] — a
+# heap-buffer-overflow that is UB (silent corruption) in a plain build
+# but a deterministic abort under ASan.
+emeraldwf_layout_asan = executable('emeraldwf-layout-asan',
+    ['test_layout.cpp', '../src/emerald-layout.cpp'],
+    include_directories: [src_inc, emerald_inc],
+    dependencies: emerald_test_extra + [gtest_main],
+    c_args: ['-fsanitize=address'],
+    cpp_args: ['-fsanitize=address'],
+    link_args: ['-fsanitize=address'])
+test('emeraldwf-layout-asan', emeraldwf_layout_asan)
+
 # ---- part 04: scene node pure helpers (headless) ----
 # Compiles only the wayfire-free pure TU (emerald-node-pure.cpp) so the test
 # links without wayfire core symbols (libwayfire is not a linkable shared
