@@ -4,6 +4,7 @@
 #pragma once
 
 #include <cstdint>
+#include <map>
 #include <string>
 
 #include <cairo.h>
@@ -12,29 +13,34 @@ namespace wf
 {
 namespace emeraldwf
 {
+// One rendered frame surface at a given output scale, plus the GL texture
+// the node created from it (opaque handle: wf::texture_t * in the node;
+// the node owns it in a parallel map). M10 (issue #1): the surface is
+// sized physical = logical * scale, so each DISTINCT scale needs its own
+// surface; a window visible on outputs of different scale (mixed-scale
+// multi-output) must NOT re-render on every pass — it reuses the entry
+// for the current scale.
+struct node_scale_entry_t
+{
+    cairo_surface_t *surface = nullptr; // owned; destroyed on replace/dtor
+    void *texture = nullptr;
+};
+
 // Cache state of the node (kept plain so the invalidation predicate can be
 // tested headlessly — see `needs_rebuild()` below).
 struct node_cache_t
 {
-    // Last rendered frame surface (owned; destroyed on re-render / dtor).
-    cairo_surface_t *surface = nullptr;
-    // The title that `surface` was rendered with ("" if none).
+    // The title the surfaces were rendered with ("" if none).
     std::string title = "";
-    // Whether `surface` was rendered with the active/inactive frame settings.
+    // Whether the surfaces were rendered with active/inactive frame settings.
     bool active = false;
-    // Full frame size the surface was rendered for (D7).
+    // Full frame size the surfaces were rendered for (D7).
     int width = 0, height = 0;
-    // Output scale the surface was rendered at (render_target_t.scale). The
-    // surface is sized physical = logical * scale, so a scale change (moving a
-    // window to a differently-scaled output) must force a re-render.
-    double scale = 1.0;
     // Last hover button (-1 if none) — drives button-fade + hover redraws.
     int hover_button = -1;
-    // GL texture created from `surface` (opaque handle: wf::texture_t * in
-    // the node; the node's shared_ptr owns it). Valid only while it points
-    // at a texture derived from the CURRENT `surface` — see
-    // `pick_frame_texture()` below.
-    void *texture = nullptr;
+    // Per-scale rendered surfaces (M10): keyed on the output scale
+    // (render_target_t.scale). Bounded in the node (see render_frame).
+    std::map<double, node_scale_entry_t> surfaces;
 };
 
 // ── Frame-texture pick (per-frame upload regression) ───────────────────────
@@ -65,15 +71,30 @@ struct texture_pick_t
     bool must_create = false;
 };
 
-texture_pick_t pick_frame_texture(const node_cache_t & cache,
+texture_pick_t pick_frame_texture(const node_scale_entry_t & entry,
     const cairo_surface_t *surface);
 
 // Pure invalidation predicate (spec 04 Tests): returns true if the node must
 // re-render the frame next render pass. Extracted from the render instance so
 // it can be tested directly without GL or wayfire.
+//
+// M10 (issue #1): the key is the SCALE-INVARIANT inputs (active, title,
+// frame size, hover button). Scale is deliberately NOT part of the key —
+// the per-scale surface cache (node_cache_t::surfaces) covers it: a scale
+// without a cached entry is a one-time render, not a rebuild (see
+// has_cached_scale()). Pre-M10, scale was in the key, so a window visible
+// on a 1.0× and a 2.0× output re-rendered + re-uploaded on EVERY pass of
+// both outputs (the per-frame-upload regression pick_frame_texture was
+// built to eliminate, resurrected by mixed-scale outputs).
 bool needs_rebuild(const node_cache_t & cache, bool active,
     const std::string & title, int frame_w, int frame_h,
-    double scale, int hover_button);
+    int hover_button);
+
+// M10 (issue #1): true if a surface for `scale` is already cached. The
+// caller must have established that the scale-invariant key matches
+// (needs_rebuild() == false) — the entries are all rendered with the
+// cached key.
+bool has_cached_scale(const node_cache_t & cache, double scale);
 
 // ── Frame-bounding-box math (extracted for the headless regression test) ────
 //

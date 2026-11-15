@@ -7,13 +7,17 @@ namespace wf
 {
 namespace emeraldwf
 {
-// The node re-renders the frame when any input that feeds
-// `emeraldwf_render_frame()` changed since the last render.
+// The node re-renders the frame when any SCALE-INVARIANT input that feeds
+// `emeraldwf_render_frame()` changed since the last render. M10 (issue #1):
+// scale is NOT in the key — the per-scale surface cache covers it (a scale
+// without an entry is a one-time render, decided by the caller via
+// has_cached_scale()); pre-M10, a window visible on outputs of different
+// scale re-rendered + re-uploaded on every pass of both outputs.
 bool needs_rebuild(const node_cache_t & cache, bool active,
     const std::string & title, int frame_w, int frame_h,
-    double scale, int hover_button)
+    int hover_button)
 {
-    if (cache.surface == nullptr)
+    if (cache.surfaces.empty())
     {
         return true;
     }
@@ -33,11 +37,6 @@ bool needs_rebuild(const node_cache_t & cache, bool active,
         return true;
     }
 
-    if (cache.scale != scale)
-    {
-        return true;
-    }
-
     if (cache.hover_button != hover_button)
     {
         return true;
@@ -46,10 +45,16 @@ bool needs_rebuild(const node_cache_t & cache, bool active,
     return false;
 }
 
+// M10 (issue #1): is a surface for `scale` already cached?
+bool has_cached_scale(const node_cache_t & cache, double scale)
+{
+    return cache.surfaces.find(scale) != cache.surfaces.end();
+}
+
 // The frame surface is immutable once rendered, so its texture stays valid
 // until the surface pointer is replaced. Cache hit (same surface, texture
 // recorded) → reuse the texture, no upload; anything else → create.
-texture_pick_t pick_frame_texture(const node_cache_t & cache,
+texture_pick_t pick_frame_texture(const node_scale_entry_t & entry,
     const cairo_surface_t *surface)
 {
     texture_pick_t pick;
@@ -58,9 +63,9 @@ texture_pick_t pick_frame_texture(const node_cache_t & cache,
         return pick; // nothing to draw
     }
 
-    if ((cache.surface == surface) && (cache.texture != nullptr))
+    if ((entry.surface == surface) && (entry.texture != nullptr))
     {
-        pick.texture = cache.texture; // cache hit — blit the existing texture
+        pick.texture = entry.texture; // cache hit — blit the existing texture
         return pick;
     }
 

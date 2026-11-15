@@ -6,6 +6,7 @@
 // EmeraldLayout to wayfire WM actions (overview D11).
 #pragma once
 
+#include <map>
 #include <memory>
 #include <optional>
 #include <string>
@@ -67,11 +68,12 @@ class emerald_node_t : public wf::scene::node_t,
 
     // ── Cached render state (exposed for tests) ────────────────────────────
     node_cache_t cache;
-    // Owns the GL texture derived from cache.surface across frames. The
-    // surface is immutable once rendered, so the texture stays valid until a
-    // rebuild replaces the surface — a cache hit reuses it instead of
-    // re-uploading the full frame buffer to the GPU (pick_frame_texture).
-    std::shared_ptr<wf::texture_t> cache_texture;
+    // Owns the GL textures derived from the per-scale cache surfaces across
+    // frames (M10, issue #1: one entry per distinct output scale). A surface
+    // is immutable once rendered, so its texture stays valid until the entry
+    // is replaced — a cache hit reuses it instead of re-uploading the full
+    // frame buffer to the GPU (pick_frame_texture).
+    std::map<double, std::shared_ptr<wf::texture_t>> cache_textures;
 
   private:
     // wf::scene::node_t

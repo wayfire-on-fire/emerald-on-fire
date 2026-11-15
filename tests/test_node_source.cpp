@@ -128,12 +128,14 @@ TEST(NodeSource, RebuildDecisionPrecedesPerFrameWork)
         << "M9: the frame render must run only on a rebuild";
 
     // M9 follow-up (ChatGPT): textual order alone does not prove the
-    // calls are INSIDE the rebuild branch (a refactor could keep the
+    // calls are INSIDE the render branch (a refactor could keep the
     // order while moving them outside). Bracket-match the
-    // `if (rebuild)` block and require all three to be contained in it.
-    const size_t branch = body.find("if (rebuild)");
+    // `if (need_surface)` block (M10: the branch covers both key
+    // rebuilds and scale-only renders) and require all three to be
+    // contained in it.
+    const size_t branch = body.find("if (need_surface)");
     ASSERT_NE(branch, std::string::npos)
-        << "the rebuild branch must exist";
+        << "the render branch must exist";
     const size_t bopen = body.find('{', branch);
     ASSERT_NE(bopen, std::string::npos)
         << "the rebuild branch must have a body";
@@ -164,7 +166,7 @@ TEST(NodeSource, RebuildDecisionPrecedesPerFrameWork)
     {
         EXPECT_LT(call.second, bclose)
             << std::string(call.first)
-            << " must be INSIDE the if (rebuild) branch, not merely "
+            << " must be INSIDE the if (need_surface) branch, not merely "
                "after the decision (pre-fix: every render pass ran it)";
     }
 }

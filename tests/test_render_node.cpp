@@ -18,12 +18,15 @@ using namespace wf::emeraldwf;
 
 namespace
 {
-// Build a cache matching the given inputs.
+// Build a cache matching the given inputs, with one per-scale entry
+// (sentinel surface, never destroyed) at scale 1.0 by default.
 node_cache_t make_cache(bool active, const std::string & title,
-    int w, int h, int hover)
+    int w, int h, int hover, double scale = 1.0)
 {
     node_cache_t c;
-    c.surface = reinterpret_cast<cairo_surface_t*>(0x1); // sentinel (never destroyed)
+    node_scale_entry_t entry;
+    entry.surface = reinterpret_cast<cairo_surface_t*>(0x1); // sentinel (never destroyed)
+    c.surfaces[scale] = entry;
     c.active  = active;
     c.title   = title;
     c.width   = w;
@@ -34,61 +37,218 @@ node_cache_t make_cache(bool active, const std::string & title,
 } // namespace
 
 // ── needs_rebuild (invalidation predicate) ──────────────────────────────────
+// M10 (issue #1): the key is the SCALE-INVARIANT inputs. Scale is handled by
+// the per-scale surface cache (has_cached_scale), not by the key — see the
+// M10 tests below.
 TEST(RenderNodeTest, NoSurface_RequiresRebuild)
 {
-    node_cache_t cache; // surface == nullptr
-    EXPECT_TRUE(needs_rebuild(cache, true, "title", 200, 150, 1.0, -1));
+    node_cache_t cache; // no entries
+    EXPECT_TRUE(needs_rebuild(cache, true, "title", 200, 150, -1));
 }
 
 TEST(RenderNodeTest, Unchanged_NoRebuild)
 {
     auto cache = make_cache(true, "title", 200, 150, -1);
-    EXPECT_FALSE(needs_rebuild(cache, true, "title", 200, 150, 1.0, -1));
+    EXPECT_FALSE(needs_rebuild(cache, true, "title", 200, 150, -1));
 }
 
 TEST(RenderNodeTest, ChangedActive_RequiresRebuild)
 {
     auto cache = make_cache(true, "title", 200, 150, -1);
-    EXPECT_TRUE(needs_rebuild(cache, false, "title", 200, 150, 1.0, -1));
+    EXPECT_TRUE(needs_rebuild(cache, false, "title", 200, 150, -1));
 }
 
 TEST(RenderNodeTest, ChangedTitle_RequiresRebuild)
 {
     auto cache = make_cache(true, "old title", 200, 150, -1);
-    EXPECT_TRUE(needs_rebuild(cache, true, "new title", 200, 150, 1.0, -1));
+    EXPECT_TRUE(needs_rebuild(cache, true, "new title", 200, 150, -1));
 }
 
 TEST(RenderNodeTest, ChangedSize_RequiresRebuild)
 {
     auto cache = make_cache(true, "title", 200, 150, -1);
-    EXPECT_TRUE(needs_rebuild(cache, true, "title", 210, 160, 1.0, -1));
+    EXPECT_TRUE(needs_rebuild(cache, true, "title", 210, 160, -1));
 }
 
 TEST(RenderNodeTest, ChangedHover_RequiresRebuild)
 {
     auto cache = make_cache(true, "title", 200, 150, -1);
-    EXPECT_TRUE(needs_rebuild(cache, true, "title", 200, 150, 1.0, 2));
+    EXPECT_TRUE(needs_rebuild(cache, true, "title", 200, 150, 2));
 }
 
 TEST(RenderNodeTest, EmptyTitleChange_RequiresRebuild)
 {
     auto cache = make_cache(false, "title", 200, 150, -1);
-    EXPECT_TRUE(needs_rebuild(cache, false, "", 200, 150, 1.0, -1));
+    EXPECT_TRUE(needs_rebuild(cache, false, "", 200, 150, -1));
 }
 
-// The surface is rendered at physical resolution (logical * scale), so moving
-// a window to a differently-scaled output (or changing the output scale) must
-// force a re-render — the cached surface is the wrong physical size otherwise.
-TEST(RenderNodeTest, ChangedScale_RequiresRebuild)
+// ── M10: scale is NOT in the rebuild key ────────────────────────────────────
+//
+// The surface is rendered at physical resolution (logical * scale), so a
+// window on a differently-scaled output DOES need a surface at that scale —
+// but that is a ONE-TIME render per scale, cached (node_cache_t::surfaces),
+// not a rebuild. Pre-M10, scale was in the key: a window visible on a 1.0×
+// and a 2.0× output (mixed-scale multi-output) re-rendered + re-uploaded on
+// EVERY pass of BOTH outputs — the per-frame-upload regression
+// pick_frame_texture was built to eliminate.
+TEST(RenderNodeTest, ChangedScale_IsNotAKeyChange)
 {
-    auto cache = make_cache(true, "title", 200, 150, -1); // cached at scale 1.0
-    cache.scale = 1.0;
-    EXPECT_FALSE(needs_rebuild(cache, true, "title", 200, 150, 1.0, -1));
-    EXPECT_TRUE(needs_rebuild(cache, true, "title", 200, 150, 2.0, -1));
+    auto cache = make_cache(true, "title", 200, 150, -1, 1.0);
+    // Same key, different scale: NOT a key rebuild...
+    EXPECT_FALSE(needs_rebuild(cache, true, "title", 200, 150, -1));
+    // ...and the scale is handled by the per-scale cache lookup:
+    EXPECT_TRUE(has_cached_scale(cache, 1.0));
+    EXPECT_FALSE(has_cached_scale(cache, 2.0));
+}
 
-    cache.scale = 2.0;
-    EXPECT_TRUE(needs_rebuild(cache, true, "title", 200, 150, 1.0, -1));
-    EXPECT_FALSE(needs_rebuild(cache, true, "title", 200, 150, 2.0, -1));
+TEST(RenderNodeTest, HasCachedScale_EmptyCache)
+{
+    node_cache_t cache;
+    EXPECT_FALSE(has_cached_scale(cache, 1.0));
+    EXPECT_FALSE(has_cached_scale(cache, 2.0));
+}
+
+// The exact oscillation scenario, simulated with the pure decisions the
+// node makes (needs_rebuild + has_cached_scale + the node's entry
+// bookkeeping): alternating passes on a 1.0× and a 2.0× output must cost
+// exactly ONE render per scale — never one per pass.
+TEST(M10Test, MixedScaleOscillation_RendersOncePerScale)
+{
+    node_cache_t cache;
+    bool active = true;
+    const std::string title = "title";
+    const int fw = 200, fh = 150, hover = -1;
+
+    const double scales[] = {1.0, 2.0, 1.0, 2.0, 1.0, 2.0, 1.0, 2.0};
+    int renders = 0;
+    for (double scale : scales)
+    {
+        // The node's decision:
+        const bool key_changed = needs_rebuild(
+            cache, active, title, fw, fh, hover);
+        const bool scale_cached =
+            !key_changed && has_cached_scale(cache, scale);
+        const bool need_surface = key_changed || !scale_cached;
+        if (need_surface)
+        {
+            renders++;
+            // The node renders a surface at `scale` and caches it under
+            // the shared key fields (a key change drops old entries).
+            if (key_changed)
+            {
+                cache.surfaces.clear();
+            }
+            node_scale_entry_t entry;
+            entry.surface = reinterpret_cast<cairo_surface_t*>(0x1 + renders);
+            cache.surfaces[scale] = entry;
+            cache.active  = active;
+            cache.title   = title;
+            cache.width   = fw;
+            cache.height  = fh;
+            cache.hover_button = hover;
+        }
+    }
+
+    EXPECT_EQ(renders, 2) <<
+        "a window alternating between two outputs of different scale must "
+        "render once per scale (2), not once per pass (8) — the pre-M10 "
+        "rebuild key included scale, so every pass re-rendered + re-uploaded";
+    EXPECT_EQ(cache.surfaces.size(), 2u);
+}
+
+// M10 (ChatGPT follow-up): the per-scale cache is BOUNDED (the node caps
+// it at 4 distinct scales; inserting beyond the cap evicts all other
+// entries). A revisited (evicted) scale renders exactly once, then is
+// cached again.
+TEST(M10Test, ScaleCacheEvictionAndRevisit_Bounded)
+{
+    node_cache_t cache;
+    bool active = true;
+    const std::string title = "title";
+    const int fw = 200, fh = 150, hover = -1;
+    const size_t MAX_CACHED_SCALES = 4; // the node's cap
+
+    // Simulate the node's decision + bookkeeping over 5 distinct scales.
+    int renders = 0;
+    const double scales[] = {1.0, 1.25, 1.5, 1.75, 2.0};
+    for (double scale : scales)
+    {
+        const bool key_changed =
+            needs_rebuild(cache, active, title, fw, fh, hover);
+        const bool scale_cached =
+            !key_changed && has_cached_scale(cache, scale);
+        if (key_changed || !scale_cached)
+        {
+            renders++;
+            if (key_changed)
+            {
+                cache.surfaces.clear();
+            }
+            if ((!has_cached_scale(cache, scale)) &&
+                (cache.surfaces.size() >= MAX_CACHED_SCALES))
+            {
+                cache.surfaces.clear(); // evict-all at the cap
+            }
+            node_scale_entry_t entry;
+            entry.surface = reinterpret_cast<cairo_surface_t*>(0x1 + renders);
+            cache.surfaces[scale] = entry;
+            cache.active  = active;
+            cache.title   = title;
+            cache.width   = fw;
+            cache.height  = fh;
+            cache.hover_button = hover;
+        }
+    }
+    EXPECT_EQ(renders, 5) << "each distinct scale renders once";
+    EXPECT_EQ(cache.surfaces.size(), 1u)
+        << "evict-all at the cap keeps only the incoming scale";
+    EXPECT_TRUE(has_cached_scale(cache, 2.0));
+
+    // Revisit an evicted scale: exactly one new render, then cached.
+    renders = 0;
+    for (double scale : {1.0, 1.0, 1.0})
+    {
+        const bool key_changed =
+            needs_rebuild(cache, active, title, fw, fh, hover);
+        const bool scale_cached =
+            !key_changed && has_cached_scale(cache, scale);
+        if (key_changed || !scale_cached)
+        {
+            renders++;
+            if (key_changed)
+            {
+                cache.surfaces.clear();
+            }
+            if ((!has_cached_scale(cache, scale)) &&
+                (cache.surfaces.size() >= MAX_CACHED_SCALES))
+            {
+                cache.surfaces.clear();
+            }
+            node_scale_entry_t entry;
+            entry.surface = reinterpret_cast<cairo_surface_t*>(0x100 + renders);
+            cache.surfaces[scale] = entry;
+        }
+    }
+    EXPECT_EQ(renders, 1)
+        << "a revisited (evicted) scale renders exactly once, then is "
+           "cached";
+}
+
+// A KEY change invalidates every cached scale entry (they were rendered
+// with the old key) — the next pass at ANY scale renders again.
+TEST(M10Test, KeyChangeInvalidatesAllScaleEntries)
+{
+    node_cache_t cache;
+    cache.surfaces[1.0] = node_scale_entry_t{};
+    cache.surfaces[2.0] = node_scale_entry_t{};
+    cache.active = true;
+    cache.title  = "old";
+    cache.width  = 200;
+    cache.height = 150;
+    cache.hover_button = -1;
+
+    // New title → key change at every scale:
+    EXPECT_TRUE(needs_rebuild(cache, true, "new", 200, 150, -1));
 }
 
 // ── frame_box_for (part 06 regression: "no decoration painted on first map") ──
@@ -514,18 +674,14 @@ TEST(FrameRenderGuardTest, FullscreenAndZeroSizeAreNotRendered)
 
 namespace
 {
-// A "rendered" cache entry: sentinel surface (never destroyed, as in
-// make_cache) + the texture the node created from it on rebuild.
-node_cache_t make_texture_cache()
+// A "rendered" per-scale cache entry: sentinel surface (never destroyed,
+// as in make_cache) + the texture the node created from it.
+node_scale_entry_t make_texture_entry()
 {
-    node_cache_t c;
-    c.surface = reinterpret_cast<cairo_surface_t*>(0x1);
-    c.texture = reinterpret_cast<void*>(0xABCDEF); // the cached GL texture (sentinel)
-    c.active  = true;
-    c.title   = "title";
-    c.width   = 200;
-    c.height  = 150;
-    return c;
+    node_scale_entry_t e;
+    e.surface = reinterpret_cast<cairo_surface_t*>(0x1);
+    e.texture = reinterpret_cast<void*>(0xABCDEF); // the cached GL texture (sentinel)
+    return e;
 }
 } // namespace
 
@@ -536,12 +692,12 @@ TEST(FrameTexturePickTest, CacheHit_ReusesTextureWithoutUpload)
     // be reused as-is; must_create would mean wlr_texture_from_pixels() ran
     // again — a full CPU→GPU copy of the frame on a frame that needed
     // nothing.
-    auto cache = make_texture_cache();
-    auto pick  = pick_frame_texture(cache, cache.surface);
+    auto entry = make_texture_entry();
+    auto pick  = pick_frame_texture(entry, entry.surface);
     EXPECT_FALSE(pick.must_create) <<
         "cache hit must not re-create the texture (per-frame full-buffer "
         "upload — the video-page CPU regression)";
-    EXPECT_EQ(pick.texture, cache.texture) <<
+    EXPECT_EQ(pick.texture, entry.texture) <<
         "cache hit must hand back the EXISTING texture, not a new one";
 }
 
@@ -549,10 +705,10 @@ TEST(FrameTexturePickTest, NewSurface_RequiresNewTexture)
 {
     // Rebuild: the surface pointer changed (re-rendered frame). The old
     // texture derives from the old surface — it must be replaced.
-    auto cache = make_texture_cache();
+    auto entry = make_texture_entry();
     // Opaque sentinel (not a real surface) — int->ptr is a reinterpret_cast.
     const cairo_surface_t *new_surface = reinterpret_cast<cairo_surface_t*>(0x2);
-    auto pick = pick_frame_texture(cache, new_surface);
+    auto pick = pick_frame_texture(entry, new_surface);
     EXPECT_TRUE(pick.must_create) <<
         "a new surface has no texture yet — one must be created";
 }
@@ -560,8 +716,8 @@ TEST(FrameTexturePickTest, NewSurface_RequiresNewTexture)
 TEST(FrameTexturePickTest, NoSurface_NoTexture)
 {
     // Nothing rendered (or destroyed) — nothing to blit, nothing to create.
-    node_cache_t cache; // all null
-    auto pick = pick_frame_texture(cache, nullptr);
+    node_scale_entry_t entry; // all null
+    auto pick = pick_frame_texture(entry, nullptr);
     EXPECT_FALSE(pick.must_create);
     EXPECT_EQ(pick.texture, nullptr);
 }
@@ -570,9 +726,9 @@ TEST(FrameTexturePickTest, SurfaceWithoutTexture_RequiresUpload)
 {
     // Defensive: a surface with no texture recorded (e.g. texture creation
     // failed last time) must be re-created, not blitted as a dangling null.
-    auto cache = make_texture_cache();
-    cache.texture = nullptr;
-    auto pick = pick_frame_texture(cache, cache.surface);
+    auto entry = make_texture_entry();
+    entry.texture = nullptr;
+    auto pick = pick_frame_texture(entry, entry.surface);
     EXPECT_TRUE(pick.must_create);
 }
 
@@ -582,15 +738,15 @@ TEST(FrameTexturePickTest, StaleTextureAfterReplace_RequiresNewTexture)
     // this pins that the pick keys off the SURFACE pair, not the texture
     // alone — a texture pointer that happens to match an old cache entry is
     // no excuse to skip the upload.
-    auto cache = make_texture_cache();
+    auto entry = make_texture_entry();
     // Opaque sentinel (not a real surface) — int->ptr is a reinterpret_cast.
-    // (non-const: it is stored into cache.surface, a non-const member)
+    // (non-const: it is stored into entry.surface, a non-const member)
     cairo_surface_t *new_surface = reinterpret_cast<cairo_surface_t*>(0x2);
     // Caller-created texture for the new surface — a DIFFERENT one.
     void *new_texture = reinterpret_cast<void*>(0x123456);
-    cache.surface = new_surface;
-    cache.texture = new_texture;
-    auto pick = pick_frame_texture(cache, new_surface);
+    entry.surface = new_surface;
+    entry.texture = new_texture;
+    auto pick = pick_frame_texture(entry, new_surface);
     EXPECT_FALSE(pick.must_create);
     EXPECT_EQ(pick.texture, new_texture);
 }

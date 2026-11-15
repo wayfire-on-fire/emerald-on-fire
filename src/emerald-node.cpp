@@ -249,11 +249,19 @@ emerald_node_t::emerald_node_t(std::shared_ptr<emerald_decorator_t> deco_) :
 emerald_node_t::~emerald_node_t()
 {
     fade_timer.disconnect();
-    if (cache.surface != nullptr)
+    // M10 (issue #1): the cache holds one surface per distinct output
+    // scale; destroy them all (cache_textures drops the GL textures).
+    for (auto & [scale, entry] : cache.surfaces)
     {
-        cairo_surface_destroy(cache.surface);
-        cache.surface = nullptr;
+        if (entry.surface != nullptr)
+        {
+            cairo_surface_destroy(entry.surface);
+            entry.surface = nullptr;
+        }
     }
+
+    cache.surfaces.clear();
+    cache_textures.clear();
 
     // Review N2: the measure context is owned here (one 1×1 surface +
     // PangoLayout per node, reused across rebuilds — see render_frame).
@@ -588,10 +596,21 @@ void emerald_node_t::render_frame(
     // activate -> active_dirty, title -> title_dirty, theme ->
     // theme_dirty) and needs_rebuild() covers the remaining cache-key
     // inputs, so the work is skipped safely on a cache hit.
-    const bool rebuild = theme_dirty || active_dirty || title_dirty ||
+    const bool key_changed = theme_dirty || active_dirty || title_dirty ||
         size_dirty ||
-        needs_rebuild(cache, active, title, fw, fh,
-        data.target.scale, last_hover_button);
+        needs_rebuild(cache, active, title, fw, fh, last_hover_button);
+
+    // M10 (issue #1): scale is NOT part of the rebuild key — the surface
+    // is physical = logical * scale, so each distinct output scale needs
+    // its own surface, but each is rendered ONCE and then reused. Pre-M10
+    // scale was in the key: a window visible on a 1.0× and a 2.0× output
+    // (mixed-scale multi-output, e.g. straddling two outputs during a
+    // move) re-rendered + re-uploaded on EVERY pass of BOTH outputs —
+    // the per-frame-upload regression pick_frame_texture was built to
+    // eliminate, resurrected.
+    const bool scale_cached =
+        !key_changed && has_cached_scale(cache, data.target.scale);
+    const bool need_surface = key_changed || !scale_cached;
 
     // The frame's GL texture is derived from the cached cairo surface,
     // which is immutable once rendered — so the texture stays valid until
@@ -602,38 +621,44 @@ void emerald_node_t::render_frame(
     // video-page CPU regression). pick_frame_texture() decides: reuse on
     // hit, create on (re)build.
     std::shared_ptr<wf::texture_t> tex;
-    if (rebuild)
+    if (need_surface)
     {
-        // Measure the title with Pango (spec §2). Review N2: the 1×1
+        // Measure the title with Pango (spec §2) — only when the
+        // scale-invariant key changed (the measurement is in logical
+        // units, independent of the output scale). Review N2: the 1×1
         // surface + PangoLayout are created ONCE per node and reused
-        // across rebuilds (the old code allocated them on every
-        // rebuild); only the font description + text are (re)set per
-        // rebuild. M9: only on a rebuild at all.
-        int title_width = 0;
+        // across rebuilds; only the font description + text are
+        // (re)set per rebuild. M9: only on a rebuild at all.
         auto ws = theme->ws();
-        if ((ws != nullptr) && (ws->font_desc != nullptr))
+        if (key_changed)
         {
-            if (measure_cr == nullptr)
+            int title_width = 0;
+            if ((ws != nullptr) && (ws->font_desc != nullptr))
             {
-                measure_surface = cairo_image_surface_create(
-                    CAIRO_FORMAT_ARGB32, 1, 1);
-                measure_cr = cairo_create(measure_surface);
-                measure_pl = pango_cairo_create_layout(measure_cr);
+                if (measure_cr == nullptr)
+                {
+                    measure_surface = cairo_image_surface_create(
+                        CAIRO_FORMAT_ARGB32, 1, 1);
+                    measure_cr = cairo_create(measure_surface);
+                    measure_pl = pango_cairo_create_layout(measure_cr);
+                }
+
+                pango_layout_set_font_description(measure_pl, ws->font_desc);
+                pango_layout_set_text(measure_pl, title.c_str(),
+                    (int)title.size());
+                int w = 0, h = 0;
+                pango_layout_get_pixel_size(measure_pl, &w, &h);
+                title_width = w;
             }
 
-            pango_layout_set_font_description(measure_pl, ws->font_desc);
-            pango_layout_set_text(measure_pl, title.c_str(),
-                (int)title.size());
-            int w = 0, h = 0;
-            pango_layout_get_pixel_size(measure_pl, &w, &h);
-            title_width = w;
+            layout.title_text_width_ = title_width;
         }
 
-        layout.title_text_width_ = title_width;
-
         // Rebuild the DecorContext (state, active, client size, layout
-        // fields). M9: only on a rebuild — the ctx must match the cached
-        // surface between rebuilds (hit-testing uses it).
+        // fields) on every render — cheap field copies, and the ctx must
+        // match the surface being rendered. M9: only on a render at all
+        // (the cache-hit path skips this); the expensive parts (Pango
+        // measurement, layout.build) run only when the key changed.
         auto & ctx = deco->ctx();
         // pending() (from the guard above) is the toplevel's pending state.
         // pending().geometry is the FRAME (client + margins); the client
@@ -726,7 +751,13 @@ void emerald_node_t::render_frame(
             }
         }
 
-        layout.build(*theme, ctx);
+        // The titlebar layout is in logical coordinates (no scale
+        // dependency in emerald-layout.cpp) — rebuild it only when the
+        // scale-invariant key changed; a scale-only render reuses it.
+        if (key_changed)
+        {
+            layout.build(*theme, ctx);
+        }
         ctx.fs = ctx.active ? theme->fs_active() : theme->fs_inactive();
 
         cairo_surface_t *surface = emeraldwf_render_frame(*theme, ctx);
@@ -755,38 +786,76 @@ void emerald_node_t::render_frame(
 
         auto surface_tex = wf::owned_texture_t{surface};
         tex = surface_tex.get_texture();
-        if (cache.surface != nullptr)
+
+        // M10 (issue #1): per-scale cache bookkeeping. A key change makes
+        // every existing per-scale entry stale (rendered with the old
+        // key) — drop them; the new key gets fresh entries as scales are
+        // visited.
+        auto drop_entries = [this]
         {
-            cairo_surface_destroy(cache.surface);
-            cache.surface = nullptr;
+            for (auto & [sc, entry] : cache.surfaces)
+            {
+                if (entry.surface != nullptr)
+                {
+                    cairo_surface_destroy(entry.surface);
+                    entry.surface = nullptr;
+                }
+                entry.texture = nullptr;
+            }
+            cache.surfaces.clear();
+            cache_textures.clear();
+        };
+        if (key_changed)
+        {
+            drop_entries();
+        }
+        // Bound the cache: distinct scales a window visits in a session are
+        // few (output scale factors); beyond the cap keep only the incoming
+        // scale (the two-scale oscillation case — the one M10 exists for —
+        // is always within the cap).
+        const size_t MAX_CACHED_SCALES = 4;
+        if ((!has_cached_scale(cache, data.target.scale)) &&
+            (cache.surfaces.size() >= MAX_CACHED_SCALES))
+        {
+            drop_entries();
         }
 
-        cache.surface = surface;
+        // The shared key fields describe every cached entry; on a
+        // scale-only render they are unchanged (writing them keeps the
+        // invariant explicit).
         cache.active  = active;
         cache.title   = title;
         cache.width   = fw;
         cache.height  = fh;
-        cache.scale   = data.target.scale;
         cache.hover_button = last_hover_button;
-        // cache_texture owns the GL texture across frames; cache.texture is
-        // its opaque handle for pick_frame_texture().
-        cache_texture = tex;
-        cache.texture = tex.get();
-    } else if (cache.surface != nullptr)
+
+        auto &entry = cache.surfaces[data.target.scale];
+        if (entry.surface != nullptr)
+        {
+            cairo_surface_destroy(entry.surface);
+        }
+        entry.surface = surface;
+        entry.texture = tex.get();
+        // cache_textures owns the GL texture across frames; entry.texture
+        // is its opaque handle for pick_frame_texture().
+        cache_textures[data.target.scale] = tex;
+    } else
     {
-        auto pick = pick_frame_texture(cache, cache.surface);
+        // M10 cache hit: a surface for the current scale is cached and the
+        // key matches — blit its texture, no re-upload, no re-render.
+        auto &entry = cache.surfaces.at(data.target.scale);
+        auto pick = pick_frame_texture(entry, entry.surface);
         if (pick.must_create)
         {
             // Defensive: surface with no recorded texture (e.g. texture
-            // creation failed on the rebuild) — recreate it.
-            auto surface_tex = wf::owned_texture_t{cache.surface};
+            // creation failed on the render) — recreate it.
+            auto surface_tex = wf::owned_texture_t{entry.surface};
             tex = surface_tex.get_texture();
-            cache_texture = tex;
-            cache.texture = tex.get();
+            entry.texture = tex.get();
+            cache_textures[data.target.scale] = tex;
         } else
         {
-            // Cache hit: blit the existing texture — no re-upload.
-            tex = cache_texture;
+            tex = cache_textures.at(data.target.scale);
         }
     }
 
