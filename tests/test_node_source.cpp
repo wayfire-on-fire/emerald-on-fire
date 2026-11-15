@@ -30,18 +30,18 @@ std::string read_file(const std::string &path)
     return ss.str();
 }
 
-// The body of `void emerald_node_t::render_frame(...)` (bracket-matched
+// The body of a `void emerald_node_t::<fn>(...)` member (bracket-matched
 // from the first '{' after the signature), with // comments stripped
-// (the fix's own comments quote the pre-fix call names).
-std::string render_frame_body(const std::string &src)
+// (the fixes' own comments quote pre-fix call names).
+std::string node_fn_body(const std::string &src, const std::string &sig)
 {
-    const size_t sig = src.find("void emerald_node_t::render_frame(");
-    if (sig == std::string::npos)
+    const size_t at = src.find(sig);
+    if (at == std::string::npos)
     {
         return {};
     }
 
-    const size_t open = src.find('{', sig);
+    const size_t open = src.find('{', at);
     if (open == std::string::npos)
     {
         return {};
@@ -66,7 +66,7 @@ std::string render_frame_body(const std::string &src)
     }
 
     std::string body = src.substr(open + 1, end - open - 1);
-    // Strip // line comments (no string in this body contains "//").
+    // Strip // line comments (no string in these bodies contains "//").
     std::string out;
     for (size_t i = 0; i < body.size(); i++)
     {
@@ -86,6 +86,14 @@ std::string render_frame_body(const std::string &src)
     }
 
     return out;
+}
+
+// The body of `void emerald_node_t::render_frame(...)` (bracket-matched
+// from the first '{' after the signature), with // comments stripped
+// (the fix's own comments quote the pre-fix call names).
+std::string render_frame_body(const std::string &src)
+{
+    return node_fn_body(src, "void emerald_node_t::render_frame(");
 }
 
 // M9 (issue #1): the rebuild decision must come FIRST; the Pango
@@ -220,5 +228,37 @@ TEST(NodeSource, GlTextureCreationValidatedBeforeCache)
     EXPECT_LT(first_val, first_rec)
         << "the validation must precede the cache recording (a failed "
            "creation must NOT be recorded)";
+}
+
+// M13 (issue #1): every input handler gates on view_of() before
+// dereferencing deco. handle_pointer_axis was the only one that wasn't:
+// it called layout.in_titlebar(deco->ctx(), ...) with no guard — not a
+// live bug (deco is never null while the node lives), but the first
+// crash site if the invariant is ever violated.
+TEST(NodeSource, PointerAxisHandlerGatesOnViewOf)
+{
+    const std::string src = read_file(
+        std::string{EMERALDWF_TEST_SOURCE_ROOT} + "/src/emerald-node.cpp");
+    ASSERT_FALSE(src.empty()) << "src/emerald-node.cpp must be readable";
+
+    const std::string body =
+        node_fn_body(src, "void emerald_node_t::handle_pointer_axis(");
+    ASSERT_FALSE(body.empty())
+        << "could not locate emerald_node_t::handle_pointer_axis()";
+
+    // The guard must be the EARLY-RETURN pattern (a bare view_of()
+    // mention elsewhere — e.g. assigned to a variable that is never
+    // checked — would not guard the dereference).
+    const size_t guard = body.find("if (view_of() == nullptr)");
+    ASSERT_NE(guard, std::string::npos)
+        << "handle_pointer_axis must early-return on view_of() == "
+           "nullptr like every other handler (pre-M13: the only "
+           "handler dereferencing deco unguarded)";
+
+    const size_t first_deco = body.find("deco->");
+    ASSERT_NE(first_deco, std::string::npos)
+        << "the handler must use the decorator (deco->ctx())";
+    EXPECT_LT(guard, first_deco)
+        << "the view_of() guard must precede the first deco dereference";
 }
 } // namespace

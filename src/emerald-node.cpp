@@ -1059,6 +1059,16 @@ void emerald_node_t::handle_pointer_button(
 
 void emerald_node_t::handle_pointer_axis(const wlr_pointer_axis_event& event)
 {
+    // M13 (issue #1): gate on view_of() like every other handler —
+    // pre-fix this was the only input handler that dereferenced deco
+    // (deco->ctx()) without the guard: not a live bug (deco is never
+    // null while the node lives), but the first crash site if the
+    // invariant is ever violated.
+    if (view_of() == nullptr)
+    {
+        return;
+    }
+
     if (event.orientation == WL_POINTER_AXIS_VERTICAL_SCROLL)
     {
         auto local = to_local_full_extent(last_pointer_pos);
