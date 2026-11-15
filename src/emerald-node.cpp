@@ -574,142 +574,161 @@ void emerald_node_t::render_frame(
         return;
     }
 
-    // Measure the title with Pango before emeraldwf_render_frame (spec §2).
-    // Review N2: the 1×1 surface + PangoLayout are created ONCE per node and
-    // reused across rebuilds (the old code allocated them on every rebuild);
-    // only the font description + text are (re)set per render.
-    std::string title = view->get_title();
-    int title_width   = 0;
-    auto ws = theme->ws();
-    if ((ws != nullptr) && (ws->font_desc != nullptr))
-    {
-        if (measure_cr == nullptr)
-        {
-            measure_surface = cairo_image_surface_create(
-                CAIRO_FORMAT_ARGB32, 1, 1);
-            measure_cr = cairo_create(measure_surface);
-            measure_pl = pango_cairo_create_layout(measure_cr);
-        }
+    const std::string title = view->get_title();
+    const bool active = view->activated;
 
-        pango_layout_set_font_description(measure_pl, ws->font_desc);
-        pango_layout_set_text(measure_pl, title.c_str(), (int)title.size());
-        int w = 0, h = 0;
-        pango_layout_get_pixel_size(measure_pl, &w, &h);
-        title_width = w;
-    }
-
-    layout.title_text_width_ = title_width;
-
-    // Rebuild the DecorContext (state, active, client size, layout fields).
-    auto & ctx = deco->ctx();
-    // pending() (from the guard above) is the toplevel's pending state.
-    // pending().geometry is the FRAME (client + margins); the client (base)
-    // geometry is the frame shrunk by the margins. The engine needs the real
-    // client size to position the title bar / borders correctly.
-    auto base_geom =
-        wf::shrink_geometry_by_margins(pending.geometry, pending.margins);
-    ctx.client_width  = base_geom.width;
-    ctx.client_height = base_geom.height;
-    ctx.title  = title;
-    ctx.active = view->activated;
-    ctx.state  = emerald_state_from_view(pending, view->sticky);
-    // Finding 31: EWS_SHADED drives the layout's shaded resize-band logic
-    // (emerald main.c update_event_windows: shaded → only the middle row's
-    // side bands are live). The state bit is not derivable from the toplevel
-    // state — it comes from the live shade transformer (progress > 0).
-    if (auto tr = deco->shade())
-    {
-        if (tr->get_progression() > 0.0)
-        {
-            ctx.state |= EWS_SHADED;
-        }
-    }
-
-    ctx.decorated = !deco->is_csd();
-    // Finding 19: feed the plugin's maximized options to the render crop
-    // (emeraldwf_render_frame) — same values margins_for() uses.
-    ctx.maximized_borders = deco->maximized_borders();
-    ctx.maximized_shadows = deco->maximized_shadows();
-    // The layout (button positions) and the engine draw against the
-    // FULL-EXTENT frame; the node's bbox (fw × fh) already excludes the
-    // maximized crop, so add it back for ctx.
-    decor_crop_t crop = decor_crop_t{};
-    if ((ws != nullptr) && (pending.tiled_edges == TILED_EDGES_ALL))
-    {
-        crop = maximized_crop(*ws, deco->maximized_borders(),
-            deco->maximized_shadows());
-    }
-
-    ctx.width  = fw + crop.left + crop.right;
-    ctx.height = fh + crop.top + crop.bottom;
-    // Output scale (render_target_t.scale): the frame surface is rendered at
-    // physical resolution (logical * scale) so the decoration composites
-    // crisply on scaled outputs — the same contract wayfire's native deco
-    // follows (deco-subsurface.cpp scales its title surface by
-    // data.target.scale). The bounding box stays logical; wayfire's
-    // logical->framebuffer dst-box mapping fills the physical surface 1:1.
-    ctx.scale = data.target.scale;
-
-    // Button interaction state (emerald's event-window flags): the hovered
-    // button renders its S_ACTIVE_HOVER surface column, a pressed button its
-    // S_ACTIVE_PRESS one (get_b_state). Without this the buttons never change
-    // on hover/press (part 06 regression: "buttons used to change color when
-    // hovered").
-    for (int b = 0; b < B_T_COUNT; ++b)
-    {
-        ctx.button_states[b] = 0;
-    }
-
-    if (last_hover_button >= 0)
-    {
-        ctx.button_states[last_hover_button] |= IN_EVENT_WINDOW;
-    }
-
-    if (pressed_button >= 0)
-    {
-        ctx.button_states[pressed_button] |=
-            (IN_EVENT_WINDOW | PRESSED_EVENT_WINDOW);
-    }
-
-    // Finding 43: publish the current per-button crossfade alphas.
-    // Stable-state renders don't tick (the timer only runs while a
-    // counter moves), so the state was last set by an event/reset.
-    for (int b = 0; b < B_T_COUNT; ++b)
-    {
-        if (button_fade_cfg_.enabled)
-        {
-            auto a = button_fade_alphas(button_fade_state[b],
-                button_fade_cfg_.num_steps);
-            ctx.button_fade_normal[b] = a.normal;
-            ctx.button_fade_hover[b]  = a.hover;
-        } else
-        {
-            ctx.button_fade_normal[b] = 1.0;
-            ctx.button_fade_hover[b]  = 0.0;
-        }
-    }
-
-    layout.build(*theme, ctx);
-    ctx.fs = ctx.active ? theme->fs_active() : theme->fs_inactive();
-
-    bool active = view->activated;
-
-    bool rebuild = theme_dirty || active_dirty || title_dirty || size_dirty ||
+    // M9 (issue #1): decide the rebuild BEFORE doing any work. Pre-fix,
+    // the Pango title measurement, the full DecorContext rebuild and
+    // layout.build() ran on EVERY render pass — before needs_rebuild()
+    // discovered nothing changed. On a page with continuous client
+    // damage (video) that is a full Pango layout pass + ctx mutation +
+    // layout rebuild at the client's framerate, for a surface that is
+    // never re-rendered. Every layout input sets a dirty flag on change
+    // (hover/press/shade-progress -> theme_dirty, resize -> size_dirty,
+    // activate -> active_dirty, title -> title_dirty, theme ->
+    // theme_dirty) and needs_rebuild() covers the remaining cache-key
+    // inputs, so the work is skipped safely on a cache hit.
+    const bool rebuild = theme_dirty || active_dirty || title_dirty ||
+        size_dirty ||
         needs_rebuild(cache, active, title, fw, fh,
         data.target.scale, last_hover_button);
 
-    // The frame's GL texture is derived from the cached cairo surface, which
-    // is immutable once rendered — so the texture stays valid until a rebuild
-    // replaces the surface. On a page with continuous client damage (video)
-    // the frame node is rendered at the client's framerate with an UNCHANGED
-    // surface; creating a fresh texture on every such pass re-uploads the
-    // whole frame buffer to the GPU per frame (the video-page CPU
-    // regression). pick_frame_texture() decides: reuse on hit, create on
-    // (re)build.
+    // The frame's GL texture is derived from the cached cairo surface,
+    // which is immutable once rendered — so the texture stays valid until
+    // a rebuild replaces the surface. On a page with continuous client
+    // damage (video) the frame node is rendered at the client's framerate
+    // with an UNCHANGED surface; creating a fresh texture on every such
+    // pass re-uploads the whole frame buffer to the GPU per frame (the
+    // video-page CPU regression). pick_frame_texture() decides: reuse on
+    // hit, create on (re)build.
     std::shared_ptr<wf::texture_t> tex;
     if (rebuild)
     {
-        theme_dirty = active_dirty = title_dirty = size_dirty = false;
+        // Measure the title with Pango (spec §2). Review N2: the 1×1
+        // surface + PangoLayout are created ONCE per node and reused
+        // across rebuilds (the old code allocated them on every
+        // rebuild); only the font description + text are (re)set per
+        // rebuild. M9: only on a rebuild at all.
+        int title_width = 0;
+        auto ws = theme->ws();
+        if ((ws != nullptr) && (ws->font_desc != nullptr))
+        {
+            if (measure_cr == nullptr)
+            {
+                measure_surface = cairo_image_surface_create(
+                    CAIRO_FORMAT_ARGB32, 1, 1);
+                measure_cr = cairo_create(measure_surface);
+                measure_pl = pango_cairo_create_layout(measure_cr);
+            }
+
+            pango_layout_set_font_description(measure_pl, ws->font_desc);
+            pango_layout_set_text(measure_pl, title.c_str(),
+                (int)title.size());
+            int w = 0, h = 0;
+            pango_layout_get_pixel_size(measure_pl, &w, &h);
+            title_width = w;
+        }
+
+        layout.title_text_width_ = title_width;
+
+        // Rebuild the DecorContext (state, active, client size, layout
+        // fields). M9: only on a rebuild — the ctx must match the cached
+        // surface between rebuilds (hit-testing uses it).
+        auto & ctx = deco->ctx();
+        // pending() (from the guard above) is the toplevel's pending state.
+        // pending().geometry is the FRAME (client + margins); the client
+        // (base) geometry is the frame shrunk by the margins. The engine
+        // needs the real client size to position the title bar / borders
+        // correctly.
+        auto base_geom =
+            wf::shrink_geometry_by_margins(pending.geometry,
+                pending.margins);
+        ctx.client_width  = base_geom.width;
+        ctx.client_height = base_geom.height;
+        ctx.title  = title;
+        ctx.active = active;
+        ctx.state  = emerald_state_from_view(pending, view->sticky);
+        // Finding 31: EWS_SHADED drives the layout's shaded resize-band
+        // logic (emerald main.c update_event_windows: shaded → only the
+        // middle row's side bands are live). The state bit is not
+        // derivable from the toplevel state — it comes from the live
+        // shade transformer (progress > 0).
+        if (auto tr = deco->shade())
+        {
+            if (tr->get_progression() > 0.0)
+            {
+                ctx.state |= EWS_SHADED;
+            }
+        }
+
+        ctx.decorated = !deco->is_csd();
+        // Finding 19: feed the plugin's maximized options to the render
+        // crop (emeraldwf_render_frame) — same values margins_for() uses.
+        ctx.maximized_borders = deco->maximized_borders();
+        ctx.maximized_shadows = deco->maximized_shadows();
+        // The layout (button positions) and the engine draw against the
+        // FULL-EXTENT frame; the node's bbox (fw × fh) already excludes
+        // the maximized crop, so add it back for ctx.
+        decor_crop_t crop = decor_crop_t{};
+        if ((ws != nullptr) && (pending.tiled_edges == TILED_EDGES_ALL))
+        {
+            crop = maximized_crop(*ws, deco->maximized_borders(),
+                deco->maximized_shadows());
+        }
+
+        ctx.width  = fw + crop.left + crop.right;
+        ctx.height = fh + crop.top + crop.bottom;
+        // Output scale (render_target_t.scale): the frame surface is
+        // rendered at physical resolution (logical * scale) so the
+        // decoration composites crisply on scaled outputs — the same
+        // contract wayfire's native deco follows (deco-subsurface.cpp
+        // scales its title surface by data.target.scale). The bounding
+        // box stays logical; wayfire's logical->framebuffer dst-box
+        // mapping fills the physical surface 1:1.
+        ctx.scale = data.target.scale;
+
+        // Button interaction state (emerald's event-window flags): the
+        // hovered button renders its S_ACTIVE_HOVER surface column, a
+        // pressed button its S_ACTIVE_PRESS one (get_b_state). Without
+        // this the buttons never change on hover/press (part 06
+        // regression: "buttons used to change color when hovered").
+        for (int b = 0; b < B_T_COUNT; ++b)
+        {
+            ctx.button_states[b] = 0;
+        }
+
+        if (last_hover_button >= 0)
+        {
+            ctx.button_states[last_hover_button] |= IN_EVENT_WINDOW;
+        }
+
+        if (pressed_button >= 0)
+        {
+            ctx.button_states[pressed_button] |=
+                (IN_EVENT_WINDOW | PRESSED_EVENT_WINDOW);
+        }
+
+        // Finding 43: publish the current per-button crossfade alphas.
+        // Stable-state renders don't tick (the timer only runs while a
+        // counter moves), so the state was last set by an event/reset.
+        for (int b = 0; b < B_T_COUNT; ++b)
+        {
+            if (button_fade_cfg_.enabled)
+            {
+                auto a = button_fade_alphas(button_fade_state[b],
+                    button_fade_cfg_.num_steps);
+                ctx.button_fade_normal[b] = a.normal;
+                ctx.button_fade_hover[b]  = a.hover;
+            } else
+            {
+                ctx.button_fade_normal[b] = 1.0;
+                ctx.button_fade_hover[b]  = 0.0;
+            }
+        }
+
+        layout.build(*theme, ctx);
+        ctx.fs = ctx.active ? theme->fs_active() : theme->fs_inactive();
+
         cairo_surface_t *surface = emeraldwf_render_frame(*theme, ctx);
         if (surface == nullptr)
         {
@@ -725,6 +744,14 @@ void emerald_node_t::render_frame(
 
             return;
         }
+
+        // M9 follow-up (ChatGPT): clear the dirty flags only AFTER a
+        // successful render. Pre-fix (top-of-branch) a nullptr from
+        // emeraldwf_render_frame would have dropped the flags while the
+        // cached surface stayed stale — needs_rebuild() would then see a
+        // clean cache and never rebuild. Clearing here keeps the flags
+        // armed so the next pass retries the rebuild.
+        theme_dirty = active_dirty = title_dirty = size_dirty = false;
 
         auto surface_tex = wf::owned_texture_t{surface};
         tex = surface_tex.get_texture();

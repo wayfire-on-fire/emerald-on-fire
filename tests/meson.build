@@ -124,6 +124,15 @@ emeraldwf_plugin_source = executable('emeraldwf-plugin-source',
     dependencies: [gtest, gtest_main])
 test('emeraldwf-plugin-source', emeraldwf_plugin_source)
 
+# M9 (issue #1): source-structure test for the node TU's render_frame()
+# ordering (rebuild decision before the per-frame work). emerald-node.cpp
+# cannot be linked headlessly (wayfire scene symbols).
+emeraldwf_node_source = executable('emeraldwf-node-source',
+    ['test_node_source.cpp'],
+    include_directories: [emerald_test_inc],
+    dependencies: [gtest, gtest_main])
+test('emeraldwf-node-source', emeraldwf_node_source)
+
 # ---- part 04: scene node pure helpers (headless) ----
 # Compiles only the wayfire-free pure TU (emerald-node-pure.cpp) so the test
 # links without wayfire core symbols (libwayfire is not a linkable shared
