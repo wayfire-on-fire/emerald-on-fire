@@ -397,4 +397,27 @@ TEST(NodeSource, NoDeadStateFromViewOverload)
             "removed from " << f;
     }
 }
+
+// Minor (issue #1): the parent→frame-local coordinate transform was
+// duplicated. node.cpp hand-rolled the frame origin in node_offset_of()
+// ({-margins.left, -margins.top}) and subtracted it in to_local_of(), while
+// emerald-node-pure.cpp already derives the SAME origin in the unit-tested
+// frame_box_from_pending() (whose header documents it as "the pure core of
+// emerald_node_t::to_local()"). Route to_local_of() through the pure core
+// (keeping the final subtraction in doubles so fractional pointer
+// coordinates are preserved) and drop the redundant node_offset_of().
+TEST(NodeSource, CoordTransformReusesPureCore)
+{
+    const std::string src = read_file(
+        std::string{EMERALDWF_TEST_SOURCE_ROOT} + "/src/emerald-node.cpp");
+    ASSERT_FALSE(src.empty()) << "src/emerald-node.cpp must be readable";
+
+    EXPECT_EQ(src.find("node_offset_of"), std::string::npos) <<
+        "node_offset_of() re-derives the frame origin that the pure "
+        "frame_box_from_pending() already computes; it must be removed";
+    EXPECT_NE(src.find("frame_box_from_pending"), std::string::npos) <<
+        "to_local_of() must reuse the pure frame_box_from_pending() "
+        "origin derivation instead of hard-coding {-margins.left, "
+        "-margins.top}";
+}
 } // namespace

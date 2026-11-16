@@ -57,32 +57,29 @@ namespace emeraldwf
 // surface-root coordinate system (spec 04 §1): the frame's top-left is that far
 // above-left of the client's top-left. Frame (node-local) coords = parent
 // coords - offset.
-static wf::pointf_t node_offset_of(const emerald_decorator_t & deco)
-{
-    // The frame's top-left in parent (surface-root) coords is
-    // {-margins.left, -margins.top} (see frame_box_for) — the node's local
-    // origin sits at that point, so the offset is NEGATIVE. A positive
-    // offset here shifted every input coordinate by (-left, -top), landing
-    // titlebar presses above the frame and killing move/resize (part 06).
-    //
-    // Uses pending().margins (the value wayfire itself uses to size the
-    // client surface as shrink(geometry, margins)) so the input offset and
-    // the bounding-box origin can never disagree.
-    auto view = deco.view_for_offsets();
-    if (view == nullptr)
-    {
-        return {0, 0};
-    }
-
-    const auto & pending = view->toplevel()->pending();
-    return {-(double)pending.margins.left, -(double)pending.margins.top};
-}
-
+//
+// Minor (issue #1): the frame origin is derived by the pure, unit-tested
+// frame_box_from_pending() (emerald-node-pure.cpp) instead of being
+// hand-rolled here — a duplicated coordinate transform that had drifted
+// apart. Uses pending().margins (the value wayfire itself uses to size the
+// client surface as shrink(geometry, margins)) so the input offset and the
+// bounding-box origin can never disagree. The final subtraction stays in
+// doubles so fractional pointer coordinates are preserved.
 static wf::pointf_t to_local_of(const emerald_decorator_t & deco,
     wf::pointf_t parent)
 {
-    auto off = node_offset_of(deco);
-    return {parent.x - off.x, parent.y - off.y};
+    auto view = deco.view_for_offsets();
+    if (view == nullptr)
+    {
+        return parent;
+    }
+
+    const auto & pending = view->toplevel()->pending();
+    const auto box = frame_box_from_pending({
+                0, 0,
+                (int)pending.margins.left, (int)pending.margins.right,
+                (int)pending.margins.bottom, (int)pending.margins.top});
+    return {parent.x - (double)box.x, parent.y - (double)box.y};
 }
 
 // ── Node-local coord conversion + live view (used by state updates) ─────────
