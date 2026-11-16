@@ -84,16 +84,23 @@ jobs:
           case "$LIBDIR" in /*) : ;; *) LIBDIR="/usr/$LIBDIR" ;; esac
           test -f "$LIBDIR/wayfire/libemeraldwf.so"
           test -f "$LIBDIR/emeraldwf/libemeraldengine.so"
-          test "$(ls "$LIBDIR/emeraldwf/engines" | grep -c '\.so')" -eq 7
+          # Count the versioned engine files (libX.so.MAJOR.MINOR.PATCH), not
+          # every directory entry: the install places 3 entries per engine
+          # (the versioned file + the libX.so.0 / libX.so symlinks), so a
+          # bare `ls | grep -c '\.so'` would count 21, not 7. -type f keeps
+          # the count to regular files (never the symlinks).
+          test "$(find "$LIBDIR/emeraldwf/engines" -maxdepth 1 -type f -name 'lib*.so.*' -printf '%f\n' | grep -cE '^lib.*\.so\.[0-9]+\.[0-9]+\.[0-9]+$')" -eq 7
       - uses: actions/upload-artifact@v4
         with:
           name: emeraldwf-native
           path: build/src/libemeraldwf.so
 
   # per-distro build + test jobs (no session; the visible-GUI path is the
-  # local QEMU harness in e2e/distros/, intentionally not in CI). gtest is
-  # installed in both distro images, so the source-hygiene tests run here too
-  # (the display-only engine-pane test self-skips in the headless container).
+  # local QEMU harness in e2e/distros/, intentionally not in CI). gtest and
+  # the other test RUNTIME deps (awk/git/ImageMagick/fonts — the base images
+  # are minimal and the suite needs them) are installed in both images, so
+  # the full test suite runs here too (the display-only engine-pane test
+  # self-skips in the headless container).
   distro-compile:
     name: build + test (${{ matrix.distro }})
     runs-on: ubuntu-latest
@@ -115,15 +122,23 @@ jobs:
               # old, breaking the build with incompatible libraries. -Syu keeps
               # the system consistent; the pinned image above keeps the base
               # deterministic.
+              # imagemagick: the emeraldwf-e2e-script test uses `convert`
+              # (imgcmp) — not in the base image.
               pacman -Syu --noconfirm --needed base-devel git meson ninja pkgconf \
-                wayfire glm gtk3 gdk-pixbuf2 cairo glib2 libx11 pango gtest
+                wayfire glm gtk3 gdk-pixbuf2 cairo glib2 libx11 pango gtest \
+                imagemagick
           - distro: opensuse
             image: opensuse/tumbleweed:latest
             install: |
+              # gawk/git/ImageMagick/dejavu-fonts: test RUNTIME deps the
+              # base image lacks — the script-block tests extract with
+              # awk, the vendor_check tests need git, imgcmp needs
+              # `convert`, and the Pango text-metric tests need a font.
               zypper --non-interactive install --no-recommends \
                 gcc gcc-c++ make glm-devel wayfire wayfire-devel meson ninja pkgconf \
                 gtk3-devel gdk-pixbuf-devel cairo-devel glib2-devel libX11-devel \
-                pango-devel gtest Mesa-libGLESv3-devel
+                pango-devel gtest Mesa-libGLESv3-devel \
+                gawk git ImageMagick dejavu-fonts
     container: ${{ matrix.image }}
     steps:
       - uses: actions/checkout@v4

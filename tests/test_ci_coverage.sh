@@ -47,6 +47,40 @@ else
     echo "FAIL: the distro jobs are compile-only (no meson test)"; fail=1
 fi
 
+# 4. The install.sh verification must count the VERSIONED engine files
+#    (libX.so.MAJOR.MINOR.PATCH), not every directory entry: the install
+#    places 3 entries per engine (libX.so.0.1.0 + the libX.so.0 / libX.so
+#    symlinks), so a bare `ls | grep -c '\.so'` counts 3x (7 engines ->
+#    21) and the check fails.
+eng_count_line="$(grep -F 'emeraldwf/engines' "$CI" | grep -F 'grep -c' || true)"
+if printf '%s\n' "$eng_count_line" | grep -qF 'so\.[0-9]'; then
+    echo "ok: the engine count check counts versioned .so files"
+else
+    echo "FAIL: the engine count check must count versioned .so files (libX.so.M.N.P), not all dir entries"; fail=1
+fi
+
+# 5. The distro base images are minimal: the test suite needs runtime tools
+#    they do not ship (awk for the script-block extraction tests, git for
+#    the vendor_check tests, ImageMagick `convert` for imgcmp, and a font
+#    for the Pango text-metric tests). The distro install steps must carry
+#    them, or `meson test` goes red there while green on ubuntu.
+arch_block="$(printf '%s\n' "$distro_block" | sed -n '/distro: arch/,/distro: opensuse/p')"
+osu_block="$(printf '%s\n' "$distro_block" | sed -n '/distro: opensuse/,$p')"
+for pkg in imagemagick; do
+    if printf '%s\n' "$arch_block" | grep -q "$pkg"; then
+        echo "ok: arch image installs $pkg (test runtime dep)"
+    else
+        echo "FAIL: arch image must install $pkg"; fail=1
+    fi
+done
+for pkg in gawk git ImageMagick dejavu-fonts; do
+    if printf '%s\n' "$osu_block" | grep -q "$pkg"; then
+        echo "ok: opensuse image installs $pkg (test runtime dep)"
+    else
+        echo "FAIL: opensuse image must install $pkg"; fail=1
+    fi
+done
+
 if [ "$fail" -ne 0 ]; then
     exit 1
 fi
