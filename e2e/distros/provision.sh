@@ -95,8 +95,18 @@ wf_ge_011() {
 build_wayfire_from_source() {
   # Mirrors the ci.yml `native` job; installs wayfire v0.11.0 into /usr.
   log "building wayfire from source (ci.yml recipe) — this takes a while"
-  pip3 install --break-system-packages --upgrade meson 2>/dev/null \
-    || pip3 install --upgrade meson 2>/dev/null || true
+  # Install the pinned meson (the from-source builds below require
+  # meson >= 1.4.0; the distro meson is older). Try the PEP 668 flag first,
+  # then fall back. Do NOT swallow failure: a missing/old meson must fail
+  # loudly, not silently proceed to a broken from-source build.
+  pip3 install --break-system-packages "meson==1.12.1" 2>/dev/null \
+    || pip3 install "meson==1.12.1" 2>/dev/null
+  local meson_ver
+  meson_ver="$(meson --version 2>/dev/null | head -1 || echo 0.0.0)"
+  if [ "$(printf '%s\n1.4.0\n' "$meson_ver" | sort -V | head -1)" != "1.4.0" ]; then
+    log "ERROR: meson >= 1.4.0 required for the from-source builds (got: ${meson_ver:-none})"
+    return 1
+  fi
   git clone --depth 1 --branch 1.24.0 \
       https://gitlab.freedesktop.org/wayland/wayland /tmp/wl
   ( cd /tmp/wl && meson setup build --prefix=/usr -Ddocumentation=false \

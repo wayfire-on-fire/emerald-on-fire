@@ -205,6 +205,11 @@ emeraldwf_makefile_docker = executable('emeraldwf-makefile-docker',
     dependencies: [gtest, gtest_main])
 test('emeraldwf-makefile-docker', emeraldwf_makefile_docker)
 
+# Minor (issue #1): the Dockerfile and e2e/distros/provision.sh must install a
+# PINNED meson via pip (an unpinned `meson` lets a future release silently
+# change the build tool and break the from-source builds). Shell-level test.
+test('emeraldwf-ci-meson-pin', find_program('test_ci_meson_pin.sh'))
+
 # M28 (issue #1): install.sh WF_PLUGDIR must be the dir the plugin was
 # installed into ($LIBDIR/wayfire) - shell-level test: extracts the
 # assignment and evaluates it with a stubbed pkg-config (fail + ok +

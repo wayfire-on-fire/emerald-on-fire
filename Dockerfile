@@ -62,8 +62,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # noble ships meson 1.3.2, but xkbcommon 1.13.x and a wayfire subproject require
 # meson >= 1.4.0. The pip meson lands in /usr/local/bin (ahead of the apt one in
 # PATH), so every from-source build below uses it. (--break-system-packages:
-# noble enables PEP 668.)
-RUN python3 -m pip install --break-system-packages --upgrade meson
+# noble enables PEP 668.) Pinned to a known-good version so a future meson
+# release cannot silently change the build tool (and break the from-source
+# builds below).
+RUN python3 -m pip install --break-system-packages "meson==1.12.1"
 
 # Build wayland 1.24.0 from source: noble ships wayland 1.22, but wayfire
 # 0.11.0's bundled wlroots requires wayland-server >= 1.24.0. Installed to
