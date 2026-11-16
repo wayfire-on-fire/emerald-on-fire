@@ -79,7 +79,6 @@ GtkWidget * DeleteButton;
 GtkWidget * ImportButton;
 GtkWidget * ExportButton;
 GtkWidget * QuitButton;
-gchar * themecache;
 
 static gint8 version_compare(const gchar *str1, const gchar *str2)
 {
@@ -922,8 +921,12 @@ static void layout_button_box(GtkWidget * vbox, gint b_t)
 
     table_append(gtk_label_new(b_names[b_t]),FALSE);
 
-    filesel=gtk_file_chooser_button_new(g_strdup_printf("%s Button Pixmap",b_names[b_t]),
+    /* The title is copied by the widget, so the g_strdup_printf result must
+       be freed (pre-fix it was a leaked temporary). */
+    gchar * fc_title = g_strdup_printf("%s Button Pixmap",b_names[b_t]);
+    filesel=gtk_file_chooser_button_new(fc_title,
             GTK_FILE_CHOOSER_ACTION_OPEN);
+    g_free(fc_title);
     table_append(filesel,FALSE);
     imgfilter = gtk_file_filter_new();
     gtk_file_filter_set_name(imgfilter,"Images");
@@ -1782,29 +1785,6 @@ GtkWidget * build_tree_view()
     gtk_box_pack_startC(vbox,scrollwin,TRUE,TRUE,0);
     return vbox;
 }
-void import_cache(GtkWidget * progbar)
-{
-    GDir * d;
-    d = g_dir_open(themecache,0,NULL);
-    if (d)
-    {
-        gchar * n;
-        while((n = (gchar *) g_dir_read_name(d)))
-        {
-            gchar * fn;
-            if (g_str_has_suffix(n,".emerald"))
-            {
-              fn = g_strconcat(themecache,"/",NULL);
-	      fn = g_strconcat(fn,n,NULL);
-                import_theme(fn);
-                g_free(fn);
-                gtk_progress_bar_pulse(GTK_PROGRESS_BAR(progbar));
-            }
-        }
-        g_free(n);
-        g_dir_close(d);
-    }
-}
 void cb_quit(GtkWidget * w, gpointer p)
 {
     gtk_widget_destroy(mainWindow);
@@ -1939,8 +1919,15 @@ int main(int argc, char * argv[])
     dbus_g_thread_init();
 #endif
 
-    g_mkdir_with_parents(g_strdup_printf("%s/.emerald/theme/",g_get_home_dir()),00755);
-    g_mkdir_with_parents(g_strdup_printf("%s/.emerald/themes/",g_get_home_dir()),00755);
+    /* g_mkdir_with_parents does not take ownership of the path, so the
+       g_strdup_printf results must be freed (pre-fix they were leaked
+       temporaries). */
+    gchar * theme_dir = g_strdup_printf("%s/.emerald/theme/",g_get_home_dir());
+    g_mkdir_with_parents(theme_dir,00755);
+    g_free(theme_dir);
+    gchar * themes_dir = g_strdup_printf("%s/.emerald/themes/",g_get_home_dir());
+    g_mkdir_with_parents(themes_dir,00755);
+    g_free(themes_dir);
 
     init_key_files();
 

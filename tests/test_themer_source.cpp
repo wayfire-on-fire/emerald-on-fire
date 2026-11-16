@@ -257,4 +257,38 @@ TEST(ThemerSource, SaveRejectsDotAndDotDot)
         "cb_save() must reject the theme name '..' (it would write into "
         "~/.emerald/)";
 }
+
+// Minor (issue #1): the themer carried dead code and `g_strdup_printf`
+// temporary leaks.
+// (1) import_cache() was defined but never called — dead code.
+// (2) Three `g_strdup_printf` results were passed directly as arguments to
+// functions that COPY the string (gtk_file_chooser_button_new takes a
+// title it copies; g_mkdir_with_parents does not take ownership). The
+// allocations were never freed.
+// The "dlopen all engines at startup" part of this finding is upstream-parity
+// (init_engine_list must dlopen each engine .so to build the engine-list UI)
+// and is verified-and-skipped, not fixed here.
+TEST(ThemerSource, NoDeadCodeOrStrdupLeaks)
+{
+    const std::string src =
+        read_file(std::string{EMERALDWF_TEST_SOURCE_ROOT} + "/themer/main.c");
+    ASSERT_FALSE(src.empty()) << "themer/main.c must be readable";
+
+    // (1) The dead import_cache() function must be removed.
+    EXPECT_EQ(src.find("import_cache("), std::string::npos) <<
+        "import_cache() is defined but never called — dead code; remove it";
+
+    // (2a) The file-chooser title must not be a leaked g_strdup_printf
+    // temporary (gtk_file_chooser_button_new copies the title).
+    EXPECT_EQ(src.find("gtk_file_chooser_button_new(g_strdup_printf"),
+        std::string::npos) <<
+        "the file-chooser title is a leaked g_strdup_printf temporary";
+
+    // (2b) g_mkdir_with_parents must not be called with a g_strdup_printf
+    // temporary (it does not take ownership of the path).
+    EXPECT_EQ(src.find("g_mkdir_with_parents(g_strdup_printf"),
+        std::string::npos) <<
+        "g_mkdir_with_parents is called with a leaked g_strdup_printf "
+        "temporary (the path is not freed)";
+}
 } // namespace
