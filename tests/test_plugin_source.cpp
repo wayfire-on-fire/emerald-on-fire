@@ -469,4 +469,26 @@ TEST(PluginSource, ReloadEngineChangeLogComparesPreviousEngine)
         "the engine-change comparison must not be against the override (ov) "
         "(empty when unset - the source of the spurious log)";
 }
+
+// Minor (issue #1): the last_stamp map (file stamps for the watched paths)
+// was never pruned. When the theme_dir option changes, the watched set swaps
+// (emerald_watched_paths() derives the paths from last_theme_dir), but the
+// old paths' stamps stay in the map forever - stale entries accumulate.
+// Prune last_stamp to the currently-watched paths in poll_tick().
+TEST(PluginSource, LastStampPrunedToWatchedPaths)
+{
+    const std::string src =
+        read_file(std::string{EMERALDWF_TEST_SOURCE_ROOT} + "/src/plugin.cpp");
+    ASSERT_FALSE(src.empty()) << "src/plugin.cpp must be readable";
+
+    const std::string body =
+        fn_body(src, "bool emeraldwf_plugin::poll_tick(");
+    ASSERT_FALSE(body.empty()) <<
+        "could not locate emeraldwf_plugin::poll_tick()";
+
+    EXPECT_NE(body.find("last_stamp.erase"), std::string::npos) <<
+        "poll_tick() must prune last_stamp entries for paths no longer "
+        "watched (a theme_dir change swaps the watched set; the old entries "
+        "were never removed)";
+}
 } // namespace

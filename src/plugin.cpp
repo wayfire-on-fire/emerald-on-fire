@@ -19,6 +19,7 @@
 #include <wayfire/util/log.hpp>
 #include <wayfire/plugins/ipc/ipc-activator.hpp>
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <ctime>
@@ -616,6 +617,21 @@ bool emeraldwf_plugin::poll_tick()
 {
     std::vector<std::string> paths;
     emerald_watched_paths(paths);
+
+    // Minor (issue #1): prune stamps for paths no longer watched. A theme_dir
+    // option change swaps the watched set (emerald_watched_paths() derives the
+    // paths from last_theme_dir); the old paths' stamps were never removed, so
+    // the map accumulated stale entries. Keep only the current watched paths.
+    for (auto it = last_stamp.begin(); it != last_stamp.end();)
+    {
+        if (std::find(paths.begin(), paths.end(), it->first) == paths.end())
+        {
+            it = last_stamp.erase(it);
+        } else
+        {
+            ++it;
+        }
+    }
 
     bool emerald_changed = false;
     for (auto & p : paths)
