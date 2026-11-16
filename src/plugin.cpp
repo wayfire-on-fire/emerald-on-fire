@@ -725,9 +725,14 @@ void emeraldwf_plugin::reload_theme()
 
     // Swap the engine before publishing the new theme (the loader already
     // dlopen'd it; emerald_engine_load() closes the previous engine's ws).
-    if (new_theme->engine() != ov)
+    // Minor (issue #1): compare against the PREVIOUS engine (theme->engine()),
+    // not the override. The override is empty when no override is set, so the
+    // old comparison (new_theme->engine() != ov) fired this log spuriously on
+    // every reload (e.g. "engine changed  → legacy"). theme is always set here
+    // (init loads it before any reload can arm).
+    if (new_theme->engine() != theme->engine())
     {
-        LOGI("emeraldwf: engine changed %s → %s", ov,
+        LOGI("emeraldwf: engine changed %s → %s", theme->engine(),
             new_theme->engine());
     }
 

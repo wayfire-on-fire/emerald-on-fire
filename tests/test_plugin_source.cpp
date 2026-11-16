@@ -445,4 +445,28 @@ TEST(PluginSource, ScrollShadeHonorsNoScrollShadeForCsd)
         "scroll_shade() must honor no_scroll_shade for CSD views (pre-fix "
         "only the SSD path checked titlebar_no_scroll_shade)";
 }
+
+// Minor (issue #1): reload_theme() logged "engine changed ov -> X" when
+// new_theme->engine() != ov, comparing against the OVERRIDE. The override is
+// empty when no override is set, so the log fired spuriously on every reload
+// (e.g. "engine changed  -> legacy"). Compare against the PREVIOUS engine
+// (theme->engine()) so the log only fires on a real engine change.
+TEST(PluginSource, ReloadEngineChangeLogComparesPreviousEngine)
+{
+    const std::string src =
+        read_file(std::string{EMERALDWF_TEST_SOURCE_ROOT} + "/src/plugin.cpp");
+    ASSERT_FALSE(src.empty()) << "src/plugin.cpp must be readable";
+
+    const std::string body =
+        fn_body(src, "void emeraldwf_plugin::reload_theme(");
+    ASSERT_FALSE(body.empty()) <<
+        "could not locate emeraldwf_plugin::reload_theme()";
+
+    EXPECT_NE(body.find("theme->engine()"), std::string::npos) <<
+        "reload_theme() must compare the new engine against the previous "
+        "engine (theme->engine()), not the override";
+    EXPECT_EQ(body.find("!= ov"), std::string::npos) <<
+        "the engine-change comparison must not be against the override (ov) "
+        "(empty when unset - the source of the spurious log)";
+}
 } // namespace
