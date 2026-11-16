@@ -153,6 +153,10 @@ DATADIR=$(pkg-config --variable=datadir wayfire 2>/dev/null)
 atomic_install() {  # srcfile destdir
     local src="$1" dir="$2" tmp
     tmp=$(mktemp "$dir/.install.XXXXXX")
+    # Register the exact temp path so cleanup_on_exit removes ONLY this
+    # invocation's temps (a dir-wide .install.* glob could delete a
+    # CONCURRENT installer's temps).
+    INSTALL_TMP_FILES+=("$tmp")
     cp "$src" "$tmp"
     # mktemp creates 0600 and cp into an EXISTING file never changes the
     # destination's mode — without this, every installed .so lands as
@@ -164,6 +168,8 @@ atomic_install() {  # srcfile destdir
 atomic_link() {  # target destdir linkname
     local tgt="$1" dir="$2" name="$3" tmp
     tmp=$(mktemp -u "$dir/.link.XXXXXX")
+    # Register the exact temp path (see atomic_install).
+    INSTALL_TMP_FILES+=("$tmp")
     ln -s "$tgt" "$tmp"
     mv -f "$tmp" "$dir/$name"
 }
@@ -201,10 +207,25 @@ is_versioned_so() {
 # left a window where the theme was missing/incomplete. Populating the temp
 # dir BEFORE the rm makes the swap a single fast rename (the window is one
 # syscall, not the whole copy).
+# ── temp-file cleanup (one EXIT trap, set early, not clobbered) ─────────────
+# atomic_install / atomic_link create .install.XXXXXX / .link.XXXXXX temps in
+# the target (system) dir and rename them into place; an interrupted script
+# leaves them behind in a system dir. Each helper registers its EXACT temp path
+# in INSTALL_TMP_FILES right after mktemp, so cleanup_on_exit removes only THIS
+# invocation's temps (never a concurrent installer's, and never the installed
+# files). It also removes an in-flight default-theme temp dir (tracked in
+# DEFAULT_THEME_TMP). The trap is set ONCE, after the target dirs are known;
+# refresh_default_theme tracks its temp in DEFAULT_THEME_TMP (no separate trap,
+# so this trap is not clobbered by the theme refresh).
+INSTALL_TMP_FILES=()
 DEFAULT_THEME_TMP=""
-cleanup_default_theme_tmp() {
+cleanup_on_exit() {
+    local f
+    for f in "${INSTALL_TMP_FILES[@]}"; do
+        [ -n "$f" ] && rm -f -- "$f" 2>/dev/null
+    done
     if [ -n "$DEFAULT_THEME_TMP" ] && [ -d "$DEFAULT_THEME_TMP" ]; then
-        rm -rf "$DEFAULT_THEME_TMP"
+        rm -rf -- "$DEFAULT_THEME_TMP"
     fi
 }
 
@@ -214,7 +235,6 @@ refresh_default_theme() {  # destdir
     mkdir -p "$parent"
     tmp="$(mktemp -d "$parent/.emeraldwf-defaults.XXXXXX")" || return 1
     DEFAULT_THEME_TMP="$tmp"
-    trap cleanup_default_theme_tmp EXIT
     cp -r "$DEFAULTS/theme" "$tmp/theme"
     # Backup-and-swap: rename the old dir out (fast), rename the new one in
     # (fast), THEN remove the old (slow) - so the window of a missing theme is
@@ -253,6 +273,12 @@ if [ ! -w "$LIBDIR/wayfire" ] || [ ! -w "$LIBDIR/emeraldwf/engines" ]; then
     echo "writable. Re-run with:  sudo $0 $*" >&2
     exit 1
 fi
+
+# Clean up any .install.* / .link.* temps an interrupted install leaves in the
+# target (system) dirs, on exit (normal or interrupted). The helpers register
+# their exact temp paths in INSTALL_TMP_FILES; the trap is set here, once,
+# before any atomic placement runs.
+trap cleanup_on_exit EXIT
 
 atomic_install "$BUILD/src/libemeraldwf.so" "$LIBDIR/wayfire"
 echo "==> libemeraldwf.so → $LIBDIR/wayfire"

@@ -228,6 +228,11 @@ test('emeraldwf-install-builtree', find_program('test_install_builtree.sh'))
 # running plugin sees a missing/incomplete theme. Shell-level test.
 test('emeraldwf-install-defaulttheme', find_program('test_install_defaulttheme.sh'))
 
+# Minor (issue #1): install.sh must clean up .install.XXXXXX / .link.XXXXXX
+# temps (from an interrupted atomic_install/atomic_link) on exit via a trap.
+# Shell-level test.
+test('emeraldwf-install-tmpcleanup', find_program('test_install_tmpcleanup.sh'))
+
 # ---- part 07: engine pane / engine module lifetime (findings 46/47) ----
 # Regression for the "Round Top Left Corner" SEGV_MAPERR: append_engine's
 # dlclose unmapped the engine .so (static-vendored libemeraldengine) while
