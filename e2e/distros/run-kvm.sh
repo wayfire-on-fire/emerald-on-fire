@@ -172,6 +172,16 @@ bring_up() {  # distro [extra provision args...]
   local idx port
   idx="$(row_index "$d")"; port=$((2200 + idx))
 
+  # A re-run against a LIVE VM would silently target the stale guest: the
+  # deterministic port is already bound by the old QEMU (so the new QEMU fails
+  # to start), and the pgrep below that finds the "new" pid would instead match
+  # the OLD QEMU. Refuse to launch over a running VM — destroy it first.
+  local existing
+  existing="$(pgrep -f "qemu-system-x86_64.*emeraldwf-$d\"" | head -1)"
+  if [ -n "$existing" ]; then
+    die "a QEMU is already running for '$d' (pid $existing, ssh -> 127.0.0.1:$port); run '$0 destroy $d' first"
+  fi
+
   ensure_ssh_key
   fetch_image "$d" "$URL" "$SHA"
   local base="$IMAGES/$d.qcow2"
@@ -205,7 +215,7 @@ bring_up() {  # distro [extra provision args...]
     -monitor "unix:$rundir/mon.sock,server,nowait" \
     >"$rundir/qemu.log" 2>&1 &
   sleep 2
-  local qpid; qpid="$(pgrep -f "qemu-system-x86_64.*emeraldwf-$d" | head -1)"
+  local qpid; qpid="$(pgrep -f "qemu-system-x86_64.*emeraldwf-$d\"" | head -1)"
   [ -n "$qpid" ] || die "QEMU did not start (see $rundir/qemu.log)"
   echo "$qpid" > "$rundir/qemu.pid"
   log "qemu pid=$qpid (window title: 'emeraldwf-$d')"

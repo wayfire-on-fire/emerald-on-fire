@@ -191,6 +191,11 @@ test('emeraldwf-themer-import', find_program('test_themer_import.sh'))
 # script needs qemu + network).
 test('emeraldwf-run-kvm-fetch', find_program('test_run_kvm_fetch.sh'))
 
+# Minor (issue #1): run-kvm.sh's bring_up() must refuse to launch a new QEMU
+# when one is already running for the distro (a re-run against a live VM would
+# silently target the stale guest via the deterministic port). Shell-level test.
+test('emeraldwf-run-kvm-livewm', find_program('test_run_kvm_livewm.sh'))
+
 # M26 (issue #1): matrix.sh must exit non-zero when any distro fails
 # (shell-level test: extracts the collect_results() block and runs it
 # with a stubbed wait - the real script needs qemu + /dev/kvm).
