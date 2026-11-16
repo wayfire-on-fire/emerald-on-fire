@@ -8,7 +8,7 @@
 PWD   := $(shell pwd)
 IMAGE := emeraldwf-dev
 
-.PHONY: build binary test build-local clean
+.PHONY: build binary test build-docker build-local clean
 
 # ==========================================
 # TOOLCHAIN IMAGE
@@ -18,15 +18,20 @@ build:
 	docker build -t $(IMAGE) .
 
 # ==========================================
-# PRODUCTION (ephemeral Docker) -> ./dist
+# SINGLE Docker build: compile ONCE (release), run the tests against that same
+# build, and package the artifacts into ./dist. Pre-fix CI built the plugin
+# TWICE (a release `binary` build AND a separate debug `test` build); now one
+# release build serves both the artifact and the test suite (a release build
+# runs the gtest suite fine).
 # ==========================================
-binary: build
-	@echo "Compiling the plugin inside Docker..."
+build-docker: build
+	@echo "Compiling the plugin inside Docker (one build: tests + artifact)..."
 	docker run --rm -v $(PWD):/app $(IMAGE) bash -c '\
 		git config --global --add safe.directory /app; \
 		rm -rf build-docker dist; \
 		meson setup build-docker --buildtype=release --prefix=/usr; \
 		ninja -C build-docker; \
+		meson test -C build-docker; \
 		mkdir -p dist/wayfire dist/emeraldwf/engines; \
 		cp build-docker/src/libemeraldwf.so dist/wayfire/; \
 		cp build-docker/libengine/libemeraldengine.so* dist/emeraldwf/; \
@@ -37,15 +42,14 @@ binary: build
 	@ls -R dist
 
 # ==========================================
-# TESTS (gtest suite inside the toolchain container)
+# PRODUCTION artifact (the single shared release build; also runs the tests)
 # ==========================================
-test: build
-	docker run --rm -v $(PWD):/app $(IMAGE) bash -c '\
-		git config --global --add safe.directory /app; \
-		rm -rf build-docker; \
-		meson setup build-docker; \
-		ninja -C build-docker; \
-		meson test -C build-docker'
+binary: build-docker
+
+# ==========================================
+# TESTS (run against the same single release build; no second compile)
+# ==========================================
+test: build-docker
 
 # ==========================================
 # LOCAL (host needs wayfire>=0.11, gtk3, meson, ninja)

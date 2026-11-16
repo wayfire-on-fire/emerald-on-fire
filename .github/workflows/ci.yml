@@ -9,10 +9,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Build toolchain image + plugin
-        run: make binary
-      - name: Run test suite in the toolchain container
-        run: make test
+      # A SINGLE make invocation: binary and test share the build-docker
+      # prerequisite, so the plugin is compiled ONCE (a .PHONY target would
+      # run again under a separate `make` call). The release build runs the
+      # gtest suite and packages the ./dist artifact.
+      - name: Build toolchain image + plugin, run tests, package artifacts
+        run: make binary test
       - name: Verify artifacts
         run: |
           test -f dist/wayfire/libemeraldwf.so

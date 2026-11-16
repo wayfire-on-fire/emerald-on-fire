@@ -1,10 +1,10 @@
 // test_makefile_docker.cpp — source-structure test for the Makefile's
 // Docker build (M27, issue #1).
 //
-// The `binary` target compiles the plugin in the toolchain image and
+// The dist build compiles the plugin in the toolchain image and
 // ships the artifacts in ./dist. The themer's rpath and libengine's
 // ENGINE_DIR are baked from meson's `prefix` option at setup time.
-// Pre-M27 the target ran `meson setup build-docker --buildtype=release`
+// Pre-M27 the dist build ran `meson setup build-docker --buildtype=release`
 // with no --prefix, so the artifacts carried /usr/local (meson's
 // default) while the image's wayfire is installed into /usr (see the
 // Dockerfile): the shipped themer could not find libemeraldengine.so
@@ -62,16 +62,15 @@ TEST(MakefileDocker, BinaryTargetsTheImagePrefix)
         "the Dockerfile must install wayfire into /usr (the reference "
         "prefix for the dist artifacts)";
 
-    // (2) The Makefile's binary target must use the SAME prefix for the
-    // dist build.
-    const size_t bin = makefile.find("binary: build");
-    ASSERT_NE(bin, std::string::npos) << "could not locate the binary target";
-    const size_t msetup = makefile.find("meson setup build-docker", bin);
+    // (2) The Makefile's dist build must use the SAME prefix for the
+    // dist build. (There is a single shared `meson setup build-docker` line —
+    // the one release build that serves both the artifact and the tests.)
+    const size_t msetup = makefile.find("meson setup build-docker");
     ASSERT_NE(msetup, std::string::npos) <<
-        "the binary target must set up a build-docker dir";
+        "the Makefile must set up a build-docker dir";
     const std::string m_line = line_at(makefile, msetup);
     EXPECT_NE(m_line.find("--prefix=/usr"), std::string::npos) <<
-        "the binary target must pass --prefix=/usr to meson setup "
+        "the dist build must pass --prefix=/usr to meson setup "
         "(M27) — pre-fix it used meson's /usr/local default, so the "
         "dist themer's rpath/ENGINE_DIR pointed outside the image";
 }

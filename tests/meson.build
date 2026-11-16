@@ -210,6 +210,12 @@ test('emeraldwf-makefile-docker', emeraldwf_makefile_docker)
 # change the build tool and break the from-source builds). Shell-level test.
 test('emeraldwf-ci-meson-pin', find_program('test_ci_meson_pin.sh'))
 
+# Minor (issue #1): the Makefile CI (Docker) path must build the plugin ONCE
+# (a single release build serves both the artifact and the test suite), not
+# twice (a release `binary` build + a separate debug `test` build).
+# Shell-level test.
+test('emeraldwf-makefile-single-build', find_program('test_makefile_single_build.sh'))
+
 # M28 (issue #1): install.sh WF_PLUGDIR must be the dir the plugin was
 # installed into ($LIBDIR/wayfire) - shell-level test: extracts the
 # assignment and evaluates it with a stubbed pkg-config (fail + ok +
