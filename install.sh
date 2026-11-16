@@ -155,15 +155,19 @@ atomic_link() {  # target destdir linkname
     mv -f "$tmp" "$dir/$name"
 }
 
-# A versioned .so plus its .so.0 / .so symlinks (the build dir also
-# contains .so.0.1.0.p object dirs — copy the exact versioned file).
+# A versioned .so plus its .so.<major> / .so symlinks (the build dir also
+# contains .so.<ver>.p object dirs — copy the exact versioned file). The
+# symlink names are DERIVED from the filename (strip .patch, then .minor),
+# not hardcoded, so a version bump does not silently break the install.
 atomic_versioned_so() {  # srcfile destdir
     local src="$1" dir="$2"
-    local real="${src##*/}"           # libfoo.so.0.1.0
-    local sover="${real%.1.0}"        # libfoo.so.0
+    local real="${src##*/}"            # libfoo.so.0.1.0
+    local sover="${real%.*}"           # libfoo.so.0.1   (strip .patch)
+    sover="${sover%.*}"                # libfoo.so.0     (strip .minor)
+    local unver="${real%%.so.*}.so"    # libfoo.so
     atomic_install "$src" "$dir"
     atomic_link "$real" "$dir" "$sover"
-    atomic_link "$sover" "$dir" "${sover%.0}"
+    atomic_link "$sover" "$dir" "$unver"
 }
 
 echo "==> installing (plugin, engines, metadata, icon)"
@@ -189,18 +193,34 @@ fi
 atomic_install "$BUILD/src/libemeraldwf.so" "$LIBDIR/wayfire"
 echo "==> libemeraldwf.so → $LIBDIR/wayfire"
 
-for f in "$BUILD"/engines/lib*.so.0.1.0; do
+# Install every versioned engine .so (a REGULAR file with a version suffix —
+# skips the .so / .so.<major> symlinks and the .so.<ver>.p object dirs). The
+# glob is version-agnostic so a version bump does not silently install zero
+# engines.
+n_engines=0
+for f in "$BUILD"/engines/lib*.so.*; do
+    [ -f "$f" ] && [ ! -L "$f" ] || continue
     atomic_versioned_so "$f" "$LIBDIR/emeraldwf/engines"
+    n_engines=$((n_engines + 1))
 done
-echo "==> 7 engines → $LIBDIR/emeraldwf/engines"
+echo "==> $n_engines engines → $LIBDIR/emeraldwf/engines"
 
+# The engine library (libemeraldengine.so) is a versioned .so too; find the
+# exact versioned file (a regular file, not a symlink) rather than hardcoding
+# the version.
+eng_lib=""
+for f in "$BUILD"/libengine/libemeraldengine.so.*; do
+    if [ -f "$f" ] && [ ! -L "$f" ]; then eng_lib="$f"; break; fi
+done
+if [ -z "$eng_lib" ]; then
+    echo "FATAL: no versioned libemeraldengine.so found in $BUILD/libengine" >&2
+    exit 1
+fi
 if [ -w "$LIBDIR/emeraldwf" ]; then
-    atomic_versioned_so "$BUILD/libengine/libemeraldengine.so.0.1.0" \
-        "$LIBDIR/emeraldwf"
+    atomic_versioned_so "$eng_lib" "$LIBDIR/emeraldwf"
     echo "==> libemeraldengine.so → $LIBDIR/emeraldwf"
 else
-    atomic_versioned_so "$BUILD/libengine/libemeraldengine.so.0.1.0" \
-        "$LIBDIR/emeraldwf/engines"
+    atomic_versioned_so "$eng_lib" "$LIBDIR/emeraldwf/engines"
     echo "==> libemeraldengine.so → $LIBDIR/emeraldwf/engines (user-writable fallback)"
 fi
 

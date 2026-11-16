@@ -211,6 +211,13 @@ test('emeraldwf-makefile-docker', emeraldwf_makefile_docker)
 # non-default libdir).
 test('emeraldwf-install-plugdir', find_program('test_install_plugdir.sh'))
 
+# Minor (issue #1): install.sh must not hardcode the library version
+# ("0.1.0") - a version bump must not silently break the install. Shell-level
+# test: runs atomic_versioned_so against a non-0.1.0 version (stubbed helpers)
+# and asserts the engine glob / libemeraldengine lookup / count are
+# version-agnostic.
+test('emeraldwf-install-version', find_program('test_install_version.sh'))
+
 # ---- part 07: engine pane / engine module lifetime (findings 46/47) ----
 # Regression for the "Round Top Left Corner" SEGV_MAPERR: append_engine's
 # dlclose unmapped the engine .so (static-vendored libemeraldengine) while
