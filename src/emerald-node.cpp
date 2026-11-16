@@ -43,7 +43,6 @@ extern "C"
 #include <wayfire/opengl.hpp>
 #include <cairo.h>
 #include <wayfire/plugins/common/cairo-util.hpp>
-#include <wayfire/scene-operations.hpp>
 
 #include <pango/pango.h>
 #include <pango/pangocairo.h>

@@ -266,4 +266,43 @@ TEST(NodeSource, PointerAxisHandlerGatesOnViewOf)
     EXPECT_LT(guard, first_deco) <<
         "the view_of() guard must precede the first deco dereference";
 }
+
+// Minor (issue #1): emerald-node.cpp included <wayfire/scene-operations.hpp>
+// TWICE (harmless — the include guard makes the second a no-op — but a
+// merge/leftover smell). No translation unit in src/ may include the same
+// header twice.
+TEST(NodeSource, NoDuplicateIncludes)
+{
+    const std::string src = read_file(
+        std::string{EMERALDWF_TEST_SOURCE_ROOT} + "/src/emerald-node.cpp");
+    ASSERT_FALSE(src.empty()) << "src/emerald-node.cpp must be readable";
+
+    std::vector<std::string> includes;
+    std::stringstream ss(src);
+    std::string line;
+    while (std::getline(ss, line))
+    {
+        const std::string t = line; // trim leading whitespace
+        size_t start = t.find_first_not_of(" \t");
+        if (start == std::string::npos)
+        {
+            continue;
+        }
+
+        const std::string trimmed = t.substr(start);
+        if (trimmed.rfind("#include", 0) == 0)
+        {
+            includes.push_back(trimmed);
+        }
+    }
+
+    for (size_t i = 0; i < includes.size(); i++)
+    {
+        for (size_t j = i + 1; j < includes.size(); j++)
+        {
+            EXPECT_NE(includes[i], includes[j]) <<
+                "duplicate #include: " << includes[i];
+        }
+    }
+}
 } // namespace
