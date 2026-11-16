@@ -513,44 +513,199 @@ static void cb_load(GtkTreeView *w, gpointer d)
 static gchar * import_theme(const gchar * file)
 {
     /* first make sure we have our location */
-    gchar * fn, * at, * ot, *pot, *rstr;
+    gchar * fn, * at, * ot, *pot, *rstr, *name, *listing;
+    gchar * tmp, * tmpdir;
+    gchar **members, **m;
     gint ex;
-    ot = g_strdup(file);
-    pot=ot;
-    if (!g_str_has_suffix(ot,".emerald"))
+    pot=g_strdup(file);
+    if (!g_str_has_suffix(pot,".emerald"))
     {
         g_free(pot);
         error_dialog(_("Invalid theme file.  Does not end in .emerald"));
         return NULL;
     }
-    ot[strlen(ot)-strlen(".emerald")]='\0';
-    ot = g_strrstr(ot,"/");
-    if (!ot)
+    /* M23 (issue #1): the theme name is the BASENAME without the
+       .emerald suffix. The file chooser hands us an absolute path; the
+       old strrstr logic worked for normal paths but left path
+       components (and '..') in the name for edge cases, so the
+       extraction target could land outside the themes dir. */
     {
-        ot=pot;
+        const gchar *base = g_path_get_basename(pot);
+        name = g_strndup(base, strlen(base) - strlen(".emerald"));
     }
-    else
-        ot++;
-    rstr=g_strdup(ot);
-    fn = g_strdup_printf("%s/.emerald/themes/%s/",g_get_home_dir(),ot);
-    g_free(pot);
-    g_mkdir_with_parents(fn,00755);
-    at = g_shell_quote(fn);
-    g_free(fn);
+    /* Reject names that escape the themes dir. The basename cannot
+       contain '/', but the check is cheap and a miss means writes
+       outside ~/.emerald/themes. */
+    if (!strlen(name) ||
+        strcmp(name,".")==0 ||
+        strcmp(name,"..")==0 ||
+        strchr(name,'/')!=NULL)
+    {
+        g_free(name);
+        g_free(pot);
+        error_dialog(_("Invalid theme name."));
+        return NULL;
+    }
+    rstr = g_strdup(name);
+
+    /* M23 (issue #1): validate the archive BEFORE extracting — the
+       Import button is exactly where untrusted files enter. No
+       absolute member paths, no '..' components, no symlinks (a theme
+       is PNGs + an ini; a symlink member is an attack, not a feature). */
+    {
+        gchar *q = g_shell_quote(file);
+        ot = g_strdup_printf("tar -tzf %s", q);
+        listing = NULL;
+        if (!g_spawn_command_line_sync(ot,NULL,&listing,&ex,NULL) ||
+            !(WIFEXITED(ex)&&WEXITSTATUS(ex)==0) || !listing)
+        {
+            g_free(ot); g_free(q); g_free(name); g_free(pot);
+            error_dialog("Error reading theme archive.");
+            return NULL;
+        }
+        members = g_strsplit(listing,"\n",-1);
+        for (m=members; *m; m++)
+        {
+            if (!**m)
+                continue;
+            if ((*m)[0]=='/' ||
+                strcmp(*m,"..")==0 ||
+                g_str_has_prefix(*m,"../") ||
+                g_strstr_len(*m,-1,"/../")!=NULL ||
+                g_str_has_suffix(*m,"/.."))
+            {
+                g_strfreev(members); g_free(listing);
+                g_free(ot); g_free(q); g_free(name); g_free(pot);
+                error_dialog(_("Theme archive contains unsafe paths."));
+                return NULL;
+            }
+        }
+        g_strfreev(members);
+        g_free(listing);
+        /* type check: in 'tar -tvzf' output the FIRST char of each
+           line is the entry type. A theme is regular files ('-') and
+           directories ('d') - nothing else (ChatGPT follow-up):
+           symlinks ('l'), hardlinks ('h'), devices ('c'/'b'), FIFOs
+           ('p') and any other special entry are rejected. */
+        ot = g_strdup_printf("tar -tvzf %s", q);
+        listing = NULL;
+        if (!g_spawn_command_line_sync(ot,NULL,&listing,&ex,NULL) ||
+            !(WIFEXITED(ex)&&WEXITSTATUS(ex)==0) || !listing)
+        {
+            g_free(ot); g_free(q); g_free(name); g_free(pot);
+            error_dialog("Error reading theme archive.");
+            return NULL;
+        }
+        members = g_strsplit(listing,"\n",-1);
+        for (m=members; *m; m++)
+        {
+            if (!**m)
+                continue;
+            if ((*m)[0]!='-' && (*m)[0]!='d')
+            {
+                g_strfreev(members); g_free(listing);
+                g_free(ot); g_free(q); g_free(name); g_free(pot);
+                error_dialog(_("Theme archive contains unsupported file types."));
+                return NULL;
+            }
+        }
+        g_strfreev(members);
+        g_free(listing);
+        g_free(ot); g_free(q);
+    }
+
+    /* M23 (issue #1): extract to a TEMP dir and rename it into place —
+       a failed/half extraction must not leave a broken theme in the
+       themes list, and the rename is atomic (same filesystem). */
+    {
+        gchar *themesdir =
+            g_strdup_printf("%s/.emerald/themes", g_get_home_dir());
+        g_mkdir_with_parents(themesdir,00755);
+        g_free(themesdir);
+    }
+    tmp = g_strdup_printf("%s/.emerald/themes/.import-XXXXXX",
+        g_get_home_dir());
+    tmpdir = g_mkdtemp(tmp);
+    if (!tmpdir)
+    {
+        g_free(tmp); g_free(name); g_free(pot);
+        error_dialog("Error creating temp dir for theme import.");
+        return NULL;
+    }
+    at = g_shell_quote(tmpdir);
     fn = g_shell_quote(file);
-    ot = g_strdup_printf("tar -xzf %s -C %s",fn,at);
+    /* --no-absolute-names: strip absolute member paths explicitly
+       (tar-slip defense; the member validation above is the primary
+       guard). */
+    ot = g_strdup_printf("tar -xzf --no-absolute-names %s -C %s",fn,at);
     if (!g_spawn_command_line_sync(ot,NULL,NULL,&ex,NULL) ||
             (WIFEXITED(ex)&&WEXITSTATUS(ex)))
     {
-        g_free(fn);
-        g_free(ot);
-        g_free(at);
+        gchar *rm = g_strdup_printf("rm -rf %s", at);
+        g_spawn_command_line_sync(rm,NULL,NULL,NULL,NULL);
+        g_free(rm);
+        g_free(fn); g_free(ot); g_free(at); g_free(tmp);
+        g_free(name); g_free(pot);
         error_dialog("Error calling tar.");
         return NULL;
     }
-    g_free(fn);
-    g_free(ot);
+    g_free(fn); g_free(ot);
+    fn = g_strdup_printf("%s/.emerald/themes/%s",g_get_home_dir(),name);
+    /* M23 (issue #1, ChatGPT follow-up): if the destination EXISTS,
+       it must be a real directory - a symlink (or any other object)
+       at the destination must not be passed to a recursive delete.
+       g_file_test IS_SYMLINK does not follow the link; IS_DIRECTORY
+       does, so the pair rejects symlinked/non-directory targets. */
+    if (g_file_test(fn,G_FILE_TEST_EXISTS) &&
+        (g_file_test(fn,G_FILE_TEST_IS_SYMLINK) ||
+         !g_file_test(fn,G_FILE_TEST_IS_DIR)))
+    {
+        gchar *rm = g_strdup_printf("rm -rf %s", at);
+        g_spawn_command_line_sync(rm,NULL,NULL,NULL,NULL);
+        g_free(rm);
+        g_free(at); g_free(tmp); g_free(name); g_free(pot);
+        error_dialog(_("Error installing theme: existing target is not a directory."));
+        return NULL;
+    }
+    if (g_rename(tmpdir,fn)!=0)
+    {
+        /* re-import of an existing theme: the rename fails because the
+           destination is a non-empty dir. Swap via a unique backup so
+           a failed install cannot LOSE the previous theme (ChatGPT
+           follow-up: rm-then-rename is not atomic). */
+        gchar *bak = g_strdup_printf("%s/.emerald/themes/.%s-bak-XXXXXX",
+            g_get_home_dir(),name);
+        if (!g_mkdtemp(bak) || g_rename(fn,bak)!=0)
+        {
+            gchar *rm = g_strdup_printf("rm -rf %s", at);
+            g_spawn_command_line_sync(rm,NULL,NULL,NULL,NULL);
+            g_free(rm);
+            g_free(bak); g_free(at); g_free(tmp);
+            g_free(name); g_free(pot);
+            error_dialog("Error installing theme.");
+            return NULL;
+        }
+        if (g_rename(tmpdir,fn)!=0)
+        {
+            g_rename(bak,fn); /* restore the old theme */
+            gchar *rm = g_strdup_printf("rm -rf %s", at);
+            g_spawn_command_line_sync(rm,NULL,NULL,NULL,NULL);
+            g_free(rm);
+            g_free(bak); g_free(at); g_free(tmp);
+            g_free(name); g_free(pot);
+            error_dialog("Error installing theme.");
+            return NULL;
+        }
+        /* new theme in place - drop the backup */
+        gchar *rm = g_strdup_printf("rm -rf %s", g_shell_quote(bak));
+        g_spawn_command_line_sync(rm,NULL,NULL,NULL,NULL);
+        g_free(rm);
+        g_free(bak);
+    }
     g_free(at);
+    g_free(tmp);
+    g_free(name);
+    g_free(pot);
     /* info_dialog(_("Theme Imported")); */
     return rstr;
 }

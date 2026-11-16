@@ -173,6 +173,22 @@ test('emeraldwf-shade-source', emeraldwf_shade_source)
 # it; the script itself builds first, so it is not run whole).
 test('emeraldwf-install-home', find_program('test_install_home.sh'))
 
+# M23 (issue #1): source-structure test for the themer's theme import
+# (tar-slip: basename-derived name, pre-extraction member validation,
+# temp-dir + rename). themer/main.c is a GTK TU — not headless-linkable.
+emeraldwf_themer_source = executable('emeraldwf-themer-source',
+    ['test_themer_source.cpp'],
+    include_directories: [emerald_test_inc],
+    dependencies: [gtest, gtest_main])
+test('emeraldwf-themer-source', emeraldwf_themer_source)
+
+# M23 (issue #1, ChatGPT follow-up): pin the TAR signatures the
+# import validation relies on (entry-type chars in `tar -tvzf`, '..'
+# and absolute member paths in `tar -tzf`) against REAL tar output,
+# including malicious archives (symlink / hardlink / FIFO / '..' /
+# absolute members) built with python3 tarfile.
+test('emeraldwf-themer-import', find_program('test_themer_import.sh'))
+
 # ---- part 07: engine pane / engine module lifetime (findings 46/47) ----
 # Regression for the "Round Top Left Corner" SEGV_MAPERR: append_engine's
 # dlclose unmapped the engine .so (static-vendored libemeraldengine) while
