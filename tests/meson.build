@@ -207,6 +207,12 @@ test('emeraldwf-cloudinit-opensuse', find_program('test_cloudinit_opensuse.sh'))
 # Shell-level test.
 test('emeraldwf-provision-result-json', find_program('test_provision_result_json.sh'))
 
+# Minor (issue #1): CI coverage gaps — install.sh must RUN in CI, the
+# emeraldwf-engine-pane test (the part-07 SEGV regression) must run under a
+# display (Xvfb) so it is not silently skipped, and the distro jobs must run
+# the test suite (not just compile). Shell-level test.
+test('emeraldwf-ci-coverage', find_program('test_ci_coverage.sh'))
+
 # M26 (issue #1): matrix.sh must exit non-zero when any distro fails
 # (shell-level test: extracts the collect_results() block and runs it
 # with a stubbed wait - the real script needs qemu + /dev/kvm).

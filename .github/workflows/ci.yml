@@ -58,15 +58,44 @@ jobs:
         run: ninja -C build
       - name: Test
         run: meson test -C build --print-errorlogs
+      # The emeraldwf-engine-pane test (the part-07 SEGV regression, finding
+      # 46) dlopens the built engines and drives a GTK event loop, so it needs
+      # a display; it self-skips when none is available. Run it under Xvfb so
+      # the SEGV regression is actually tested in CI, not silently skipped.
+      # Run the binary directly (not via `meson test`) and require a PASSED
+      # result: a meson test success alone is insufficient when the test can
+      # self-skip, so a self-skip under Xvfb must fail the job.
+      - name: Test engine pane under a display (Xvfb)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb
+          xvfb-run -a ./build/tests/emeraldwf-engine-pane > /tmp/engine-pane.log 2>&1
+          grep -q '\[  PASSED  \]' /tmp/engine-pane.log \
+            || { echo "FAIL: engine-pane test did not PASS"; cat /tmp/engine-pane.log; exit 1; }
+          grep -q '\[  SKIPPED  \]' /tmp/engine-pane.log \
+            && { echo "FAIL: engine-pane test self-skipped under Xvfb"; cat /tmp/engine-pane.log; exit 1; }
+      # The docker/native jobs build the plugin but never run the install
+      # script. Run it (wayfire is installed to /usr in this job) and verify
+      # the plugin + shared engine lib + the 7 engines land in wayfire's libdir.
+      - name: Run install.sh (the real install path, not just meson install)
+        run: |
+          sudo ./install.sh --skip-tests
+          LIBDIR="$(pkg-config --variable=libdir wayfire)"
+          case "$LIBDIR" in /*) : ;; *) LIBDIR="/usr/$LIBDIR" ;; esac
+          test -f "$LIBDIR/wayfire/libemeraldwf.so"
+          test -f "$LIBDIR/emeraldwf/libemeraldengine.so"
+          test "$(ls "$LIBDIR/emeraldwf/engines" | grep -c '\.so')" -eq 7
       - uses: actions/upload-artifact@v4
         with:
           name: emeraldwf-native
           path: build/src/libemeraldwf.so
 
-  # per-distro compilation-only jobs (no session; the visible-GUI path is the
-  # local QEMU harness in e2e/distros/, intentionally not in CI)
+  # per-distro build + test jobs (no session; the visible-GUI path is the
+  # local QEMU harness in e2e/distros/, intentionally not in CI). gtest is
+  # installed in both distro images, so the source-hygiene tests run here too
+  # (the display-only engine-pane test self-skips in the headless container).
   distro-compile:
-    name: compile (${{ matrix.distro }})
+    name: build + test (${{ matrix.distro }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -104,6 +133,8 @@ jobs:
         run: meson setup build
       - name: Build (ninja)
         run: ninja -C build
+      - name: Test
+        run: meson test -C build --print-errorlogs
       - name: Verify plugin compiled
         run: |
           test -f build/src/libemeraldwf.so
