@@ -163,4 +163,49 @@ TEST(ThemerSource, ImportThemeIsTarSlipSafe)
         << "import_theme() must not run the unvalidated "
            "tar -xzf directly (M23)";
 }
+
+// M24 (issue #1): the -i (import-from-CLI) flow had a use-after-destroy.
+// create_filechooserdialog1() ran the dialog MODALLY (gtk_dialog_run),
+// destroyed it, and then RETURNED the destroyed widget pointer; main()
+// called gtk_widget_show() on that dangling pointer - a g_critical on
+// every CLI run. The dialog is fully managed inside the function, so
+// there is nothing for the caller to show: the function must return a
+// success flag (not a widget), and main must not show a result.
+TEST(ThemerSource, ImportCliDialogIsNotUsedAfterDestroy)
+{
+    const std::string src =
+        read_file(std::string{EMERALDWF_TEST_SOURCE_ROOT} + "/themer/main.c");
+    ASSERT_FALSE(src.empty()) << "themer/main.c must be readable";
+
+    // (1) The dangling return is gone: the body must not return the
+    //     destroyed dialog widget.
+    const std::string body =
+        fn_body(src, "create_filechooserdialog1(");
+    ASSERT_FALSE(body.empty()) << "could not locate create_filechooserdialog1()";
+    EXPECT_EQ(body.find("return dialog_startup"), std::string::npos)
+        << "create_filechooserdialog1() must not return the dialog "
+           "widget it just destroyed (M24) — pre-fix main() showed the "
+           "dangling pointer (g_critical on every -i run)";
+
+    // (2) The signature is no longer a widget factory: the function
+    //     returns a success flag, so the caller has nothing to show.
+    EXPECT_EQ(src.find("GtkWidget* create_filechooserdialog1"),
+        std::string::npos)
+        << "create_filechooserdialog1() must not be declared to return "
+           "a GtkWidget* (M24) — it destroys the dialog before returning; "
+           "it should return a success flag";
+    EXPECT_NE(src.find("gboolean create_filechooserdialog1"),
+        std::string::npos)
+        << "create_filechooserdialog1() must return a success flag "
+           "(ChatGPT follow-up: assert the positive contract, not only "
+           "the absence of the widget return)";
+
+    // (3) main() must not gtk_widget_show() the import dialog result.
+    const std::string main_body = fn_body(src, "int main(");
+    ASSERT_FALSE(main_body.empty()) << "could not locate main()";
+    EXPECT_EQ(main_body.find("gtk_widget_show(filechooserdialog1)"),
+        std::string::npos)
+        << "main() must not show the import dialog (M24) — it was "
+           "destroyed inside create_filechooserdialog1()";
+}
 } // namespace

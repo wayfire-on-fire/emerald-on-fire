@@ -1825,9 +1825,15 @@ void layout_themes_pane(GtkWidget * vbox)
     layout_upper_pane(build_notebook_page(_("Themes"),notebook));
     layout_lower_pane(build_notebook_page(_("Edit Themes"),notebook));
 }
-GtkWidget* create_filechooserdialog1(char *input)
+/* M24 (issue #1): returns a success flag, NOT a widget. The dialog is
+   run MODALLY (gtk_dialog_run) and destroyed inside this function, so
+   pre-M24 the returned pointer was dangling and main() showed it
+   (g_critical on every -i run). There is nothing for the caller to
+   show. */
+static gboolean create_filechooserdialog1(char *input)
 {
     /* get a filename */
+    gboolean imported = FALSE;
     GtkWidget * button;
     GtkWidget * dialog_startup = gtk_file_chooser_dialog_new(
             _("Import Theme..."),NULL,GTK_FILE_CHOOSER_ACTION_OPEN,NULL,NULL);
@@ -1862,11 +1868,15 @@ GtkWidget* create_filechooserdialog1(char *input)
         thn=import_theme(filename);
         g_free(filename);
         refresh_theme_list(thn);
-        if (thn) g_free(thn);
+        if (thn)
+        {
+            imported = TRUE;
+            g_free(thn);
+        }
     }
 
-        gtk_widget_destroy(dialog_startup);
-        return dialog_startup;
+    gtk_widget_destroy(dialog_startup);
+    return imported;
 }
 void layout_main_window()
 {
@@ -1933,9 +1943,11 @@ int main(int argc, char * argv[])
     mainWindow = gtk_window_new(GTK_WINDOW_TOPLEVEL);
 
     if (install_file == 1) {
-	GtkWidget *filechooserdialog1;
-	filechooserdialog1 = create_filechooserdialog1(input_file);
-	gtk_widget_show(filechooserdialog1);
+	/* M24 (issue #1): the import dialog is run and destroyed inside
+	   create_filechooserdialog1(); its result is a success flag, so
+	   there is nothing to show here (pre-fix the show was on a
+	   destroyed widget - a g_critical on every -i run). */
+	create_filechooserdialog1(input_file);
     }
 
 #ifdef USE_DBUS
