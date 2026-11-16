@@ -25,7 +25,7 @@ binary: build
 	docker run --rm -v $(PWD):/app $(IMAGE) bash -c '\
 		git config --global --add safe.directory /app; \
 		rm -rf build-docker dist; \
-		meson setup build-docker --buildtype=release; \
+		meson setup build-docker --buildtype=release --prefix=/usr; \
 		ninja -C build-docker; \
 		mkdir -p dist/wayfire dist/emeraldwf/engines; \
 		cp build-docker/src/libemeraldwf.so dist/wayfire/; \

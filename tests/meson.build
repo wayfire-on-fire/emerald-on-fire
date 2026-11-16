@@ -200,6 +200,15 @@ test('emeraldwf-run-kvm-fetch', find_program('test_run_kvm_fetch.sh'))
 # with a stubbed wait - the real script needs qemu + /dev/kvm).
 test('emeraldwf-matrix-collect', find_program('test_matrix_collect.sh'))
 
+# M27 (issue #1): the Makefile's Docker `binary` target must build the
+# dist artifacts against the prefix the Dockerfile installs wayfire
+# into (/usr) - source-structure cross-check of Makefile + Dockerfile.
+emeraldwf_makefile_docker = executable('emeraldwf-makefile-docker',
+    ['test_makefile_docker.cpp'],
+    include_directories: [emerald_test_inc],
+    dependencies: [gtest, gtest_main])
+test('emeraldwf-makefile-docker', emeraldwf_makefile_docker)
+
 # ---- part 07: engine pane / engine module lifetime (findings 46/47) ----
 # Regression for the "Round Top Left Corner" SEGV_MAPERR: append_engine's
 # dlclose unmapped the engine .so (static-vendored libemeraldengine) while
