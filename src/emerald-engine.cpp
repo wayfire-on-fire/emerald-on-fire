@@ -1126,8 +1126,11 @@ cairo_surface_t *emeraldwf_render_frame(const ThemeSettings & ts,
                 pango_layout_set_font_description(layout, ws->font_desc);
             }
 
-            std::string title = ctx.title; // window title (set by the node)
-            pango_layout_set_text(layout, title.c_str(), (int)title.size());
+            // Minor (issue #1): no copy — ctx.title is the caller's
+            // std::string; feeding Pango through a per-render-pass copy
+            // was pure overhead.
+            pango_layout_set_text(layout, ctx.title.c_str(),
+                (int)ctx.title.size());
 
             pango_layout_set_alignment(layout,
                 (PangoAlignment)ws->title_text_align);

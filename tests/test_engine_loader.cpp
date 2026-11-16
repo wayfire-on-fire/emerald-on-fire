@@ -217,4 +217,25 @@ TEST_F(EngineLoaderTest, SuccessfulSwapFinalizesOldBeforeNewInit)
 
     delete ws;
 }
+
+// Minor (issue #1): the titlebar text was fed to Pango through a
+// per-render-pass copy — `std::string title = ctx.title;` — although
+// ctx.title is already the caller's std::string. The copy is pure
+// overhead on every frame; pango_layout_set_text() must use ctx.title
+// directly.
+TEST(EngineSource, TitleNotCopiedBeforePango)
+{
+    std::ifstream in(std::string{EMERALDWF_TEST_SOURCE_ROOT} +
+        "/src/emerald-engine.cpp");
+    ASSERT_TRUE(in.good()) << "src/emerald-engine.cpp must be readable";
+    std::string src((std::istreambuf_iterator<char>(in)),
+        std::istreambuf_iterator<char>());
+    ASSERT_FALSE(src.empty());
+
+    EXPECT_EQ(src.find("std::string title = ctx.title"), std::string::npos) <<
+        "the redundant title copy before Pango must be gone";
+    EXPECT_NE(src.find("pango_layout_set_text(layout, ctx.title.c_str()"),
+        std::string::npos) <<
+        "pango_layout_set_text() must use ctx.title directly";
+}
 } // namespace
