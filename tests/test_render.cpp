@@ -1102,4 +1102,30 @@ TEST_F(RenderTest, ZootreevesMissingPixmaps_ButtonsAndBorderDrawn)
     emerald_engine_unload();
     fs::remove_all(theme_dir);
 }
+
+// Minor (issue #1): make_goldens.cpp (the render golden generator) used
+// magic loop bounds (i < 11 for tobj_item_state, i < 9 for button_states)
+// and an unused GError (cairo_surface_write_to_png takes no GError). Use the
+// named counts (TBT_COUNT / B_T_COUNT) and drop the dead GError.
+TEST(RenderSource, MakeGoldensUsesNamedCountsAndNoDeadGError)
+{
+    std::ifstream in(std::string{EMERALDWF_TEST_SOURCE_ROOT} +
+        "/tests/make_goldens.cpp");
+    ASSERT_TRUE(in.good()) << "tests/make_goldens.cpp must be readable";
+    std::string src((std::istreambuf_iterator<char>(in)),
+        std::istreambuf_iterator<char>());
+    ASSERT_FALSE(src.empty());
+
+    EXPECT_EQ(src.find("i < 11"), std::string::npos) <<
+        "the magic loop bound 11 must be replaced by TBT_COUNT";
+    EXPECT_EQ(src.find("i < 9"), std::string::npos) <<
+        "the magic loop bound 9 must be replaced by B_T_COUNT";
+    EXPECT_NE(src.find("TBT_COUNT"), std::string::npos) <<
+        "tobj_item_state must be zeroed with TBT_COUNT";
+    EXPECT_NE(src.find("B_T_COUNT"), std::string::npos) <<
+        "button_states must be zeroed with B_T_COUNT";
+    EXPECT_EQ(src.find("GError"), std::string::npos) <<
+        "the unused GError in save_png() must be removed "
+        "(cairo_surface_write_to_png takes no GError)";
+}
 }

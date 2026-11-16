@@ -14,7 +14,6 @@
 
 #include <cairo.h>
 #include <cairo-features.h>
-#include <glib.h>
 
 #include "emerald-engine.hpp"
 #include "emerald-settings.hpp"
@@ -50,12 +49,12 @@ DecorContext make_ctx(const ThemeSettings & ts, bool active, bool maximized)
         0;
     ctx.actions = EWA_CLOSE | EWA_MAXIMIZE | EWA_MINIMIZE;
 
-    for (int i = 0; i < 11; i++)
+    for (int i = 0; i < TBT_COUNT; i++)
     {
         ctx.tobj_item_state[i] = 3;
     }
 
-    for (int i = 0; i < 9; i++)
+    for (int i = 0; i < B_T_COUNT; i++)
     {
         ctx.button_states[i] = 0;
     }
@@ -65,7 +64,6 @@ DecorContext make_ctx(const ThemeSettings & ts, bool active, bool maximized)
 
 bool save_png(cairo_surface_t *surf, const fs::path & file)
 {
-    GError *err = nullptr;
     cairo_status_t status = cairo_surface_write_to_png(surf, file.c_str());
     if (status != CAIRO_STATUS_SUCCESS)
     {
@@ -74,7 +72,6 @@ bool save_png(cairo_surface_t *surf, const fs::path & file)
         return false;
     }
 
-    (void)err;
     return true;
 }
 }
