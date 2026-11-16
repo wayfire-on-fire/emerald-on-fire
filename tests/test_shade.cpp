@@ -347,18 +347,18 @@ TEST_F(ShadeTest, TitlebarHeightClamped)
 {
     emerald_decorator_t deco(nullptr, nullptr);
     deco.set_titlebar_height(-5);
-    EXPECT_EQ(deco.get_titlebar_height(), 0)
-        << "negative titlebar height must clamp to 0 — pre-M18 it was "
-           "stored as-is (shaded CSD window renders nothing)";
+    EXPECT_EQ(deco.get_titlebar_height(), 0) <<
+        "negative titlebar height must clamp to 0 — pre-M18 it was "
+        "stored as-is (shaded CSD window renders nothing)";
     deco.set_titlebar_height(1 << 20);
     EXPECT_EQ(deco.get_titlebar_height(), 1 << 20);
     deco.set_titlebar_height((1 << 20) + 1000);
-    EXPECT_EQ(deco.get_titlebar_height(), 1 << 20)
-        << "huge titlebar height must clamp — pre-M18 it overflowed the "
-           "int margin sums in margins_for()";
+    EXPECT_EQ(deco.get_titlebar_height(), 1 << 20) <<
+        "huge titlebar height must clamp — pre-M18 it overflowed the "
+        "int margin sums in margins_for()";
     deco.set_titlebar_height(32);
-    EXPECT_EQ(deco.get_titlebar_height(), 32)
-        << "in-range values must pass through unchanged";
+    EXPECT_EQ(deco.get_titlebar_height(), 32) <<
+        "in-range values must pass through unchanged";
 }
 
 // ── Finding 53 (successor): the steady client never dips below the hint ──
@@ -752,9 +752,9 @@ TEST_F(ShadeTest, ExportShadowMarginsForeignTypeUnderSharedKey)
 
     auto data = view->get_data<wf::emeraldwf::wf_shadow_margin_t>(
         wf::emeraldwf::SHADOW_MARGIN_DATA_KEY);
-    ASSERT_NE(data.get(), nullptr)
-        << "after export, the shared key must hold a wf_shadow_margin_t "
-        << "(the foreign entry is replaced, not dereferenced)";
+    ASSERT_NE(data.get(), nullptr) <<
+        "after export, the shared key must hold a wf_shadow_margin_t " <<
+        "(the foreign entry is replaced, not dereferenced)";
 
     const auto expected = shadow_margins_for(300, 6, 17, 0.5, 0);
     const auto m = data->get_margins();
@@ -794,8 +794,8 @@ TEST_F(ShadeTest, ExportShadowMarginsRepeatUpdates)
 
     const auto m = data->get_margins();
     const auto expected = shadow_margins_for(300, 6, 17, 1.0, 0);
-    EXPECT_DOUBLE_EQ(m.bottom, expected.bottom)
-        << "a second export must UPDATE the existing margins, not "
-        << "leave the first call's value";
+    EXPECT_DOUBLE_EQ(m.bottom, expected.bottom) <<
+        "a second export must UPDATE the existing margins, not " <<
+        "leave the first call's value";
 }
 } // namespace

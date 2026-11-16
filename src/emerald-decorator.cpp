@@ -81,15 +81,15 @@ wf::decoration_margins_t emerald_decorator_t::margins_for(const MarginsInput & i
     // clamped to [0, 1<<20], but the overflow defense must not depend on
     // the other operands' bounds (top_space/extra_extents come from the
     // theme; the int sum used to overflow before the double cast).
-    const double t     =
+    const double t =
         static_cast<double>(static_cast<int64_t>(in.left_space) + in.extra_left);
     const double right =
         static_cast<double>(static_cast<int64_t>(in.right_space) + in.extra_right);
-    const double bot   =
+    const double bot =
         static_cast<double>(static_cast<int64_t>(in.bottom_space) + in.extra_bottom);
-    const double top   =
-        static_cast<double>(static_cast<int64_t>(in.top_space) + in.extra_top
-        + in.titlebar_height);
+    const double top =
+        static_cast<double>(static_cast<int64_t>(in.top_space) + in.extra_top +
+            in.titlebar_height);
 
     const bool maximized = (in.tiled_edges == TILED_EDGES_ALL);
     if (maximized)

@@ -70,7 +70,7 @@ void emerald_engine_fini_engine(const window_settings *ws);
 // file the engine will dereference exists: the pixmap engine reads its
 // textures with no NULL check (pixmap.c:250 → compositor segfault).
 // Pure (filesystem + GKeyFile only) so it is testable headlessly.
-bool theme_has_pixmap_assets(const std::string &theme_dir);
+bool theme_has_pixmap_assets(const std::string & theme_dir);
 
 // M5 (issue #1): the pixmap/zootreeves engines resolve their pixmaps
 // via the vendored make_filename() (third_party/emerald/libengine/

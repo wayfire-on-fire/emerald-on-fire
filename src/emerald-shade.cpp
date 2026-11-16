@@ -32,7 +32,7 @@ emerald_shade_t::emerald_shade_t(::wayfire_toplevel_view view_arg, int strip_h_a
         // rendering (no damage) after the move, tick() never runs again and
         // the animation would freeze on the stale output. (Wayfire's animate
         // plugin uses the same pattern.)
-        on_set_output = [=] (view_set_output_signal *)
+        on_set_output = [=] (view_set_output_signal*)
         {
             this->sync_output();
         };
@@ -59,7 +59,7 @@ emerald_shade_t::~emerald_shade_t()
     }
 }
 
-wf::output_t *emerald_shade_t::sync_output()
+wf::output_t*emerald_shade_t::sync_output()
 {
     if (view == nullptr)
     {

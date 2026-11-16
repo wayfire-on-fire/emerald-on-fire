@@ -395,10 +395,10 @@ void emeraldwf_plugin::recreate()
     // full emerald frames, persisting until the next matcher change. The
     // quadrant handling mirrors update_view_decoration():
     // - rejected views: never decorated; a stale decoration (if any) is
-    //   removed, so a rejected view cannot keep an emerald frame;
+    // removed, so a rejected view cannot keep an emerald frame;
     // - accepted views: forced remove+re-adjust — that is what
-    //   propagates the new option values to the fresh decorator
-    //   (adjust_new_decorations() sets maximized_borders/shadows).
+    // propagates the new option values to the fresh decorator
+    // (adjust_new_decorations() sets maximized_borders/shadows).
     for (const auto & view : wf::get_core().get_all_views())
     {
         auto toplevel = wf::toplevel_cast(view);
@@ -500,9 +500,9 @@ void emeraldwf_plugin::scroll_shade(wayfire_view view, double delta)
         // Unshading a view with no transformer is a no-op — check BEFORE
         // the helper (it would create one).
         if ((view->get_transformed_node()
-                ->get_transformer<wf::emeraldwf::emerald_shade_t>(
-                    wf::emeraldwf::SHADE_TRANSFORMER_NAME) == nullptr)
-            && !to_shade)
+             ->get_transformer<wf::emeraldwf::emerald_shade_t>(
+                 wf::emeraldwf::SHADE_TRANSFORMER_NAME) == nullptr) &&
+            !to_shade)
         {
             return; // unshaded; nothing to unshade
         }
@@ -595,7 +595,7 @@ bool emeraldwf_plugin::poll_tick()
         auto it = last_stamp.find(p);
         if ((it == last_stamp.end()) || (it->second != m))
         {
-            last_stamp[p] = m;
+            last_stamp[p]   = m;
             emerald_changed = true;
         }
     }
@@ -972,7 +972,7 @@ void emeraldwf_plugin::init()
     // too), so the handler must not re-read the config file and re-apply
     // its values — that would revert a legitimate runtime change to the
     // file's value (ChatGPT review of M29).
-    on_config_reload = [this] (wf::reload_config_signal * /*ev*/)
+    on_config_reload = [this] (wf::reload_config_signal* /*ev*/)
     {
         LOGD("emeraldwf: config reloaded — arming theme reload");
         arm_reload();

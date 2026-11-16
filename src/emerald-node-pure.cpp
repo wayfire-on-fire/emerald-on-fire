@@ -218,8 +218,8 @@ void on_touch_down(touch_state_t & state, int finger_id,
 {
     state.down_active = true;
     state.down_finger = finger_id;
-    state.down_x      = frame_local_x;
-    state.down_y      = frame_local_y;
+    state.down_x = frame_local_x;
+    state.down_y = frame_local_y;
 }
 
 touch_up_result on_touch_up(touch_state_t & state, int finger_id,

@@ -128,12 +128,13 @@ int surfaces_close(cairo_surface_t *a, cairo_surface_t *b, int tolerance = 4)
             bool pixel_differs = false;
             for (int c = 0; c < 4 && !pixel_differs; c++)
             {
-                if (std::abs((int)ra[x * 4 + c] - (int)rb[x * 4 + c])
-                    > tolerance)
+                if (std::abs((int)ra[x * 4 + c] - (int)rb[x * 4 + c]) >
+                    tolerance)
                 {
                     pixel_differs = true;
                 }
             }
+
             if (pixel_differs)
             {
                 diffs++;
@@ -262,9 +263,9 @@ TEST_F(RenderTest, Structural)
                     EXPECT_EQ(diffs, 0) <<
                         "engine=" << engine << " state=" << state <<
                         " mode=" << mode << " differs from golden (" <<
-                        (diffs < 0 ? std::string("size mismatch") :
-                            (std::to_string(diffs) +
-                                " pixels beyond tolerance")) << ")";
+                            (diffs < 0 ? std::string("size mismatch") :
+                        (std::to_string(diffs) +
+                            " pixels beyond tolerance")) << ")";
                     if (g)
                     {
                         cairo_surface_destroy(g);
@@ -274,6 +275,7 @@ TEST_F(RenderTest, Structural)
                 cairo_surface_destroy(surf);
             }
         }
+
         emerald_engine_unload();
     }
 }

@@ -373,7 +373,7 @@ inline std::shared_ptr<emerald_shade_t> get_or_create_shade(
     std::function<void()> shadow_update = nullptr)
 {
     auto tmgr = view->get_transformed_node();
-    auto tr = tmgr->get_transformer<emerald_shade_t>(SHADE_TRANSFORMER_NAME);
+    auto tr   = tmgr->get_transformer<emerald_shade_t>(SHADE_TRANSFORMER_NAME);
     if (tr == nullptr)
     {
         tr = std::make_shared<emerald_shade_t>(view, strip_h, duration);

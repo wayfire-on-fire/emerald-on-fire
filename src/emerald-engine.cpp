@@ -584,15 +584,15 @@ static void draw_shadow_background(const decor_t *d, cairo_t *cr)
 // checked five filenames no theme ships, `pixmaps.top.png` vs the
 // engine's `pixmaps.active_top.png`, so the guard was permanently false
 // and every correctly-packaged pixmap theme drew the gray fallback).
-bool wf::emeraldwf::theme_has_pixmap_assets(const std::string &theme_dir)
+bool wf::emeraldwf::theme_has_pixmap_assets(const std::string & theme_dir)
 {
     // The 11 pixmap types the engine loads (pixmap.c p_types[]).
-    static const char *const p_types[] = {
+    static const char*const p_types[] = {
         "top", "top_left", "top_right", "left", "right",
         "bottom", "bottom_left", "bottom_right",
         "title", "title_left", "title_right"};
 
-    auto has = [&theme_dir] (const std::string &name)
+    auto has = [&theme_dir] (const std::string & name)
     {
         std::error_code ec;
         return std::filesystem::exists(
@@ -642,7 +642,7 @@ bool wf::emeraldwf::theme_dir_mismatched_for_engine(const std::string & engine,
     const std::string & theme_dir)
 {
     // Only these engines load pixmaps through make_filename().
-    if (engine != "pixmap" && engine != "zootreeves")
+    if ((engine != "pixmap") && (engine != "zootreeves"))
     {
         return false;
     }
@@ -781,13 +781,13 @@ bool emerald_engine_load(const std::string & name, const std::string & system_di
     // dlsym() returns void*; reinterpret_cast is the C++-correct
     // conversion to a function pointer (a C-style cast here is flagged
     // by cppcheck).
-    auto cand_init  = reinterpret_cast<init_engine_proc>(
+    auto cand_init = reinterpret_cast<init_engine_proc>(
         dlsym(candidate, "init_engine"));
-    auto cand_fini  = reinterpret_cast<fini_engine_proc>(
+    auto cand_fini = reinterpret_cast<fini_engine_proc>(
         dlsym(candidate, "fini_engine"));
-    auto cand_load  = reinterpret_cast<load_settings_proc>(
+    auto cand_load = reinterpret_cast<load_settings_proc>(
         dlsym(candidate, "load_engine_settings"));
-    auto cand_draw  = reinterpret_cast<draw_frame_proc>(
+    auto cand_draw = reinterpret_cast<draw_frame_proc>(
         dlsym(candidate, "engine_draw_frame"));
 
     if (cand_draw == nullptr)

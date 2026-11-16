@@ -15,7 +15,7 @@
 
 namespace
 {
-std::string read_file(const std::string &path)
+std::string read_file(const std::string & path)
 {
     std::ifstream in(path);
     std::stringstream ss;
@@ -25,7 +25,7 @@ std::string read_file(const std::string &path)
 
 // The body of `void emeraldwf_plugin::fini()` (bracket-matched from the
 // first '{' after the signature).
-std::string fini_body(const std::string &src)
+std::string fini_body(const std::string & src)
 {
     const size_t sig = src.find("void emeraldwf_plugin::fini()");
     if (sig == std::string::npos)
@@ -70,31 +70,31 @@ TEST(PluginSource, FiniUnloadsEngineAfterRemovingDecorations)
     ASSERT_FALSE(src.empty()) << "src/plugin.cpp must be readable";
 
     const std::string body = fini_body(src);
-    ASSERT_FALSE(body.empty())
-        << "could not locate emeraldwf_plugin::fini() in plugin.cpp";
+    ASSERT_FALSE(body.empty()) <<
+        "could not locate emeraldwf_plugin::fini() in plugin.cpp";
 
     const size_t loop = body.find("remove_decoration");
-    ASSERT_NE(loop, std::string::npos)
-        << "fini() must remove the per-view decorations";
+    ASSERT_NE(loop, std::string::npos) <<
+        "fini() must remove the per-view decorations";
 
     const size_t unload = body.find("emerald_engine_unload()");
-    ASSERT_NE(unload, std::string::npos)
-        << "fini() must call emerald_engine_unload() (pre-fix: the "
-           "engine .so stayed mapped for the life of the wayfire "
-           "process)";
-    EXPECT_GT(unload, loop)
-        << "the engine is unloaded AFTER the decorations are removed "
-           "(the decorators use the engine while they live)";
+    ASSERT_NE(unload, std::string::npos) <<
+        "fini() must call emerald_engine_unload() (pre-fix: the "
+        "engine .so stayed mapped for the life of the wayfire "
+        "process)";
+    EXPECT_GT(unload, loop) <<
+        "the engine is unloaded AFTER the decorations are removed "
+        "(the decorators use the engine while they live)";
     EXPECT_EQ(body.find("emerald_engine_unload()", unload + 1),
-        std::string::npos)
-        << "the engine is unloaded exactly once in fini()";
+        std::string::npos) <<
+        "the engine is unloaded exactly once in fini()";
 }
 
 // The body of a `emeraldwf_plugin::<fn>(...)` member (bracket-matched from
 // the first '{' after the signature), with // comments stripped (position
 // assertions must not match identifiers quoted in comments — the M20 fix's
 // own comment mentions adjust_new_decorations()).
-std::string fn_body(const std::string &src, const std::string &sig)
+std::string fn_body(const std::string & src, const std::string & sig)
 {
     const size_t at = src.find(sig);
     if (at == std::string::npos)
@@ -108,7 +108,7 @@ std::string fn_body(const std::string &src, const std::string &sig)
         return {};
     }
 
-    int depth = 0;
+    int depth  = 0;
     size_t end = open;
     for (size_t i = open; i < src.size(); i++)
     {
@@ -130,18 +130,21 @@ std::string fn_body(const std::string &src, const std::string &sig)
     std::string out;
     for (size_t i = 0; i < body.size(); i++)
     {
-        if (body[i] == '/' && i + 1 < body.size() && body[i + 1] == '/')
+        if ((body[i] == '/') && (i + 1 < body.size()) && (body[i + 1] == '/'))
         {
             while (i < body.size() && body[i] != '\n')
             {
                 i++;
             }
+
             if (i < body.size())
             {
                 out += '\n';
             }
+
             continue;
         }
+
         out += body[i];
     }
 
@@ -166,23 +169,23 @@ TEST(PluginSource, CsdShadeCreationUsesSharedHelper)
     const std::string toggle_body =
         fn_body(src, "void emeraldwf_plugin::toggle_shade(");
     ASSERT_FALSE(toggle_body.empty()) << "could not locate toggle_shade()";
-    EXPECT_NE(toggle_body.find("get_or_create_shade("), std::string::npos)
-        << "toggle_shade()'s CSD branch must use the shared "
-           "get_or_create_shade() helper (M19) — pre-fix it had its own "
-           "inline get-or-create + shadow-export registration";
+    EXPECT_NE(toggle_body.find("get_or_create_shade("), std::string::npos) <<
+        "toggle_shade()'s CSD branch must use the shared "
+        "get_or_create_shade() helper (M19) — pre-fix it had its own "
+        "inline get-or-create + shadow-export registration";
 
     const std::string scroll_body =
         fn_body(src, "void emeraldwf_plugin::scroll_shade(");
     ASSERT_FALSE(scroll_body.empty()) << "could not locate scroll_shade()";
-    EXPECT_NE(scroll_body.find("get_or_create_shade("), std::string::npos)
-        << "scroll_shade()'s CSD branch must use the shared "
-           "get_or_create_shade() helper (M19) — pre-fix the Review S1 "
-           "regression lived in exactly this duplicated branch";
+    EXPECT_NE(scroll_body.find("get_or_create_shade("), std::string::npos) <<
+        "scroll_shade()'s CSD branch must use the shared "
+        "get_or_create_shade() helper (M19) — pre-fix the Review S1 "
+        "regression lived in exactly this duplicated branch";
 
     EXPECT_EQ(src.find("std::make_shared<wf::emeraldwf::emerald_shade_t>"),
-        std::string::npos)
-        << "plugin.cpp must not create the shade transformer directly "
-           "(M19) — creation is consolidated in get_or_create_shade()";
+        std::string::npos) <<
+        "plugin.cpp must not create the shade transformer directly "
+        "(M19) — creation is consolidated in get_or_create_shade()";
 }
 
 // M20 (issue #1): recreate() (option-change driven: maximized_borders /
@@ -205,44 +208,47 @@ TEST(PluginSource, RecreateSkipsViewsTheMatcherRejects)
     // adjust_new_decorations() call would satisfy a positional check
     // without fixing the bug.
     const size_t guard = body.find("!should_decorate_view(");
-    ASSERT_NE(guard, std::string::npos)
-        << "recreate() must skip the views should_decorate_view() "
-           "REJECTS (M20) — pre-fix it decorated every toplevel, so CSD / "
-           "ignore_views-matched views got emerald frames on an option "
-           "change";
+    ASSERT_NE(guard, std::string::npos) <<
+        "recreate() must skip the views should_decorate_view() "
+        "REJECTS (M20) — pre-fix it decorated every toplevel, so CSD / "
+        "ignore_views-matched views got emerald frames on an option "
+        "change";
 
     const size_t cont = body.find("continue", guard);
-    ASSERT_NE(cont, std::string::npos)
-        << "the rejection branch must continue (skip the view)";
+    ASSERT_NE(cont, std::string::npos) <<
+        "the rejection branch must continue (skip the view)";
 
     const size_t adjust = body.find("adjust_new_decorations(");
-    ASSERT_NE(adjust, std::string::npos)
-        << "recreate() must (re)create the decoration on accepted views "
-           "(that is what propagates the new option values)";
-    EXPECT_LT(cont, adjust)
-        << "the rejection branch must skip BEFORE any "
-           "adjust_new_decorations() call (M20)";
+    ASSERT_NE(adjust, std::string::npos) <<
+        "recreate() must (re)create the decoration on accepted views "
+        "(that is what propagates the new option values)";
+    EXPECT_LT(cont, adjust) <<
+        "the rejection branch must skip BEFORE any "
+        "adjust_new_decorations() call (M20)";
 }
 
 // Strip `//` line comments from the whole source (same rule as fn_body),
 // so the assertions below match CODE, not comment prose.
-std::string strip_comments(const std::string &src)
+std::string strip_comments(const std::string & src)
 {
     std::string out;
     for (size_t i = 0; i < src.size(); i++)
     {
-        if (src[i] == '/' && i + 1 < src.size() && src[i + 1] == '/')
+        if ((src[i] == '/') && (i + 1 < src.size()) && (src[i + 1] == '/'))
         {
             while (i < src.size() && src[i] != '\n')
             {
                 i++;
             }
+
             if (i < src.size())
             {
                 out += '\n';
             }
+
             continue;
         }
+
         out += src[i];
     }
 
@@ -271,37 +277,37 @@ TEST(PluginSource, WayfireConfigUsesReloadSignalNotMtimePoll)
     const std::string code = strip_comments(src);
 
     // 1. The cmdline-based config-file discovery is gone (in code, not
-    //    just in comments).
-    EXPECT_EQ(code.find("find_wayfire_config_file"), std::string::npos)
-        << "find_wayfire_config_file() (the /proc/self/cmdline parsing) "
-           "must be replaced by wf::reload_config_signal (M29)";
-    EXPECT_EQ(code.find("/proc/self/cmdline"), std::string::npos)
-        << "the plugin must not parse /proc/self/cmdline to locate the "
-           "config file (M29)";
+    // just in comments).
+    EXPECT_EQ(code.find("find_wayfire_config_file"), std::string::npos) <<
+        "find_wayfire_config_file() (the /proc/self/cmdline parsing) "
+        "must be replaced by wf::reload_config_signal (M29)";
+    EXPECT_EQ(code.find("/proc/self/cmdline"), std::string::npos) <<
+        "the plugin must not parse /proc/self/cmdline to locate the "
+        "config file (M29)";
 
     // 2. The plugin declares a reload_config_signal connection and
-    //    connects it in init().
+    // connects it in init().
     EXPECT_NE(src.find("connection_t<wf::reload_config_signal>"),
-        std::string::npos)
-        << "the plugin must hold a "
-           "wf::signal::connection_t<wf::reload_config_signal> member (M29)";
+        std::string::npos) <<
+        "the plugin must hold a "
+        "wf::signal::connection_t<wf::reload_config_signal> member (M29)";
 
     const std::string init = fn_body(src, "void emeraldwf_plugin::init()");
     ASSERT_FALSE(init.empty()) << "could not locate emeraldwf_plugin::init()";
-    EXPECT_NE(init.find("connect(&on_config_reload)"), std::string::npos)
-        << "init() must connect the reload_config_signal (M29)";
+    EXPECT_NE(init.find("connect(&on_config_reload)"), std::string::npos) <<
+        "init() must connect the reload_config_signal (M29)";
 
     // 3. The handler arms the debounced theme reload and re-applies the
-    //    emeraldwf options through the lenient sync (M21) using the
-    //    WAYFIRE_CONFIG_FILE env var that wayfire's config backend sets
-    //    at init.
+    // emeraldwf options through the lenient sync (M21) using the
+    // WAYFIRE_CONFIG_FILE env var that wayfire's config backend sets
+    // at init.
     const size_t handler = init.find("on_config_reload = [");
-    ASSERT_NE(handler, std::string::npos)
-        << "init() must assign the on_config_reload handler (M29)";
+    ASSERT_NE(handler, std::string::npos) <<
+        "init() must assign the on_config_reload handler (M29)";
     const size_t open = init.find('{', handler);
     ASSERT_NE(open, std::string::npos);
 
-    int depth = 0;
+    int depth    = 0;
     size_t close = std::string::npos;
     for (size_t i = open; i < init.size(); i++)
     {
@@ -318,74 +324,75 @@ TEST(PluginSource, WayfireConfigUsesReloadSignalNotMtimePoll)
             }
         }
     }
+
     ASSERT_NE(close, std::string::npos) << "unbalanced handler lambda";
     const std::string handler_body =
         init.substr(open + 1, close - open - 1);
 
-    EXPECT_NE(handler_body.find("arm_reload()"), std::string::npos)
-        << "the reload_config_signal handler must arm the debounced "
-           "theme reload (M29)";
+    EXPECT_NE(handler_body.find("arm_reload()"), std::string::npos) <<
+        "the reload_config_signal handler must arm the debounced "
+        "theme reload (M29)";
     // ChatGPT review (M29): the signal is NOT file-specific — wayfire IPC
     // (ipc-rules set_config_options) emits it for programmatic option
     // changes too. Re-reading the file and re-applying its values would
     // revert a legitimate runtime change to the file's value. The option
     // manager stays authoritative; the handler must NOT re-read the file.
     EXPECT_EQ(handler_body.find("sync_emeraldwf_options_from_config"),
-        std::string::npos)
-        << "the handler must not re-apply file values over the in-memory "
-           "option manager (it would revert IPC-made runtime changes) "
-           "(M29, ChatGPT review)";
-    EXPECT_EQ(handler_body.find("WAYFIRE_CONFIG_FILE"), std::string::npos)
-        << "the handler must not read the config file path (the handler "
-           "must not re-read the config file) (M29, ChatGPT review)";
+        std::string::npos) <<
+        "the handler must not re-apply file values over the in-memory "
+        "option manager (it would revert IPC-made runtime changes) "
+        "(M29, ChatGPT review)";
+    EXPECT_EQ(handler_body.find("WAYFIRE_CONFIG_FILE"), std::string::npos) <<
+        "the handler must not read the config file path (the handler "
+        "must not re-read the config file) (M29, ChatGPT review)";
     EXPECT_EQ(code.find("sync_emeraldwf_options_from_config"),
-        std::string::npos)
-        << "the file re-apply helper (M21) is dead weight once the signal "
-           "replaces the mtime poll — removed (M29, ChatGPT review)";
-    EXPECT_EQ(code.find("emerald-config-sync.hpp"), std::string::npos)
-        << "plugin.cpp must no longer include the config-sync header "
-           "(M29, ChatGPT review)";
+        std::string::npos) <<
+        "the file re-apply helper (M21) is dead weight once the signal "
+        "replaces the mtime poll — removed (M29, ChatGPT review)";
+    EXPECT_EQ(code.find("emerald-config-sync.hpp"), std::string::npos) <<
+        "plugin.cpp must no longer include the config-sync header "
+        "(M29, ChatGPT review)";
 
     // 4. The wayfire config file is no longer in the mtime-watched set,
-    //    and poll_tick() has no config-change branch. The emerald-owned
-    //    files stay watched.
+    // and poll_tick() has no config-change branch. The emerald-owned
+    // files stay watched.
     const std::string wpaths = fn_body(src,
         "void emeraldwf_plugin::emerald_watched_paths(std::vector<std::string> & out)");
-    ASSERT_FALSE(wpaths.empty())
-        << "could not locate emerald_watched_paths()";
-    EXPECT_EQ(wpaths.find("wayfire_config_file"), std::string::npos)
-        << "the mtime poller must watch only the emerald-owned files, not "
-           "the wayfire config (M29)";
-    EXPECT_NE(wpaths.find("last_settings_path"), std::string::npos)
-        << "settings.ini must stay mtime-watched (M29)";
-    EXPECT_NE(wpaths.find("theme.ini"), std::string::npos)
-        << "theme.ini must stay mtime-watched (M29)";
+    ASSERT_FALSE(wpaths.empty()) <<
+        "could not locate emerald_watched_paths()";
+    EXPECT_EQ(wpaths.find("wayfire_config_file"), std::string::npos) <<
+        "the mtime poller must watch only the emerald-owned files, not "
+        "the wayfire config (M29)";
+    EXPECT_NE(wpaths.find("last_settings_path"), std::string::npos) <<
+        "settings.ini must stay mtime-watched (M29)";
+    EXPECT_NE(wpaths.find("theme.ini"), std::string::npos) <<
+        "theme.ini must stay mtime-watched (M29)";
 
     const std::string tick = fn_body(src, "bool emeraldwf_plugin::poll_tick()");
     ASSERT_FALSE(tick.empty()) << "could not locate poll_tick()";
-    EXPECT_EQ(tick.find("config_changed"), std::string::npos)
-        << "poll_tick() must no longer special-case the wayfire config "
-           "(M29)";
+    EXPECT_EQ(tick.find("config_changed"), std::string::npos) <<
+        "poll_tick() must no longer special-case the wayfire config "
+        "(M29)";
     EXPECT_EQ(tick.find("sync_emeraldwf_options_from_config"),
-        std::string::npos)
-        << "the config sync belongs to the signal handler, not to the "
-           "mtime poller (M29)";
+        std::string::npos) <<
+        "the config sync belongs to the signal handler, not to the "
+        "mtime poller (M29)";
 
     // 5. The emerald-files poller itself stays.
-    EXPECT_NE(init.find("start_poller()"), std::string::npos)
-        << "init() must still start the emerald-files mtime poller (M29)";
+    EXPECT_NE(init.find("start_poller()"), std::string::npos) <<
+        "init() must still start the emerald-files mtime poller (M29)";
 
     // 6. fini() disconnects the signal like every other connection, so a
-    //    config reload during plugin unload cannot re-enter the half-
-    //    destroyed plugin — and cancels the armed reload debounce, so a
-    //    pending 250 ms timer cannot fire on the destroyed plugin.
+    // config reload during plugin unload cannot re-enter the half-
+    // destroyed plugin — and cancels the armed reload debounce, so a
+    // pending 250 ms timer cannot fire on the destroyed plugin.
     const std::string fini = fn_body(src, "void emeraldwf_plugin::fini()");
     ASSERT_FALSE(fini.empty()) << "could not locate emeraldwf_plugin::fini()";
-    EXPECT_NE(fini.find("on_config_reload.disconnect()"), std::string::npos)
-        << "fini() must disconnect on_config_reload (M29)";
-    EXPECT_NE(fini.find("reload_timer.disconnect()"), std::string::npos)
-        << "fini() must cancel the reload debounce timer (M29, ChatGPT "
-           "review: explicit signal disconnection does not cancel an "
-           "already-armed timer)";
+    EXPECT_NE(fini.find("on_config_reload.disconnect()"), std::string::npos) <<
+        "fini() must disconnect on_config_reload (M29)";
+    EXPECT_NE(fini.find("reload_timer.disconnect()"), std::string::npos) <<
+        "fini() must cancel the reload debounce timer (M29, ChatGPT "
+        "review: explicit signal disconnection does not cancel an "
+        "already-armed timer)";
 }
 } // namespace

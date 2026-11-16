@@ -249,7 +249,7 @@ void on_button_release(titlebar_input_state_t & state);
 struct touch_state_t
 {
     bool down_active = false;
-    int down_finger  = -1;
+    int down_finger = -1;
     int down_x = 0, down_y = 0; // frame-local position of the down
 };
 

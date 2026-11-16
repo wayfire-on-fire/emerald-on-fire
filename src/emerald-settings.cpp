@@ -1078,8 +1078,8 @@ ThemeSettings& ThemeSettings::operator =(ThemeSettings && other) noexcept
         engine_   = std::move(other.engine_);
         valid_    = other.valid_;
         has_pixmap_assets_ = other.has_pixmap_assets_;
-        settings_path_ = std::move(other.settings_path_);
-        theme_dir_     = std::move(other.theme_dir_);
+        settings_path_     = std::move(other.settings_path_);
+        theme_dir_ = std::move(other.theme_dir_);
 
         other.ws_     = nullptr;
         other.fs_act_ = nullptr;
@@ -1300,6 +1300,7 @@ bool ThemeSettings::load(const std::string & settings_ini,
                       "%s", theme_ini.c_str(), err->message);
             g_error_free(err);
         }
+
         theme_eng = g_key_file_get_string(tf, "engine", "engine", nullptr);
         g_key_file_free(tf);
     }
@@ -1351,6 +1352,7 @@ bool ThemeSettings::load(const std::string & settings_ini,
             g_error_free(theme_err);
             theme_err = nullptr;
         }
+
         if (!engine_override.empty())
         {
             engine_ = engine_override;
@@ -1547,7 +1549,7 @@ bool ThemeSettings::load(const std::string & settings_ini,
         ws_->shadow_radius = 0.0;
     }
 
-    ws_->shadow_radius = std::clamp(ws_->shadow_radius, 0.0, 200.0);
+    ws_->shadow_radius   = std::clamp(ws_->shadow_radius, 0.0, 200.0);
     ws_->shadow_offset_x = std::clamp(ws_->shadow_offset_x, -200, 200);
     ws_->shadow_offset_y = std::clamp(ws_->shadow_offset_y, -200, 200);
     load_float_setting(f, &ws_->shadow_opacity, "shadow_opacity", "shadow");

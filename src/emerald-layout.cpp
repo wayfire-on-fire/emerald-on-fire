@@ -270,7 +270,7 @@ void EmeraldLayout::place_objects(const window_settings *ws,
             // (main.c:2991) per-zone last-object width — use the value
             // computed in pass 1, which is authoritative.
             ctx.tobj_item_width[state] = zone_width[state];
-            ctx.tobj_item_pos[otype] = x - ctx.tobj_pos[state];
+            ctx.tobj_item_pos[otype]   = x - ctx.tobj_pos[state];
             ctx.tobj_item_state[otype] = state;
             x += w;
         }
@@ -541,7 +541,7 @@ uint32_t EmeraldLayout::resize_edges(const DecorContext & ctx, int x,
     }
 
     const int shadow_left = ws->left_space - ws->win_extents.left;
-    const int shadow_top = ws->top_space - ws->win_extents.top;
+    const int shadow_top  = ws->top_space - ws->win_extents.top;
 
     const int cx = x - shadow_left; // original-frame coords
     const int cy = y - shadow_top;
@@ -699,7 +699,7 @@ int EmeraldLayout::cursor_region(const DecorContext & ctx, int x, int y) const
     const int h = ctx.client_height;
 
     const int shadow_left = ws->left_space - ws->win_extents.left;
-    const int shadow_top = ws->top_space - ws->win_extents.top;
+    const int shadow_top  = ws->top_space - ws->win_extents.top;
 
     const int cx = x - shadow_left;
     const int cy = y - shadow_top;

@@ -572,7 +572,7 @@ void emerald_node_t::render_frame(
 
     auto box = get_bounding_box();
     int fw = (int)box.width, fh = (int)box.height;
-    auto & pending    = view->toplevel()->pending();
+    auto & pending = view->toplevel()->pending();
     // Finding 27: no frame on fullscreen windows (margins are 0 → the frame
     // box equals the client box; drawing would composite the emerald
     // titlebar over the fullscreen client). The pure guard is tested in
@@ -758,6 +758,7 @@ void emerald_node_t::render_frame(
         {
             layout.build(*theme, ctx);
         }
+
         ctx.fs = ctx.active ? theme->fs_active() : theme->fs_inactive();
 
         cairo_surface_t *surface = emeraldwf_render_frame(*theme, ctx);
@@ -824,8 +825,10 @@ void emerald_node_t::render_frame(
                     cairo_surface_destroy(entry.surface);
                     entry.surface = nullptr;
                 }
+
                 entry.texture = nullptr;
             }
+
             cache.surfaces.clear();
             cache_textures.clear();
         };
@@ -833,6 +836,7 @@ void emerald_node_t::render_frame(
         {
             drop_entries();
         }
+
         // Bound the cache: distinct scales a window visits in a session are
         // few (output scale factors); beyond the cap keep only the incoming
         // scale (the two-scale oscillation case — the one M10 exists for —
@@ -847,17 +851,18 @@ void emerald_node_t::render_frame(
         // The shared key fields describe every cached entry; on a
         // scale-only render they are unchanged (writing them keeps the
         // invariant explicit).
-        cache.active  = active;
-        cache.title   = title;
-        cache.width   = fw;
-        cache.height  = fh;
+        cache.active = active;
+        cache.title  = title;
+        cache.width  = fw;
+        cache.height = fh;
         cache.hover_button = last_hover_button;
 
-        auto &entry = cache.surfaces[data.target.scale];
+        auto & entry = cache.surfaces[data.target.scale];
         if (entry.surface != nullptr)
         {
             cairo_surface_destroy(entry.surface);
         }
+
         entry.surface = surface;
         entry.texture = tex.get();
         // cache_textures owns the GL texture across frames; entry.texture
@@ -867,8 +872,8 @@ void emerald_node_t::render_frame(
     {
         // M10 cache hit: a surface for the current scale is cached and the
         // key matches — blit its texture, no re-upload, no re-render.
-        auto &entry = cache.surfaces.at(data.target.scale);
-        auto pick = pick_frame_texture(entry, entry.surface);
+        auto & entry = cache.surfaces.at(data.target.scale);
+        auto pick    = pick_frame_texture(entry, entry.surface);
         if (pick.must_create)
         {
             // Defensive: surface with no recorded texture (e.g. texture
@@ -1114,8 +1119,9 @@ void emerald_node_t::handle_touch_up(uint32_t /*time_ms*/, int finger_id,
             down_button = layout.hit_button(deco->ctx(),
                 touch_state_.down_x, touch_state_.down_y, view->activated);
         }
-        if (on_touch_up(touch_state_, finger_id, down_button, up_button)
-            == touch_up_result::ACTION)
+
+        if (on_touch_up(touch_state_, finger_id, down_button, up_button) ==
+            touch_up_result::ACTION)
         {
             handle_button(up_button);
         }

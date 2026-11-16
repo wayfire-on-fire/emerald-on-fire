@@ -70,7 +70,7 @@ object_base_t::~object_base_t()
 bool object_base_t::has_data(std::string name)
 {
     return obase_priv != nullptr &&
-        obase_priv->data.count(name) > 0;
+           obase_priv->data.count(name) > 0;
 }
 
 void object_base_t::erase_data(std::string name)
@@ -218,7 +218,7 @@ void view_interface_t::damage()
 void view_interface_t::take_snapshot(wf::auxilliary_buffer_t&)
 {}
 
-wlr_surface *view_interface_t::get_wlr_surface()
+wlr_surface*view_interface_t::get_wlr_surface()
 {
     return nullptr;
 }

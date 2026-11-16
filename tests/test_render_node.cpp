@@ -25,12 +25,12 @@ node_cache_t make_cache(bool active, const std::string & title,
 {
     node_cache_t c;
     node_scale_entry_t entry;
-    entry.surface = reinterpret_cast<cairo_surface_t*>(0x1); // sentinel (never destroyed)
+    entry.surface     = reinterpret_cast<cairo_surface_t*>(0x1); // sentinel (never destroyed)
     c.surfaces[scale] = entry;
-    c.active  = active;
-    c.title   = title;
-    c.width   = w;
-    c.height  = h;
+    c.active = active;
+    c.title  = title;
+    c.width  = w;
+    c.height = h;
     c.hover_button = hover;
     return c;
 }
@@ -138,13 +138,14 @@ TEST(M10Test, MixedScaleOscillation_RendersOncePerScale)
             {
                 cache.surfaces.clear();
             }
+
             node_scale_entry_t entry;
             entry.surface = reinterpret_cast<cairo_surface_t*>(0x1 + renders);
             cache.surfaces[scale] = entry;
-            cache.active  = active;
-            cache.title   = title;
-            cache.width   = fw;
-            cache.height  = fh;
+            cache.active = active;
+            cache.title  = title;
+            cache.width  = fw;
+            cache.height = fh;
             cache.hover_button = hover;
         }
     }
@@ -184,24 +185,27 @@ TEST(M10Test, ScaleCacheEvictionAndRevisit_Bounded)
             {
                 cache.surfaces.clear();
             }
+
             if ((!has_cached_scale(cache, scale)) &&
                 (cache.surfaces.size() >= MAX_CACHED_SCALES))
             {
                 cache.surfaces.clear(); // evict-all at the cap
             }
+
             node_scale_entry_t entry;
             entry.surface = reinterpret_cast<cairo_surface_t*>(0x1 + renders);
             cache.surfaces[scale] = entry;
-            cache.active  = active;
-            cache.title   = title;
-            cache.width   = fw;
-            cache.height  = fh;
+            cache.active = active;
+            cache.title  = title;
+            cache.width  = fw;
+            cache.height = fh;
             cache.hover_button = hover;
         }
     }
+
     EXPECT_EQ(renders, 5) << "each distinct scale renders once";
-    EXPECT_EQ(cache.surfaces.size(), 1u)
-        << "evict-all at the cap keeps only the incoming scale";
+    EXPECT_EQ(cache.surfaces.size(), 1u) <<
+        "evict-all at the cap keeps only the incoming scale";
     EXPECT_TRUE(has_cached_scale(cache, 2.0));
 
     // Revisit an evicted scale: exactly one new render, then cached.
@@ -219,19 +223,22 @@ TEST(M10Test, ScaleCacheEvictionAndRevisit_Bounded)
             {
                 cache.surfaces.clear();
             }
+
             if ((!has_cached_scale(cache, scale)) &&
                 (cache.surfaces.size() >= MAX_CACHED_SCALES))
             {
                 cache.surfaces.clear();
             }
+
             node_scale_entry_t entry;
             entry.surface = reinterpret_cast<cairo_surface_t*>(0x100 + renders);
             cache.surfaces[scale] = entry;
         }
     }
-    EXPECT_EQ(renders, 1)
-        << "a revisited (evicted) scale renders exactly once, then is "
-           "cached";
+
+    EXPECT_EQ(renders, 1) <<
+        "a revisited (evicted) scale renders exactly once, then is "
+        "cached";
 }
 
 // A KEY change invalidates every cached scale entry (they were rendered
@@ -650,8 +657,8 @@ TEST(TouchUpGateTest, WrongFinger_NoActionAndDownSurvives)
     on_touch_down(st, 3, 10, 10);
     // A different finger lifting off must not consume finger 3's down.
     EXPECT_EQ(on_touch_up(st, 4, 0, 0), touch_up_result::NO_ACTION);
-    EXPECT_TRUE(st.down_active)
-        << "a non-matching finger must not consume the recorded down";
+    EXPECT_TRUE(st.down_active) <<
+        "a non-matching finger must not consume the recorded down";
     // Finger 3's own lift-off still fires.
     EXPECT_EQ(on_touch_up(st, 3, 0, 0), touch_up_result::ACTION);
 }

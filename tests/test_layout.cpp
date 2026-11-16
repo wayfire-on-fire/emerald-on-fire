@@ -297,20 +297,20 @@ TEST_F(LayoutFixture, build_skips_unknown_layout_chars)
     // the dirty context must be field-identical to the clean one.
     for (int z = 0; z < 3; z++)
     {
-        EXPECT_EQ(ctx_dirty.tobj_pos[z], ctx_clean.tobj_pos[z])
-            << "tobj_pos[" << z << "]";
-        EXPECT_EQ(ctx_dirty.tobj_size[z], ctx_clean.tobj_size[z])
-            << "tobj_size[" << z << "]";
+        EXPECT_EQ(ctx_dirty.tobj_pos[z], ctx_clean.tobj_pos[z]) <<
+            "tobj_pos[" << z << "]";
+        EXPECT_EQ(ctx_dirty.tobj_size[z], ctx_clean.tobj_size[z]) <<
+            "tobj_size[" << z << "]";
     }
 
     for (int t = 0; t < TBT_COUNT; t++)
     {
-        EXPECT_EQ(ctx_dirty.tobj_item_pos[t], ctx_clean.tobj_item_pos[t])
-            << "tobj_item_pos[" << t << "]";
-        EXPECT_EQ(ctx_dirty.tobj_item_state[t], ctx_clean.tobj_item_state[t])
-            << "tobj_item_state[" << t << "]";
-        EXPECT_EQ(ctx_dirty.tobj_item_width[t], ctx_clean.tobj_item_width[t])
-            << "tobj_item_width[" << t << "]";
+        EXPECT_EQ(ctx_dirty.tobj_item_pos[t], ctx_clean.tobj_item_pos[t]) <<
+            "tobj_item_pos[" << t << "]";
+        EXPECT_EQ(ctx_dirty.tobj_item_state[t], ctx_clean.tobj_item_state[t]) <<
+            "tobj_item_state[" << t << "]";
+        EXPECT_EQ(ctx_dirty.tobj_item_width[t], ctx_clean.tobj_item_width[t]) <<
+            "tobj_item_width[" << t << "]";
     }
 }
 
@@ -762,16 +762,16 @@ TEST_F(LayoutFixture, in_titlebar_with_extra_extents_top)
 
     // The band is [top_space + extra_top, top_space + extra_top + tt_h)
     // = [7, 24) — the client starts at the margin (4 + 3 + 17 = 24).
-    EXPECT_TRUE(layout.in_titlebar(ctx, 200, 7))
-        << "the band's first row (top_space + extra_top) must be titlebar";
+    EXPECT_TRUE(layout.in_titlebar(ctx, 200, 7)) <<
+        "the band's first row (top_space + extra_top) must be titlebar";
     EXPECT_TRUE(layout.in_titlebar(ctx, 200, 10));
     EXPECT_TRUE(layout.in_titlebar(ctx, 200, 23));
-    EXPECT_FALSE(layout.in_titlebar(ctx, 200, 6))
-        << "the border/extra strip above the titlebar is not titlebar "
-           "(M14's band [4, 21) misclassified it)";
-    EXPECT_FALSE(layout.in_titlebar(ctx, 200, 24))
-        << "the client (margin top = 24) is not titlebar — the band must "
-           "end exactly where the client begins";
+    EXPECT_FALSE(layout.in_titlebar(ctx, 200, 6)) <<
+        "the border/extra strip above the titlebar is not titlebar "
+        "(M14's band [4, 21) misclassified it)";
+    EXPECT_FALSE(layout.in_titlebar(ctx, 200, 24)) <<
+        "the client (margin top = 24) is not titlebar — the band must "
+        "end exactly where the client begins";
 }
 
 // M15 (issue #1): the resize bands must be aligned with the MARGIN (the
@@ -792,9 +792,9 @@ TEST_F(LayoutFixture, resize_bands_aligned_with_margins)
     // top_space + extra_top) = [0, 7); titlebar row (move, no resize) =
     // [7, 24).
     EXPECT_EQ(layout.resize_edges(ctx, 200, 2), EMERALDWF_EDGE_TOP);
-    EXPECT_EQ(layout.resize_edges(ctx, 200, 6), EMERALDWF_EDGE_TOP)
-        << "the border/extra strip [0, 7) resizes the top edge — pre-M15 "
-           "the band ended at [0, 4) and this row was the titlebar";
+    EXPECT_EQ(layout.resize_edges(ctx, 200, 6), EMERALDWF_EDGE_TOP) <<
+        "the border/extra strip [0, 7) resizes the top edge — pre-M15 "
+        "the band ended at [0, 4) and this row was the titlebar";
     EXPECT_EQ(layout.resize_edges(ctx, 200, 7), 0u) << "titlebar row";
     EXPECT_EQ(layout.resize_edges(ctx, 200, 23), 0u) << "titlebar row";
     EXPECT_EQ(layout.resize_edges(ctx, 200, 24), 0u) << "client (margin)";
@@ -809,9 +809,9 @@ TEST_F(LayoutFixture, cursor_region_with_extra_extents_top)
     DecorContext ctx = make_ctx(400, 300, 100);
     layout.build(ws, ctx);
 
-    EXPECT_EQ(layout.cursor_region(ctx, 200, 5), 1)
-        << "y=5 is in the top resize band [0, 7) — pre-M15 it fell in the "
-           "titlebar row (the band was shifted down by extra_top)";
+    EXPECT_EQ(layout.cursor_region(ctx, 200, 5), 1) <<
+        "y=5 is in the top resize band [0, 7) — pre-M15 it fell in the "
+        "titlebar row (the band was shifted down by extra_top)";
     EXPECT_EQ(layout.cursor_region(ctx, 200, 10), 4) << "titlebar row";
 }
 
@@ -825,9 +825,9 @@ TEST_F(LayoutFixture, cursor_region_client_area_is_move)
     layout.build(ws, ctx);
 
     // Client rect (fixture, extra=0): x[6, 406), y[21, 321) port coords.
-    EXPECT_EQ(layout.cursor_region(ctx, 200, 100), 4)
-        << "the client area is the move region (4) — pre-M16 the fallback "
-           "mapped it to the bottom row (7)";
+    EXPECT_EQ(layout.cursor_region(ctx, 200, 100), 4) <<
+        "the client area is the move region (4) — pre-M16 the fallback "
+        "mapped it to the bottom row (7)";
     EXPECT_EQ(layout.cursor_region(ctx, 50, 250), 4);
     EXPECT_EQ(layout.cursor_region(ctx, 390, 320), 4);
 }
@@ -841,10 +841,10 @@ TEST_F(LayoutFixture, cursor_region_shaded_is_move)
     ctx.state = EWS_SHADED;
     layout.build(ws, ctx);
 
-    EXPECT_EQ(layout.cursor_region(ctx, 200, 2), 4)
-        << "shaded: no top resize band — pre-M16 this was region 1";
-    EXPECT_EQ(layout.cursor_region(ctx, 2, 10), 4)
-        << "shaded: no corner resize — pre-M16 this was region 0";
+    EXPECT_EQ(layout.cursor_region(ctx, 200, 2), 4) <<
+        "shaded: no top resize band — pre-M16 this was region 1";
+    EXPECT_EQ(layout.cursor_region(ctx, 2, 10), 4) <<
+        "shaded: no corner resize — pre-M16 this was region 0";
     EXPECT_EQ(layout.cursor_region(ctx, 200, 10), 4) << "titlebar";
     EXPECT_EQ(layout.cursor_region(ctx, 200, 100), 4) << "hidden client";
 }
@@ -874,17 +874,17 @@ TEST_F(LayoutFixture, cursor_region_bands_unchanged)
 TEST_F(LayoutFixture, cursor_region_client_fallback_with_shadow_and_extra)
 {
     ws->left_space = 10;
-    ws->top_space = 8;
+    ws->top_space  = 8;
     ws->extra_extents.left = 2;
-    ws->extra_extents.top = 3;
+    ws->extra_extents.top  = 3;
     DecorContext ctx = make_ctx(400, 300, 100);
     layout.build(ws, ctx);
 
     // l_ext = 8, t_ext_nott = 7, t_ext = 24 (table coords).
     // Client rect in PORT coords: x[12, 412), y[28, 328).
-    EXPECT_EQ(layout.cursor_region(ctx, 200, 150), 4)
-        << "client area maps to move even when port != table coords "
-           "(pre-M16 the fallback gave the bottom row, 7)";
+    EXPECT_EQ(layout.cursor_region(ctx, 200, 150), 4) <<
+        "client area maps to move even when port != table coords "
+        "(pre-M16 the fallback gave the bottom row, 7)";
     // Top resize band in port coords: [shadow_top, shadow_top + t_ext_nott)
     // = [4, 11).
     EXPECT_EQ(layout.cursor_region(ctx, 200, 6), 1) << "top band";
@@ -903,12 +903,12 @@ TEST(M15Test, CropPartsDecompositionConsistentWithMargin)
 {
     // space = 9 = border(4) + shadow(5); extra = 3 → margin = 12.
     const auto p = maximized_crop_parts(9, 4, 3);
-    EXPECT_EQ(p.shadow, 5)
-        << "shadow spread = space - win_ext — pre-M15 it was "
-           "space - win_ext - extra (= 2)";
+    EXPECT_EQ(p.shadow, 5) <<
+        "shadow spread = space - win_ext — pre-M15 it was "
+        "space - win_ext - extra (= 2)";
     EXPECT_EQ(p.border, 7) << "border part = win_ext + extra";
-    EXPECT_EQ(p.shadow + p.border, 12)
-        << "shadow + border must equal the margin (space + extra)";
+    EXPECT_EQ(p.shadow + p.border, 12) <<
+        "shadow + border must equal the margin (space + extra)";
 
     // extra == 0: the decomposition is unchanged by M15.
     const auto q = maximized_crop_parts(9, 4, 0);

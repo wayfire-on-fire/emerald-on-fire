@@ -62,7 +62,7 @@ const char *PIXMAP_TYPES[] = {
 class PixmapIntegrationTest : public ::testing::Test
 {
   protected:
-    static void make_png(const fs::path &p, int r, int g, int b)
+    static void make_png(const fs::path & p, int r, int g, int b)
     {
         cairo_surface_t *s = cairo_image_surface_create(
             CAIRO_FORMAT_ARGB32, 16, 16);
@@ -78,7 +78,7 @@ class PixmapIntegrationTest : public ::testing::Test
     {
         const char *h = std::getenv("HOME");
         old_home_ = (h != nullptr) ? std::string(h) : "";
-        home_ = fs::temp_directory_path() /
+        home_     = fs::temp_directory_path() /
             (fs::path("emeraldwf-pixmap-int") / std::to_string(::getpid()));
         theme_dir_ = home_ / ".emerald" / "theme";
         fs::create_directories(theme_dir_);
@@ -110,8 +110,8 @@ class PixmapIntegrationTest : public ::testing::Test
         }
 
         // button PNGs — the defaults theme sets use_pixmap_buttons=true.
-        for (const auto &entry :
-            fs::directory_iterator(defaults_dir() + "/theme"))
+        for (const auto & entry :
+             fs::directory_iterator(defaults_dir() + "/theme"))
         {
             const std::string name = entry.path().filename().string();
             if (name.rfind("buttons.", 0) == 0)
@@ -151,6 +151,7 @@ class PixmapIntegrationTest : public ::testing::Test
         {
             ::unsetenv("HOME");
         }
+
         fs::remove_all(home_);
     }
 
@@ -163,11 +164,11 @@ TEST_F(PixmapIntegrationTest, FullyPackagedTheme_RendersPixmapNotFallback)
 {
     ThemeSettings ts;
     ASSERT_TRUE(ts.load(home_ / ".emerald" / "settings.ini",
-        theme_dir_.string()))
-        << "loading a fully packaged pixmap theme must succeed";
+        theme_dir_.string())) <<
+        "loading a fully packaged pixmap theme must succeed";
     EXPECT_EQ(ts.engine(), "pixmap");
-    EXPECT_TRUE(ts.has_pixmap_assets())
-        << "a complete 22-file asset set must open the gate";
+    EXPECT_TRUE(ts.has_pixmap_assets()) <<
+        "a complete 22-file asset set must open the gate";
 
     // windowed, active — same ctx shape as the render suite
     const int client_w = 400, client_h = 300;
@@ -194,8 +195,8 @@ TEST_F(PixmapIntegrationTest, FullyPackagedTheme_RendersPixmapNotFallback)
     cairo_surface_t *surf = emeraldwf_render_frame(ts, ctx);
     ASSERT_NE(surf, nullptr);
 
-    const int w       = cairo_image_surface_get_width(surf);
-    const int stride  = cairo_image_surface_get_stride(surf);
+    const int w = cairo_image_surface_get_width(surf);
+    const int stride = cairo_image_surface_get_stride(surf);
     const unsigned char *data =
         (const unsigned char*)cairo_image_surface_get_data(surf);
 
@@ -216,7 +217,7 @@ TEST_F(PixmapIntegrationTest, FullyPackagedTheme_RendersPixmapNotFallback)
     int total   = 0;
     for (int x = w / 2 - 50; x <= w / 2 + 50; x++)
     {
-        if (x < 0 || x >= w)
+        if ((x < 0) || (x >= w))
         {
             continue;
         }
@@ -238,15 +239,15 @@ TEST_F(PixmapIntegrationTest, FullyPackagedTheme_RendersPixmapNotFallback)
     }
 
     EXPECT_GT(total, 0);
-    EXPECT_GT(red_px, total / 2)
-        << "the titlebar center must be the RED `top` texture"
-        << " (pixmap engine rendered); red=" << red_px
-        << "/" << total
-        << " — a gray titlebar means the fallback path ran and the"
-        << " pixmap engine was never invoked (the pre-R1 bug)";
-    EXPECT_LE(gray_px, total / 10)
-        << "the titlebar center must not be the gray fallback fill"
-        << " (153,153,153,204); gray=" << gray_px << "/" << total;
+    EXPECT_GT(red_px, total / 2) <<
+        "the titlebar center must be the RED `top` texture" <<
+        " (pixmap engine rendered); red=" << red_px <<
+        "/" << total <<
+        " — a gray titlebar means the fallback path ran and the" <<
+        " pixmap engine was never invoked (the pre-R1 bug)";
+    EXPECT_LE(gray_px, total / 10) <<
+        "the titlebar center must not be the gray fallback fill" <<
+        " (153,153,153,204); gray=" << gray_px << "/" << total;
 
     cairo_surface_destroy(surf);
 }
@@ -261,9 +262,9 @@ TEST_F(PixmapIntegrationTest, FullyPackagedTheme_RendersPixmapNotFallback)
 // wrapped the size_t extents the same way).
 namespace
 {
-void write_shadow_theme(const fs::path &dir, const std::string &radius,
-    const std::string &offset_x = "0",
-    const std::string &offset_y = "0")
+void write_shadow_theme(const fs::path & dir, const std::string & radius,
+    const std::string & offset_x = "0",
+    const std::string & offset_y = "0")
 {
     fs::create_directories(dir / "theme");
     std::ifstream in(defaults_dir() + "/theme/theme.ini");
@@ -278,7 +279,7 @@ void write_shadow_theme(const fs::path &dir, const std::string &radius,
         {"shadow_offset_x=0", "shadow_offset_x=" + offset_x},
         {"shadow_offset_y=0", "shadow_offset_y=" + offset_y},
     };
-    for (auto &s : subs)
+    for (auto & s : subs)
     {
         const auto p = ini.find(s.key);
         if (p != std::string::npos)
@@ -326,13 +327,13 @@ TEST(ThemeDirMismatch, OnlyPixmapEnginesMismatch)
         std::string{g_get_home_dir()} + "/.emerald/theme";
     const std::string alt = "/tmp/emeraldwf-alt-theme";
 
-    EXPECT_FALSE(theme_dir_mismatched_for_engine("pixmap", def))
-        << "the default theme dir is NOT a mismatch";
+    EXPECT_FALSE(theme_dir_mismatched_for_engine("pixmap", def)) <<
+        "the default theme dir is NOT a mismatch";
     EXPECT_TRUE(theme_dir_mismatched_for_engine("pixmap", alt));
     EXPECT_TRUE(theme_dir_mismatched_for_engine("zootreeves", alt));
-    EXPECT_FALSE(theme_dir_mismatched_for_engine("oxygen", alt))
-        << "only make_filename-based engines (pixmap/zootreeves) "
-           "resolve pixmaps from the hardcoded dir";
+    EXPECT_FALSE(theme_dir_mismatched_for_engine("oxygen", alt)) <<
+        "only make_filename-based engines (pixmap/zootreeves) "
+        "resolve pixmaps from the hardcoded dir";
     EXPECT_FALSE(theme_dir_mismatched_for_engine("legacy", alt));
 }
 
@@ -351,10 +352,10 @@ TEST_F(PixmapIntegrationTest, NonDefaultThemeDir_WarnsForPixmapEngine)
     // void). Capture the warnings; remove the handler by ID (RAII, so an
     // early assertion failure cannot leave it installed).
     std::vector<std::string> warnings;
-    auto capture = +[] (const gchar *, GLogLevelFlags, const gchar *msg,
+    auto capture = +[] (const gchar*, GLogLevelFlags, const gchar *msg,
         gpointer ud)
     {
-        static_cast<std::vector<std::string> *>(ud)->emplace_back(msg);
+        static_cast<std::vector<std::string>*>(ud)->emplace_back(msg);
     };
     const guint handler_id =
         g_log_set_handler(nullptr, G_LOG_LEVEL_WARNING, capture, &warnings);
@@ -373,18 +374,18 @@ TEST_F(PixmapIntegrationTest, NonDefaultThemeDir_WarnsForPixmapEngine)
         alt_dir.string(), "");
 
     ASSERT_TRUE(ok) << "the pixmap load from the alt dir must succeed "
-        "(the engine's textures live in the hardcoded default dir)";
+                       "(the engine's textures live in the hardcoded default dir)";
 
     const bool warned = std::any_of(warnings.begin(), warnings.end(),
         [&] (const std::string & w)
-        {
-            return w.find(alt_dir.string()) != std::string::npos &&
-                w.find("pixmap") != std::string::npos;
-        });
-    EXPECT_TRUE(warned)
-        << "load() must warn that the pixmap engine resolves its "
-           "pixmaps from the hardcoded ~/.emerald/theme; captured: "
-        << (warnings.empty() ? "(none)" : warnings.front());
+    {
+        return w.find(alt_dir.string()) != std::string::npos &&
+        w.find("pixmap") != std::string::npos;
+    });
+    EXPECT_TRUE(warned) <<
+        "load() must warn that the pixmap engine resolves its "
+        "pixmaps from the hardcoded ~/.emerald/theme; captured: " <<
+            (warnings.empty() ? "(none)" : warnings.front());
 }
 
 // M6 (issue #1): a corrupt theme.ini used to load into an EMPTY GKeyFile
@@ -417,10 +418,10 @@ TEST_F(SettingsTest, MissingThemeIniReseedsIndependentOfSettingsIni)
         (dir / "theme").string());
     ASSERT_TRUE(ok);
 
-    EXPECT_TRUE(fs::exists(dir / "theme" / "theme.ini"))
-        << "a missing theme.ini must be re-seeded even when "
-           "settings.ini exists (pre-fix: the early return skipped "
-           "the theme seed)";
+    EXPECT_TRUE(fs::exists(dir / "theme" / "theme.ini")) <<
+        "a missing theme.ini must be re-seeded even when "
+        "settings.ini exists (pre-fix: the early return skipped "
+        "the theme seed)";
 
     // The seed is the vendored default theme (spot-check its engine).
     GKeyFile *f = g_key_file_new();
@@ -428,8 +429,8 @@ TEST_F(SettingsTest, MissingThemeIniReseedsIndependentOfSettingsIni)
         (dir / "theme" / "theme.ini").c_str(),
         G_KEY_FILE_NONE, nullptr);
     gchar *eng = g_key_file_get_string(f, "engine", "engine", nullptr);
-    EXPECT_STREQ(eng, "vrunner")
-        << "the re-seeded theme must be the vendored default";
+    EXPECT_STREQ(eng, "vrunner") <<
+        "the re-seeded theme must be the vendored default";
     g_free(eng);
     g_key_file_free(f);
 }
@@ -441,8 +442,8 @@ TEST_F(SettingsTest, ExistingThemeNotOverwrittenBySeed)
     const fs::path dir = tmp_dir_ / "m8-keep";
     fs::create_directories(dir / "theme");
     std::ofstream(dir / "settings.ini") << "# present\n";
-    std::ofstream(dir / "theme" / "theme.ini")
-        << "[engine]\nengine=oxygen\n[titlebar]\nactive_text=#ff0000\n";
+    std::ofstream(dir / "theme" / "theme.ini") <<
+        "[engine]\nengine=oxygen\n[titlebar]\nactive_text=#ff0000\n";
 
     ThemeSettings ts;
     const bool ok = ts.load((dir / "settings.ini").string(),
@@ -465,10 +466,10 @@ TEST_F(SettingsTest, FreshDirSeedsBothFiles)
     const bool ok = ts.load((dir / "settings.ini").string(),
         (dir / "theme").string());
     ASSERT_TRUE(ok);
-    EXPECT_TRUE(fs::exists(dir / "settings.ini"))
-        << "a fresh dir must seed settings.ini";
-    EXPECT_TRUE(fs::exists(dir / "theme" / "theme.ini"))
-        << "a fresh dir must seed theme.ini";
+    EXPECT_TRUE(fs::exists(dir / "settings.ini")) <<
+        "a fresh dir must seed settings.ini";
+    EXPECT_TRUE(fs::exists(dir / "theme" / "theme.ini")) <<
+        "a fresh dir must seed theme.ini";
 }
 
 TEST(ButtonFadeOverflow, HugeDurationPulseDerivationDoesNotOverflow)
@@ -478,9 +479,9 @@ TEST(ButtonFadeOverflow, HugeDurationPulseDerivationDoesNotOverflow)
     emeraldwf_apply_button_fade(ws, true, true, INT_MAX, 50, 0, 0);
     const int num = INT_MAX / 50; // 42949672
     ASSERT_EQ(ws->button_fade_num_steps, num);
-    EXPECT_EQ(ws->button_fade_pulse_len_steps, num)
-        << "min_opacity=0 -> pulse_len == num; pre-fix num * 100 "
-           "overflowed int (UB, wrapped to a garbage value)";
+    EXPECT_EQ(ws->button_fade_pulse_len_steps, num) <<
+        "min_opacity=0 -> pulse_len == num; pre-fix num * 100 "
+        "overflowed int (UB, wrapped to a garbage value)";
     delete ws;
 }
 
@@ -505,16 +506,16 @@ TEST_F(SettingsTest, CorruptThemeIniWarnsWithPathAndStaysTolerant)
 {
     const fs::path dir = tmp_dir_ / "m6-corrupt";
     fs::create_directories(dir / "theme");
-    std::ofstream(dir / "theme" / "theme.ini")
-        << "this is not a keyfile [[[ {{{\n";
+    std::ofstream(dir / "theme" / "theme.ini") <<
+        "this is not a keyfile [[[ {{{\n";
     std::ofstream(dir / "settings.ini") << "# test\n";
 
     // Capture glib warnings (handler replaced by ID; RAII removal).
     std::vector<std::string> warnings;
-    auto capture = +[] (const gchar *, GLogLevelFlags, const gchar *msg,
+    auto capture = +[] (const gchar*, GLogLevelFlags, const gchar *msg,
         gpointer ud)
     {
-        static_cast<std::vector<std::string> *>(ud)->emplace_back(msg);
+        static_cast<std::vector<std::string>*>(ud)->emplace_back(msg);
     };
     const guint handler_id =
         g_log_set_handler(nullptr, G_LOG_LEVEL_WARNING, capture, &warnings);
@@ -530,21 +531,21 @@ TEST_F(SettingsTest, CorruptThemeIniWarnsWithPathAndStaysTolerant)
     ThemeSettings ts;
     const bool ok = ts.load((dir / "settings.ini").string(),
         (dir / "theme").string());
-    ASSERT_TRUE(ok)
-        << "a corrupt theme.ini must not kill the load (tolerant: bare "
-           "defaults)";
+    ASSERT_TRUE(ok) <<
+        "a corrupt theme.ini must not kill the load (tolerant: bare "
+        "defaults)";
 
     const std::string theme_ini_path =
         (dir / "theme" / "theme.ini").string();
     const bool warned = std::any_of(warnings.begin(), warnings.end(),
         [&] (const std::string & w)
-        {
-            return w.find(theme_ini_path) != std::string::npos;
-        });
-    EXPECT_TRUE(warned)
-        << "load() must warn with the theme.ini path on a GKeyFile "
-           "failure; captured: "
-        << (warnings.empty() ? "(none)" : warnings.front());
+    {
+        return w.find(theme_ini_path) != std::string::npos;
+    });
+    EXPECT_TRUE(warned) <<
+        "load() must warn with the theme.ini path on a GKeyFile "
+        "failure; captured: " <<
+            (warnings.empty() ? "(none)" : warnings.front());
 }
 
 TEST_F(SettingsTest, ShadowRadiusClampedAtLoad)
@@ -554,11 +555,11 @@ TEST_F(SettingsTest, ShadowRadiusClampedAtLoad)
 
     ThemeSettings ts;
     ASSERT_TRUE(ts.load((dir / "settings.ini").string(),
-        (dir / "theme").string()))
-        << "a huge shadow_radius must not kill the load"
-        << " (pre-fix: ~640 GB allocation -> bad_alloc -> terminate)";
-    EXPECT_EQ(ts.ws()->shadow_radius, 200.0)
-        << "out-of-range shadow_radius must be clamped at load";
+        (dir / "theme").string())) <<
+        "a huge shadow_radius must not kill the load" <<
+        " (pre-fix: ~640 GB allocation -> bad_alloc -> terminate)";
+    EXPECT_EQ(ts.ws()->shadow_radius, 200.0) <<
+        "out-of-range shadow_radius must be clamped at load";
 }
 
 TEST_F(SettingsTest, ShadowRadiusNegativeClampedToZero)
@@ -571,10 +572,10 @@ TEST_F(SettingsTest, ShadowRadiusNegativeClampedToZero)
 
     ThemeSettings ts;
     ASSERT_TRUE(ts.load((dir / "settings.ini").string(),
-        (dir / "theme").string()))
-        << "a negative shadow_radius must not kill the load";
-    EXPECT_EQ(ts.ws()->shadow_radius, 0.0)
-        << "negative shadow_radius must clamp to 0";
+        (dir / "theme").string())) <<
+        "a negative shadow_radius must not kill the load";
+    EXPECT_EQ(ts.ws()->shadow_radius, 0.0) <<
+        "negative shadow_radius must clamp to 0";
 }
 
 TEST_F(SettingsTest, ShadowRadiusNaNNormalizedToZero)
@@ -587,10 +588,10 @@ TEST_F(SettingsTest, ShadowRadiusNaNNormalizedToZero)
 
     ThemeSettings ts;
     ASSERT_TRUE(ts.load((dir / "settings.ini").string(),
-        (dir / "theme").string()))
-        << "a non-finite shadow_radius must not kill the load";
-    EXPECT_EQ(ts.ws()->shadow_radius, 0.0)
-        << "NaN shadow_radius must normalize to 0";
+        (dir / "theme").string())) <<
+        "a non-finite shadow_radius must not kill the load";
+    EXPECT_EQ(ts.ws()->shadow_radius, 0.0) <<
+        "NaN shadow_radius must normalize to 0";
 }
 
 TEST_F(SettingsTest, ShadowRadiusBoundaryClamped)
@@ -601,8 +602,8 @@ TEST_F(SettingsTest, ShadowRadiusBoundaryClamped)
     ThemeSettings ts;
     ASSERT_TRUE(ts.load((dir / "settings.ini").string(),
         (dir / "theme").string()));
-    EXPECT_EQ(ts.ws()->shadow_radius, 200.0)
-        << "just above the cap must clamp to it";
+    EXPECT_EQ(ts.ws()->shadow_radius, 200.0) <<
+        "just above the cap must clamp to it";
 }
 
 TEST_F(SettingsTest, ShadowOffsetsClamped)
@@ -617,9 +618,9 @@ TEST_F(SettingsTest, ShadowOffsetsClamped)
 
     ThemeSettings ts;
     ASSERT_TRUE(ts.load((dir / "settings.ini").string(),
-        (dir / "theme").string()))
-        << "huge shadow offsets must not kill the load"
-        << " (pre-fix: ~2e9 px frame -> quadratic allocation)";
+        (dir / "theme").string())) <<
+        "huge shadow offsets must not kill the load" <<
+        " (pre-fix: ~2e9 px frame -> quadratic allocation)";
     EXPECT_EQ(ts.ws()->shadow_offset_x, 200);
     EXPECT_EQ(ts.ws()->shadow_offset_y, -200);
 }
@@ -1935,7 +1936,7 @@ class PixmapAssetsTest : public ::testing::Test
         fs::remove_all(dir_);
     }
 
-    void touch(const std::string &name)
+    void touch(const std::string & name)
     {
         std::ofstream(dir_ / ("pixmaps." + name + ".png")) << "png";
     }
@@ -1948,7 +1949,7 @@ class PixmapAssetsTest : public ::testing::Test
         }
     }
 
-    void write_theme_ini(const std::string &content)
+    void write_theme_ini(const std::string & content)
     {
         std::ofstream(dir_ / "theme.ini") << content;
     }
@@ -1981,6 +1982,7 @@ TEST_F(PixmapAssetsTest, PartialActiveSet_ReturnsFalse)
     {
         touch(std::string("active_") + t);
     }
+
     EXPECT_FALSE(theme_has_pixmap_assets(dir_.string()));
 }
 
