@@ -196,6 +196,11 @@ test('emeraldwf-run-kvm-fetch', find_program('test_run_kvm_fetch.sh'))
 # silently target the stale guest via the deterministic port). Shell-level test.
 test('emeraldwf-run-kvm-livewm', find_program('test_run_kvm_livewm.sh'))
 
+# Minor (issue #1): the openSUSE cloud-init user-data must not ship a fixed,
+# guessable root password with password auth enabled (the VM is reached by
+# SSH key). Shell-level test.
+test('emeraldwf-cloudinit-opensuse', find_program('test_cloudinit_opensuse.sh'))
+
 # M26 (issue #1): matrix.sh must exit non-zero when any distro fails
 # (shell-level test: extracts the collect_results() block and runs it
 # with a stubbed wait - the real script needs qemu + /dev/kvm).

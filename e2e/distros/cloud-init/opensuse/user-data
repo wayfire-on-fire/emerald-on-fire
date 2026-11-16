@@ -1,14 +1,15 @@
 #cloud-config
 # NoCloud seed for the emeraldwf openSUSE Tumbleweed test VM.
 # __PUBKEY__ is substituted by run-kvm.sh with the host's ssh public key.
-# We SSH in as ROOT: openSUSE cloud-init applies the users: list's
-# ssh_authorized_keys reliably (a late runcmd did not stick on this image),
-# so the key is set here for root AND the opensuse default user. A root
-# password (chpasswd) is a console fallback. ssh_pwauth stays ON so the
-# password path works.
+# We SSH in as ROOT via KEY ONLY: openSUSE cloud-init applies the users:
+# list's ssh_authorized_keys reliably (a late runcmd did not stick on this
+# image), so the key is set here for root AND the opensuse default user.
+# Password auth is disabled (ssh_pwauth: false) and NO root password is set:
+# the VM is reached by key, and a fixed, guessable root password (the project
+# name) in a test seed would be a secret (the arch user-data is the same).
 hostname: emeraldwf-opensuse
 disable_root: false
-ssh_pwauth: true
+ssh_pwauth: false
 users:
   - name: root
     ssh_authorized_keys:
@@ -17,11 +18,13 @@ users:
     sudo: ["ALL=(ALL) NOPASSWD:ALL"]
     ssh_authorized_keys:
       - __PUBKEY__
-chpasswd:
-  expire: false
-  users:
-    - root:emeraldwf
 runcmd:
+  # Lock the root password explicitly: dropping the chpasswd block above only
+  # stops SETTING a password, it does not guarantee the base image has no
+  # usable root password. Locking (usermod -L) disables password auth for
+  # root while leaving SSH KEY login working — defense in depth alongside
+  # ssh_pwauth: false + PermitRootLogin prohibit-password.
+  - usermod -L root 2>/dev/null || true
   - mkdir -p /root/.ssh
   - echo '__PUBKEY__' >> /root/.ssh/authorized_keys
   - chmod 700 /root/.ssh
