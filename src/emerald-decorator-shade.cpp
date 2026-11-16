@@ -119,7 +119,7 @@ void emerald_decorator_t::on_shade_progress(double progress)
     const int client_h  = unshaded_client_h();
     const int thickness =
         (theme && theme->valid() && theme->ws() != nullptr) ?
-        theme->ws()->win_extents.left : 6;
+        theme->ws()->win_extents.left : EMERALDWF_DEFAULT_BORDER;
     // Strip = top margin for SSD (shadow+border+titlebar), CSD titlebar
     // for CSD — the height the window collapses to (finding 15).
     int strip = titlebar_height;
@@ -331,7 +331,7 @@ void emerald_decorator_t::toggle_shade(bool shade)
     const int client_h  = unshaded_client_h();
     const int thickness =
         (theme && theme->valid() && theme->ws() != nullptr) ?
-        theme->ws()->win_extents.left : 6;
+        theme->ws()->win_extents.left : EMERALDWF_DEFAULT_BORDER;
     export_shadow_margins(view, client_h, thickness, strip,
         tr->get_progression(),
         effective_min_client_h(view->toplevel()->get_min_size().height,

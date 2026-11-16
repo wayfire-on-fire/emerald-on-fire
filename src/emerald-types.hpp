@@ -18,6 +18,14 @@
 
 namespace wf::emeraldwf
 {
+// Emerald's default LEFT/BOTTOM border value (emerald.h:
+// `win_extents = {6,6,4,6}` — left/right/bottom are 6, top is 4 — and
+// `bottom_space = 6`). The fallback shadow thickness (win_extents.left) and
+// bottom margin (bottom_space) used when a view has no valid theme. Named so
+// the default is not a magic number scattered across the decorator (Minor,
+// issue #1). NOT the top extent (which defaults to 4).
+constexpr int EMERALDWF_DEFAULT_BORDER = 6;
+
 // Bit values identical to libwnck (see D4) so the bridge can static_cast
 // into original emerald WnckWindowState/WnckWindowActions fields.
 enum EmeraldWindowState : uint32_t

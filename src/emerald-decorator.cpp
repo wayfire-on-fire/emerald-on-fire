@@ -366,7 +366,7 @@ int emerald_decorator_t::unshaded_client_h() const
 
     const auto & pending = view->toplevel()->pending();
     const int top = static_cast<int>(pending.margins.top);
-    int bottom    = 6;  // MarginsInput's default bottom_space
+    int bottom    = EMERALDWF_DEFAULT_BORDER; // emerald's default bottom_space
     if (theme && theme->valid() && (theme->ws() != nullptr))
     {
         const auto *ws = theme->ws();

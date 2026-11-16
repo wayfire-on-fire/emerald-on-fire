@@ -259,3 +259,37 @@ TEST(ShadeSource, NoViewMemberShadowsBase)
         std::string::npos) <<
         "the renamed member must be `toplevel_view`";
 }
+
+// Minor (issue #1): emerald's default border value (6) was hardcoded in
+// three places as the fallback when a view has no valid theme: the
+// bottom_space margin default in emerald-decorator.cpp and the win_extents
+// shadow-thickness fallback (x2) in emerald-decorator-shade.cpp. emerald.h
+// documents win_extents = {6,6,4,6} and bottom_space = 6. Name it
+// (EMERALDWF_DEFAULT_BORDER, emerald-types.hpp) so the default is not a
+// magic number scattered across the decorator.
+TEST(DecoratorSource, NoHardcodedDefaultBorder)
+{
+    const std::string root = std::string{EMERALDWF_TEST_SOURCE_ROOT};
+
+    const std::string types = read_file(root + "/src/emerald-types.hpp");
+    ASSERT_FALSE(types.empty()) << "src/emerald-types.hpp must be readable";
+    EXPECT_NE(types.find("EMERALDWF_DEFAULT_BORDER"), std::string::npos) <<
+        "a named constant for emerald's default border (6) must exist in "
+        "emerald-types.hpp";
+
+    const std::string dec = read_file(root + "/src/emerald-decorator.cpp");
+    ASSERT_FALSE(dec.empty()) << "src/emerald-decorator.cpp must be readable";
+    EXPECT_EQ(dec.find("int bottom    = 6;"), std::string::npos) <<
+        "the bottom_space fallback must not be a magic 6";
+    EXPECT_NE(dec.find("EMERALDWF_DEFAULT_BORDER"), std::string::npos) <<
+        "the bottom_space fallback must use the named constant";
+
+    const std::string ds =
+        read_file(root + "/src/emerald-decorator-shade.cpp");
+    ASSERT_FALSE(ds.empty()) <<
+        "src/emerald-decorator-shade.cpp must be readable";
+    EXPECT_EQ(ds.find("win_extents.left : 6;"), std::string::npos) <<
+        "the win_extents shadow-thickness fallback must not be a magic 6";
+    EXPECT_NE(ds.find("EMERALDWF_DEFAULT_BORDER"), std::string::npos) <<
+        "the win_extents fallback must use the named constant";
+}
