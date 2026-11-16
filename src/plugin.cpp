@@ -1042,20 +1042,21 @@ void emeraldwf_plugin::init()
         }
     };
 
-    // Part 06 (M29, issue #1): wayfire just re-set every registered option
-    // (inotify config reload; workarounds/auto_reload_config) and emitted
-    // this signal — the set_callback() handlers above already armed the
-    // debounced reload for the options that changed. Arm it unconditionally
-    // so options without a callback (e.g. enable_shade) reach the theme
-    // too. The option manager stays authoritative: this signal is NOT
-    // file-specific (wayfire IPC emits it for programmatic option changes
-    // too), so the handler must not re-read the config file and re-apply
-    // its values — that would revert a legitimate runtime change to the
-    // file's value (ChatGPT review of M29).
+    // Part 06 (M29, issue #1): wayfire just re-set the changed options and
+    // emitted this signal. Minor (issue #1): this handler no longer arms the
+    // debounced reload unconditionally - pre-fix it fired on ANY option
+    // change, even when the option's set_callback() handler had already
+    // applied the effect (in-place for the click actions, recreate() for
+    // maximized_borders/shadows, armed the reload for theme_dir/engine and
+    // the global emerald settings). Options read at call time (enable_shade,
+    // etc.) need no reload. So the handler is a no-op. The option
+    // manager stays authoritative: this signal is NOT file-specific (wayfire
+    // IPC emits it for programmatic option changes too), so the handler must
+    // not re-read the config file and re-apply its values — that would revert
+    // a legitimate runtime change to the file's value (ChatGPT review of M29).
     on_config_reload = [this] (wf::reload_config_signal* /*ev*/)
     {
-        LOGD("emeraldwf: config reloaded — arming theme reload");
-        arm_reload();
+        LOGD("emeraldwf: config reloaded");
     };
 
     wf::get_core().tx_manager->connect(&on_new_tx);

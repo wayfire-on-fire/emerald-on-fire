@@ -297,10 +297,9 @@ TEST(PluginSource, WayfireConfigUsesReloadSignalNotMtimePoll)
     EXPECT_NE(init.find("connect(&on_config_reload)"), std::string::npos) <<
         "init() must connect the reload_config_signal (M29)";
 
-    // 3. The handler arms the debounced theme reload and re-applies the
-    // emeraldwf options through the lenient sync (M21) using the
-    // WAYFIRE_CONFIG_FILE env var that wayfire's config backend sets
-    // at init.
+    // 3. The handler does NOT re-read the config file. (Minor, issue #1: it
+    // also no longer arms the debounced reload unconditionally - the
+    // individual option callbacks arm it for the options that need one.)
     const size_t handler = init.find("on_config_reload = [");
     ASSERT_NE(handler, std::string::npos) <<
         "init() must assign the on_config_reload handler (M29)";
@@ -329,9 +328,13 @@ TEST(PluginSource, WayfireConfigUsesReloadSignalNotMtimePoll)
     const std::string handler_body =
         init.substr(open + 1, close - open - 1);
 
-    EXPECT_NE(handler_body.find("arm_reload()"), std::string::npos) <<
-        "the reload_config_signal handler must arm the debounced "
-        "theme reload (M29)";
+    // Minor (issue #1): the handler no longer arms the reload
+    // unconditionally - the individual option callbacks arm it for the
+    // options that need one (pre-fix it fired on ANY option change, even
+    // when the option's callback had already applied the effect).
+    EXPECT_EQ(handler_body.find("arm_reload()"), std::string::npos) <<
+        "the reload_config_signal handler must not arm the reload "
+        "unconditionally (the option callbacks do) (Minor, issue #1)";
     // ChatGPT review (M29): the signal is NOT file-specific — wayfire IPC
     // (ipc-rules set_config_options) emits it for programmatic option
     // changes too. Re-reading the file and re-applying its values would
@@ -548,5 +551,102 @@ TEST(PluginSource, GetHomeDirNullChecked)
         "- transfer-none)";
     EXPECT_NE(src.find("g_get_home_dir()"), std::string::npos) <<
         "g_get_home_dir() must still be used (now NULL-checked)";
+}
+
+// Minor (issue #1): the on_config_reload handler armed the debounced theme
+// reload on ANY config reload, even when the individual option callbacks had
+// already applied the effect (in-place for double/middle_click_action, or
+// armed the reload for the others, or recreated the decorations for
+// maximized_borders/maximized_shadows). Every option that needs a theme
+// reload has a callback that arms it (engine, theme_dir, the global emerald
+// settings); options read at call time need none. So the handler no longer
+// arms a reload unconditionally - it is a no-op.
+TEST(PluginSource, ConfigReloadDoesNotArmReloadUnconditionally)
+{
+    const std::string src =
+        read_file(std::string{EMERALDWF_TEST_SOURCE_ROOT} + "/src/plugin.cpp");
+    ASSERT_FALSE(src.empty()) << "src/plugin.cpp must be readable";
+
+    // Extract the on_config_reload lambda body.
+    const size_t at = src.find("on_config_reload = [this]");
+    ASSERT_NE(at, std::string::npos) << "could not locate on_config_reload";
+    const size_t open = src.find('{', at);
+    ASSERT_NE(open, std::string::npos);
+    int depth  = 0;
+    size_t end = open;
+    for (size_t i = open; i < src.size(); i++)
+    {
+        if (src[i] == '{')
+        {
+            depth++;
+        } else if (src[i] == '}')
+        {
+            depth--;
+            if (depth == 0)
+            {
+                end = i;
+                break;
+            }
+        }
+    }
+
+    const std::string body = src.substr(open + 1, end - open - 1);
+    EXPECT_EQ(body.find("arm_reload()"), std::string::npos) <<
+        "the on_config_reload handler must not arm a reload unconditionally "
+        "(the option callbacks already arm it for the options that need one)";
+
+    // The options that genuinely need a theme reload must keep the callbacks
+    // that arm it (so making the handler a no-op does not break reloads).
+    // Extract each callback body by brace-matching from its set_callback.
+    const auto cb_body = [&src] (const std::string & anchor) -> std::string
+    {
+        const size_t at = src.find(anchor);
+        if (at == std::string::npos)
+        {
+            return std::string{};
+        }
+
+        const size_t open = src.find('{', at);
+        if (open == std::string::npos)
+        {
+            return std::string{};
+        }
+
+        int depth    = 0;
+        size_t close = std::string::npos;
+        for (size_t i = open; i < src.size(); i++)
+        {
+            if (src[i] == '{')
+            {
+                depth++;
+            } else if (src[i] == '}')
+            {
+                depth--;
+                if (depth == 0)
+                {
+                    close = i;
+                    break;
+                }
+            }
+        }
+
+        if (close == std::string::npos)
+        {
+            return std::string{};
+        }
+
+        return src.substr(open + 1, close - open - 1);
+    };
+
+    const std::string engine_body = cb_body("engine.set_callback");
+    ASSERT_FALSE(engine_body.empty()) << "engine must have a callback";
+    EXPECT_NE(engine_body.find("arm_reload()"), std::string::npos) <<
+        "the engine callback must arm the reload (a theme rebuild is needed "
+        "to swap the engine)";
+    const std::string theme_body = cb_body("theme_dir.set_callback");
+    ASSERT_FALSE(theme_body.empty()) << "theme_dir must have a callback";
+    EXPECT_NE(theme_body.find("arm_reload()"), std::string::npos) <<
+        "the theme_dir callback must arm the reload (a theme rebuild is "
+        "needed to load the new dir)";
 }
 } // namespace
