@@ -209,7 +209,13 @@ fi
 # emerald's default theme, which the installed plugin resolves at
 # <so-dir>/emeraldwf-defaults/theme (so-dir = <libdir>/wayfire). Fallback:
 # <XDG>/emeraldwf/defaults/theme (the plugin probes both).
-WF_PLUGDIR=$(pkg-config --variable=libdir wayfire 2>/dev/null || echo /usr/lib/wayfire)/wayfire
+# M28 (issue #1): derive from $LIBDIR (the SAME value the plugin was
+# just installed into, line above) - the old inline pkg-config fallback
+# was /usr/lib/wayfire (already containing 'wayfire'), so on a pkg-config
+# failure WF_PLUGDIR became /usr/lib/wayfire/wayfire: the placement check
+# looked in the wrong dir and silently took the ~/.local fallback even
+# though the plugin WAS at /usr/lib/wayfire.
+WF_PLUGDIR="$LIBDIR/wayfire"
 if [ -d "$WF_PLUGDIR" ] && [ -w "$WF_PLUGDIR" ]; then
     rm -rf "$WF_PLUGDIR/emeraldwf-defaults"
     mkdir -p "$WF_PLUGDIR/emeraldwf-defaults"

@@ -209,6 +209,12 @@ emeraldwf_makefile_docker = executable('emeraldwf-makefile-docker',
     dependencies: [gtest, gtest_main])
 test('emeraldwf-makefile-docker', emeraldwf_makefile_docker)
 
+# M28 (issue #1): install.sh WF_PLUGDIR must be the dir the plugin was
+# installed into ($LIBDIR/wayfire) - shell-level test: extracts the
+# assignment and evaluates it with a stubbed pkg-config (fail + ok +
+# non-default libdir).
+test('emeraldwf-install-plugdir', find_program('test_install_plugdir.sh'))
+
 # ---- part 07: engine pane / engine module lifetime (findings 46/47) ----
 # Regression for the "Round Top Left Corner" SEGV_MAPERR: append_engine's
 # dlclose unmapped the engine .so (static-vendored libemeraldengine) while
