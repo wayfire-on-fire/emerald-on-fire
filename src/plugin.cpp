@@ -561,6 +561,17 @@ void emeraldwf_plugin::export_csd_shadow_margins(wayfire_view view)
         return;
     }
 
+    // Minor (issue #1): CSD views only. An SSD view has a decorator that
+    // exports its OWN theme-derived shadow margins; exporting the CSD margins
+    // (thickness = shadow_pad) here would overwrite them (a spurious
+    // standalone shadow with shadow_pad > 0). Several call sites (init,
+    // adjust_new_decorations, the csd_titlebar_height / shadow_pad callbacks)
+    // iterate ALL views, so guard here instead of at every site.
+    if (toplevel->toplevel()->get_data<emerald_decorator_t>() != nullptr)
+    {
+        return;
+    }
+
     const auto & pending = toplevel->toplevel()->pending();
     if (pending.fullscreen)
     {

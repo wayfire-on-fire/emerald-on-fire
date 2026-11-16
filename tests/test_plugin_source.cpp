@@ -491,4 +491,28 @@ TEST(PluginSource, LastStampPrunedToWatchedPaths)
         "watched (a theme_dir change swaps the watched set; the old entries "
         "were never removed)";
 }
+
+// Minor (issue #1): export_csd_shadow_margins() is called from several sites
+// that iterate ALL views (init, adjust_new_decorations, the
+// csd_titlebar_height / shadow_pad option callbacks). For an SSD view (one
+// with a decorator) it overwrote the decorator's theme-derived shadow margins
+// with the CSD margins (thickness = shadow_pad) - a spurious standalone
+// shadow with shadow_pad > 0. The function must skip views that have a
+// decorator.
+TEST(PluginSource, ExportCsdShadowMarginsSkipsSsdViews)
+{
+    const std::string src =
+        read_file(std::string{EMERALDWF_TEST_SOURCE_ROOT} + "/src/plugin.cpp");
+    ASSERT_FALSE(src.empty()) << "src/plugin.cpp must be readable";
+
+    const std::string body =
+        fn_body(src, "void emeraldwf_plugin::export_csd_shadow_margins(");
+    ASSERT_FALSE(body.empty()) <<
+        "could not locate emeraldwf_plugin::export_csd_shadow_margins()";
+
+    EXPECT_NE(body.find("get_data<emerald_decorator_t>"), std::string::npos) <<
+        "export_csd_shadow_margins() must skip SSD views (those with a "
+        "decorator) so it does not overwrite the decorator's theme-derived "
+        "shadow margins";
+}
 } // namespace
