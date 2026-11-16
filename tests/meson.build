@@ -223,6 +223,11 @@ test('emeraldwf-install-version', find_program('test_install_version.sh'))
 # libemeraldengine bakes ENGINE_DIR at compile time. Shell-level test.
 test('emeraldwf-install-builtree', find_program('test_install_builtree.sh'))
 
+# Minor (issue #1): install.sh's default-theme refresh must be ATOMIC (temp
+# dir + rename), not a bare rm -rf + cp -r that leaves a window where a
+# running plugin sees a missing/incomplete theme. Shell-level test.
+test('emeraldwf-install-defaulttheme', find_program('test_install_defaulttheme.sh'))
+
 # ---- part 07: engine pane / engine module lifetime (findings 46/47) ----
 # Regression for the "Round Top Left Corner" SEGV_MAPERR: append_engine's
 # dlclose unmapped the engine .so (static-vendored libemeraldengine) while

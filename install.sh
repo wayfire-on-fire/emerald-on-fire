@@ -195,6 +195,45 @@ is_versioned_so() {
     [[ "$base" =~ ^lib.*\.so\.[0-9]+\.[0-9]+\.[0-9]+$ ]]
 }
 
+# Refresh a directory's contents ATOMICALLY: populate a temp dir first, then
+# swap it into place with a rename. A running wayfire plugin reads the default
+# theme (the engine-override mismatch path); the old `rm -rf <dest> && cp -r`
+# left a window where the theme was missing/incomplete. Populating the temp
+# dir BEFORE the rm makes the swap a single fast rename (the window is one
+# syscall, not the whole copy).
+DEFAULT_THEME_TMP=""
+cleanup_default_theme_tmp() {
+    if [ -n "$DEFAULT_THEME_TMP" ] && [ -d "$DEFAULT_THEME_TMP" ]; then
+        rm -rf "$DEFAULT_THEME_TMP"
+    fi
+}
+
+refresh_default_theme() {  # destdir
+    local dest="$1" parent tmp backup=""
+    parent="$(dirname "$dest")"
+    mkdir -p "$parent"
+    tmp="$(mktemp -d "$parent/.emeraldwf-defaults.XXXXXX")" || return 1
+    DEFAULT_THEME_TMP="$tmp"
+    trap cleanup_default_theme_tmp EXIT
+    cp -r "$DEFAULTS/theme" "$tmp/theme"
+    # Backup-and-swap: rename the old dir out (fast), rename the new one in
+    # (fast), THEN remove the old (slow) - so the window of a missing theme is
+    # two renames, not a slow rm -rf of the old theme.
+    if [ -e "$dest" ]; then
+        backup="$parent/.emeraldwf-defaults.old.$$"
+        if ! mv "$dest" "$backup"; then
+            rm -rf "$tmp"; DEFAULT_THEME_TMP=""; return 1
+        fi
+    fi
+    if ! mv "$tmp" "$dest"; then
+        # Roll back: restore the old theme, drop the temp.
+        [ -n "$backup" ] && mv "$backup" "$dest"
+        rm -rf "$tmp"; DEFAULT_THEME_TMP=""; return 1
+    fi
+    DEFAULT_THEME_TMP=""
+    [ -n "$backup" ] && rm -rf "$backup"
+}
+
 echo "==> installing (plugin, engines, metadata, icon)"
 # [ -w ] is false for a missing path, so create the target dirs first.
 mkdir -p "$DATADIR/wayfire/metadata" 2>/dev/null || true
@@ -267,14 +306,10 @@ fi
 # though the plugin WAS at /usr/lib/wayfire.
 WF_PLUGDIR="$LIBDIR/wayfire"
 if [ -d "$WF_PLUGDIR" ] && [ -w "$WF_PLUGDIR" ]; then
-    rm -rf "$WF_PLUGDIR/emeraldwf-defaults"
-    mkdir -p "$WF_PLUGDIR/emeraldwf-defaults"
-    cp -r "$DEFAULTS/theme" "$WF_PLUGDIR/emeraldwf-defaults/theme"
+    refresh_default_theme "$WF_PLUGDIR/emeraldwf-defaults"
     echo "==> default theme → $WF_PLUGDIR/emeraldwf-defaults/theme"
 else
-    rm -rf "${XDG_DATA_HOME:-$USER_HOME/.local/share}/emeraldwf/defaults"
-    mkdir -p "${XDG_DATA_HOME:-$USER_HOME/.local/share}/emeraldwf/defaults"
-    cp -r "$DEFAULTS/theme" "${XDG_DATA_HOME:-$USER_HOME/.local/share}/emeraldwf/defaults/theme"
+    refresh_default_theme "${XDG_DATA_HOME:-$USER_HOME/.local/share}/emeraldwf/defaults"
     echo "==> $WF_PLUGDIR not writable — default theme → ~/.local/share/emeraldwf/defaults/theme"
 fi
 
@@ -357,15 +392,14 @@ else
 fi
 sed -i "s|^Exec=.*|Exec=$BIN_DEST|" "$DESKTOP_DEST"
 
-# default theme (system tier)
+# default theme (system tier) - refreshed atomically, like the plugin's
+# default theme above (the themer reads this tier; a running themer would see
+# a missing theme during a non-atomic rm -rf + cp -r).
 if install -d /usr/share/emeraldwf/themes 2>/dev/null; then
-    rm -rf /usr/share/emeraldwf/themes/default
-    cp -r "$DEFAULTS/theme" /usr/share/emeraldwf/themes/default
+    refresh_default_theme /usr/share/emeraldwf/themes/default
     echo "==> default theme → /usr/share/emeraldwf/themes/default"
 else
-    rm -rf "$XDG/emeraldwf/themes/default"
-    mkdir -p "$XDG/emeraldwf/themes"
-    cp -r "$DEFAULTS/theme" "$XDG/emeraldwf/themes/default"
+    refresh_default_theme "$XDG/emeraldwf/themes/default"
     echo "==> /usr/share not writable — default theme → ~/.local/share/emeraldwf/themes/default"
 fi
 
