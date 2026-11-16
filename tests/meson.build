@@ -221,6 +221,10 @@ test('emeraldwf-makefile-single-build', find_program('test_makefile_single_build
 # copy-pasted in the Dockerfile, ci.yml, and provision.sh. Shell-level test.
 test('emeraldwf-wayfire-src-single', find_program('test_wayfire_src_single.sh'))
 
+# Minor (issue #1): the ci.yml `arch` job must install packages without a full
+# system upgrade (pacman -Syu is slow + non-deterministic). Shell-level test.
+test('emeraldwf-ci-arch-no-upgrade', find_program('test_ci_arch_no_full_upgrade.sh'))
+
 # M28 (issue #1): install.sh WF_PLUGDIR must be the dir the plugin was
 # installed into ($LIBDIR/wayfire) - shell-level test: extracts the
 # assignment and evaluates it with a stubbed pkg-config (fail + ok +

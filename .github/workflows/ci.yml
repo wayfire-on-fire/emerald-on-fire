@@ -73,8 +73,19 @@ jobs:
       matrix:
         include:
           - distro: arch
-            image: archlinux:latest
+            # Pinned to a date tag (not :latest) so the base system is
+            # deterministic across runs. Arch is rolling; a bare :latest base
+            # would let an Arch base release change the build environment for a
+            # reason unrelated to the plugin.
+            image: archlinux:base-20261108.0.623074
             install: |
+              # pacman -Syu (NOT a bare -Sy): Arch is a rolling-release distro
+              # with no safe partial upgrades. A bare -Sy (refresh the db +
+              # install the named packages, no full upgrade) can install
+              # packages built against a newer base while the image's base stays
+              # old, breaking the build with incompatible libraries. -Syu keeps
+              # the system consistent; the pinned image above keeps the base
+              # deterministic.
               pacman -Syu --noconfirm --needed base-devel git meson ninja pkgconf \
                 wayfire glm gtk3 gdk-pixbuf2 cairo glib2 libx11 pango gtest
           - distro: opensuse
