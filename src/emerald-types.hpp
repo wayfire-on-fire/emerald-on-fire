@@ -16,19 +16,6 @@
 
 #include <emerald.h> /* original emerald structs (window_settings, ...) */
 
-namespace wf
-{
-// If the real wayfire toplevel-view header is already included (it defines
-// `wayfire_toplevel_view` as nonstd::observer_ptr<toplevel_view_interface_t>),
-// do not redeclare the placeholder. The placeholder exists so this frozen
-// header can be used in TUs that do NOT include wayfire view headers (e.g.
-// the headless layout test). Part 04's node is the first TU that needs both;
-// it sets EMERALDWF_HAVE_WAYFIRE_VIEW before including any emerald header.
-#ifndef EMERALDWF_HAVE_WAYFIRE_VIEW
-using wayfire_toplevel_view = class wayfire_toplevel_view_t;
-#endif
-}
-
 namespace wf::emeraldwf
 {
 // Bit values identical to libwnck (see D4) so the bridge can static_cast
@@ -98,10 +85,11 @@ static constexpr uint32_t emerald_button_actions[B_T_COUNT] = {
         EWA_FULLSCREEN, // B_T_SUPERMAXIMIZE
 };
 
-// Maps a wayfire toplevel view to emerald state (Part 01 implements).
-// contract: fullscreen => EWS_FULLSCREEN, tiled_edges all => EWS_MAXIMIZED_*,
-// stick/above/sticky from view flags.
-EmeraldWindowState emerald_state_from_view(wayfire_toplevel_view view);
+// The live-view state mapping is emerald_state_from_view(state, sticky)
+// (emerald-decorator.hpp), declared there with a pure (no wayfire view)
+// signature so headless tests can call it. The former view-typed overload
+// was dead (never defined, never called) and is removed; it was the only
+// consumer of the old `wf::wayfire_toplevel_view` placeholder alias.
 
 // Mirrors emerald's `struct _decor` (include/emerald.h:298-338) minus the
 // X11/GTK-owned fields (event_windows, button_windows, surfaces, layout,

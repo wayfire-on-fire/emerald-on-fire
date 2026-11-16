@@ -355,4 +355,46 @@ TEST(NodeSource, NoDeadSetTitleOrTitleDirty)
     EXPECT_EQ(hpp.find("title_dirty"), std::string::npos) <<
         "the dead title_dirty member must be removed";
 }
+
+// Minor (issue #1): emerald-types.hpp declared a second
+// emerald_state_from_view(wayfire_toplevel_view) overload that was never
+// defined and never called — the live mapping is
+// emerald_state_from_view(const wf::toplevel_state_t&, bool)
+// (emerald-decorator.hpp/.cpp), used by the decorator and the node. The
+// dead overload was the ONLY consumer of the `wf::wayfire_toplevel_view`
+// placeholder alias, which in turn only existed to gate the
+// EMERALDWF_HAVE_WAYFIRE_VIEW macro in the wayfire TUs. Remove the dead
+// overload, the placeholder alias it depended on, and the now-dead macro.
+TEST(NodeSource, NoDeadStateFromViewOverload)
+{
+    const std::string types = read_file(
+        std::string{EMERALDWF_TEST_SOURCE_ROOT} + "/src/emerald-types.hpp");
+    ASSERT_FALSE(types.empty()) << "src/emerald-types.hpp must be readable";
+
+    EXPECT_EQ(types.find("emerald_state_from_view(wayfire_toplevel_view"),
+        std::string::npos) <<
+        "the dead emerald_state_from_view(wayfire_toplevel_view) "
+        "overload declaration must be removed";
+    EXPECT_EQ(types.find(
+        "using wayfire_toplevel_view = class wayfire_toplevel_view_t"),
+        std::string::npos) <<
+        "the placeholder wayfire_toplevel_view alias (whose only "
+        "consumer was the dead overload) must be removed";
+    EXPECT_EQ(types.find("EMERALDWF_HAVE_WAYFIRE_VIEW"), std::string::npos) <<
+        "the EMERALDWF_HAVE_WAYFIRE_VIEW gate (whose only purpose was "
+        "the placeholder) must be removed";
+
+    // The macro must not linger in the wayfire TUs either.
+    for (const char *f :
+     {"src/emerald-decorator.hpp", "src/emerald-node.cpp",
+         "src/emerald-node.hpp"})
+    {
+        const std::string tu = read_file(
+            std::string{EMERALDWF_TEST_SOURCE_ROOT} + "/" + f);
+        ASSERT_FALSE(tu.empty()) << f << " must be readable";
+        EXPECT_EQ(tu.find("EMERALDWF_HAVE_WAYFIRE_VIEW"), std::string::npos) <<
+            "the dead EMERALDWF_HAVE_WAYFIRE_VIEW define must be "
+            "removed from " << f;
+    }
+}
 } // namespace

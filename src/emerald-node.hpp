@@ -17,11 +17,6 @@
 // needed here (measure_pl is owned/used in emerald-node.cpp).
 typedef struct _PangoLayout PangoLayout;
 
-// Use the REAL wayfire toplevel-view type. Set EMERALDWF_HAVE_WAYFIRE_VIEW
-// before including emerald-layout.hpp (→ emerald-types.hpp) so the
-// placeholder forward-declaration there is suppressed.
-#define EMERALDWF_HAVE_WAYFIRE_VIEW 1
-
 #include <wayfire/geometry.hpp>
 #include <wayfire/render.hpp>
 #include <wayfire/region.hpp>

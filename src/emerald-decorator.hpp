@@ -20,10 +20,6 @@
 // (emerald_state_from_view) is owned by part 01 and declared here with a
 // signature that stays pure (no wayfire view), so headless tests can call
 // it. Part 02's emerald-types.hpp keeps the enum values frozen.
-//
-// toplevel-view.hpp (above) already defines the real `wayfire_toplevel_view`
-// alias, so suppress the placeholder forward-declaration in emerald-types.hpp.
-#define EMERALDWF_HAVE_WAYFIRE_VIEW 1
 #include "emerald-types.hpp"
 
 namespace wf

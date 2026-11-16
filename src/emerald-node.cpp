@@ -3,11 +3,6 @@
 // The node composites Part 02's `emeraldwf_render_frame()` cairo surface into
 // a GL texture, and routes pointer/touch through Part 03's EmeraldLayout to
 // wayfire WM actions (overview D11).
-//
-// This TU uses the REAL wayfire toplevel-view type, so set
-// EMERALDWF_HAVE_WAYFIRE_VIEW before including any emerald header to
-// suppress the placeholder forward-declaration in emerald-types.hpp.
-#define EMERALDWF_HAVE_WAYFIRE_VIEW 1
 
 #include "emerald-node.hpp"
 
