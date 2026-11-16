@@ -467,18 +467,32 @@ void load_buttons_glow_images(window_settings *ws, const std::string & theme_dir
                 "Choose same size glow images for active and inactive windows."
                 "\nInactive glow image is scaled for now.");
 
-            cairo_surface_t *tmp_surface = cairo_image_surface_create(
-                CAIRO_FORMAT_ARGB32, pix_width * 12, pix_height);
-            cairo_t *tmp_cr = cairo_create(tmp_surface);
-            cairo_scale(tmp_cr, pix_width / static_cast<double>(pix_width2),
-                pix_height / static_cast<double>(pix_height2));
-            cairo_set_source_surface(tmp_cr, ws->button_inactive_glow_array, 0, 0);
-            cairo_pattern_set_extend(cairo_get_source(tmp_cr), CAIRO_EXTEND_PAD);
-            cairo_paint(tmp_cr);
-            cairo_destroy(tmp_cr);
+            // Minor (issue #1): pix_width2 / pix_height2 are divisors; a
+            // degenerate inactive-glow png (width < 12) makes them 0 and
+            // the division -> inf -> cairo_scale takes a degenerate
+            // matrix. button_fit_scale() yields 0.0 for a non-positive
+            // dim, so the rescale is skipped (the degenerate surface is
+            // kept as-is; the draw side skips 0-dim sources too).
+            const double sx = wf::emeraldwf::button_fit_scale(
+                (double)pix_width, pix_width2);
+            const double sy = wf::emeraldwf::button_fit_scale(
+                (double)pix_height, pix_height2);
+            if ((sx > 0.0) && (sy > 0.0))
+            {
+                cairo_surface_t *tmp_surface = cairo_image_surface_create(
+                    CAIRO_FORMAT_ARGB32, pix_width * 12, pix_height);
+                cairo_t *tmp_cr = cairo_create(tmp_surface);
+                cairo_scale(tmp_cr, sx, sy);
+                cairo_set_source_surface(tmp_cr,
+                    ws->button_inactive_glow_array, 0, 0);
+                cairo_pattern_set_extend(cairo_get_source(tmp_cr),
+                    CAIRO_EXTEND_PAD);
+                cairo_paint(tmp_cr);
+                cairo_destroy(tmp_cr);
 
-            cairo_surface_destroy(ws->button_inactive_glow_array);
-            ws->button_inactive_glow_array = tmp_surface;
+                cairo_surface_destroy(ws->button_inactive_glow_array);
+                ws->button_inactive_glow_array = tmp_surface;
+            }
         }
     } else
     {

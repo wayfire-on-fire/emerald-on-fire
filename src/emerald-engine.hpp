@@ -5,6 +5,7 @@
 #define EMERALDWF_ENGINE_HPP
 
 #include <algorithm>
+#include <cmath>
 #include <string>
 
 #include <cairo.h>
@@ -56,6 +57,23 @@ inline int shadow_band_clamp(int v, int lo, int hi)
     }
 
     return std::min(std::max(v, lo), hi);
+}
+
+// Minor (issue #1): the factor that fits a draw region of size `extent`
+// into a button/glow surface of size `surface_dim`. A degenerate theme
+// (a buttons.png narrower than S_COUNT, or a glow png narrower than 12)
+// yields a 0-dim surface, and the old inline `extent / dim` divided by
+// zero -> inf -> cairo_scale took a degenerate matrix. Returns 0.0 for a
+// non-positive surface dim (the caller skips the draw); pure so it is
+// testable headlessly (tests/test_settings.cpp).
+inline double button_fit_scale(double extent, int surface_dim)
+{
+    if ((surface_dim <= 0) || !std::isfinite(extent))
+    {
+        return 0.0;
+    }
+
+    return extent / surface_dim;
 }
 
 // dlopen bridge (port of src/engine_loader.c:32-84): searches

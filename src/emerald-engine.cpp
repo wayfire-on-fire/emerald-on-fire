@@ -350,17 +350,28 @@ static void draw_button_with_glow_alpha_bstate(gint b_t, const decor_t *d,
         const gdouble h = button_region->base_y2 - y;
         if (ws->button_surface[b_state + b * S_COUNT] != NULL)
         {
-            cairo_save(cr);
-            cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
-            cairo_translate(cr, x, y);
-            cairo_scale(cr, w / (gdouble)cairo_image_surface_get_width(
-                ws->button_surface[b_state + b * S_COUNT]),
-                h / (gdouble)cairo_image_surface_get_height(
+            // Minor (issue #1): the surface's w/h are divisors; a
+            // degenerate theme can produce a 0-dim surface, and
+            // `w / 0` -> inf -> cairo_scale takes a degenerate matrix.
+            // button_fit_scale() yields 0.0 for a non-positive dim, so
+            // the draw is skipped.
+            const double sx = wf::emeraldwf::button_fit_scale(
+                w, cairo_image_surface_get_width(
                     ws->button_surface[b_state + b * S_COUNT]));
-            cairo_set_source_surface(cr, ws->button_surface[b_state + b * S_COUNT],
-                0, 0);
-            cairo_paint_with_alpha(cr, button_alpha);
-            cairo_restore(cr);
+            const double sy = wf::emeraldwf::button_fit_scale(
+                h, cairo_image_surface_get_height(
+                    ws->button_surface[b_state + b * S_COUNT]));
+            if ((sx > 0.0) && (sy > 0.0))
+            {
+                cairo_save(cr);
+                cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
+                cairo_translate(cr, x, y);
+                cairo_scale(cr, sx, sy);
+                cairo_set_source_surface(
+                    cr, ws->button_surface[b_state + b * S_COUNT], 0, 0);
+                cairo_paint_with_alpha(cr, button_alpha);
+                cairo_restore(cr);
+            }
         }
 
         if (glow_alpha > 1e-5) /* i.e. glow is on */
@@ -380,14 +391,22 @@ static void draw_button_with_glow_alpha_bstate(gint b_t, const decor_t *d,
 
             if (glow != NULL)
             {
-                cairo_save(cr);
-                cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
-                cairo_translate(cr, glow_x, glow_y);
-                cairo_scale(cr, glow_w / (gdouble)cairo_image_surface_get_width(glow),
-                    glow_h / (gdouble)cairo_image_surface_get_height(glow));
-                cairo_set_source_surface(cr, glow, 0, 0);
-                cairo_paint_with_alpha(cr, glow_alpha);
-                cairo_restore(cr);
+                // Same zero-dim guard as the button surface above: the
+                // glow surface's w/h are divisors.
+                const double sx = wf::emeraldwf::button_fit_scale(
+                    glow_w, cairo_image_surface_get_width(glow));
+                const double sy = wf::emeraldwf::button_fit_scale(
+                    glow_h, cairo_image_surface_get_height(glow));
+                if ((sx > 0.0) && (sy > 0.0))
+                {
+                    cairo_save(cr);
+                    cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
+                    cairo_translate(cr, glow_x, glow_y);
+                    cairo_scale(cr, sx, sy);
+                    cairo_set_source_surface(cr, glow, 0, 0);
+                    cairo_paint_with_alpha(cr, glow_alpha);
+                    cairo_restore(cr);
+                }
             }
         }
     } else

@@ -6,10 +6,12 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -1497,6 +1499,37 @@ TEST(EnginePure, ShadowBandClampIsOrderIndependent)
 
     // Zero-width range: lo == hi is a fixed point.
     EXPECT_EQ(shadow_band_clamp(7, 3, 3), 3);
+}
+
+// Minor (issue #1): draw_button() scales the button/glow region into the
+// button surface via cairo_scale(cr, w / surface_w, h / surface_h). A
+// degenerate theme (buttons.png narrower than S_COUNT, glow png narrower
+// than 12) produces a 0-dim surface, so surface_w / surface_h is 0 and the
+// division yields inf — cairo_scale then takes a degenerate matrix. The
+// fit factor must refuse a non-positive surface dim (0.0 → caller skips
+// the draw) instead of dividing by zero.
+TEST(EnginePure, ButtonFitScaleRefusesZeroDimSurface)
+{
+    using wf::emeraldwf::button_fit_scale;
+
+    // Normal: the factor fits the extent into the surface dim.
+    EXPECT_DOUBLE_EQ(button_fit_scale(24.0, 12), 2.0);
+    EXPECT_DOUBLE_EQ(button_fit_scale(8.0, 16), 0.5);
+    EXPECT_DOUBLE_EQ(button_fit_scale(0.0, 16), 0.0);
+
+    // Degenerate surface (dim 0): must yield 0.0 (skip), never inf/NaN.
+    EXPECT_DOUBLE_EQ(button_fit_scale(24.0, 0), 0.0);
+    EXPECT_TRUE(std::isfinite(button_fit_scale(0.0, 0)));
+    EXPECT_DOUBLE_EQ(button_fit_scale(-5.0, 0), 0.0);
+
+    // Negative dim (defensive): also refused.
+    EXPECT_DOUBLE_EQ(button_fit_scale(24.0, -3), 0.0);
+
+    // Non-finite extent (defensive): refused, never NaN/inf.
+    EXPECT_DOUBLE_EQ(button_fit_scale(
+        std::numeric_limits<double>::quiet_NaN(), 16), 0.0);
+    EXPECT_DOUBLE_EQ(button_fit_scale(
+        std::numeric_limits<double>::infinity(), 16), 0.0);
 }
 
 // WCM's metadata parser segfaults on an EMPTY <value></value> element: the
