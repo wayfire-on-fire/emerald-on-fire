@@ -85,6 +85,48 @@ class ThemeSettings
 // bistate step in the draw path then selects the twin surface.
 int get_b_t_offset(gint b_t);
 
+// Minor (issue #1): the surface-slot → logical-button table that
+// get_b_offset() builds. `bistate[b]` says whether logical button b
+// occupies a SECOND surface slot (MAXIMIZE/RESTORE, ...). Fills
+// `boffset[0 .. surface_slots-1]` with the logical button index for each
+// surface slot. Pure so it is testable headlessly with degenerate bistate
+// tables (tests/test_settings.cpp); get_b_offset() feeds it the real
+// btbistate[] / B_T_COUNT / B_COUNT.
+inline int build_button_offset(const int *bistate, int button_count,
+    int surface_slots, int *boffset)
+{
+    // Walk the LOGICAL buttons (not the surface slots): each button takes
+    // one slot, plus a second one when bistate. This stays in bounds for
+    // any bistate count — the old slot-indexed loop only worked because
+    // B_COUNT happened to equal B_T_COUNT + (current bistate count).
+    int i = 0;
+    for (int b_t = 0; b_t < button_count; b_t++)
+    {
+        if (i >= surface_slots)
+        {
+            break; // more buttons than surface slots
+        }
+
+        boffset[i] = b_t;
+        i++;
+
+        if (bistate[b_t] && (i < surface_slots))
+        {
+            boffset[i] = b_t;
+            i++;
+        }
+    }
+
+    // Defensive: any unfilled slot (fewer buttons than slots) maps to the
+    // first button rather than an invalid index.
+    for (; i < surface_slots; i++)
+    {
+        boffset[i] = 0;
+    }
+
+    return surface_slots;
+}
+
 // Finding 42: re-point the DecorContext's frame_settings pointer at a (new)
 // theme. emerald_decorator_t::set_theme() must call this on EVERY theme
 // swap: the node's render() refreshes ctx.fs per frame, but pointer events

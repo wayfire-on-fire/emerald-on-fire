@@ -1532,6 +1532,69 @@ TEST(EnginePure, ButtonFitScaleRefusesZeroDimSurface)
         std::numeric_limits<double>::infinity(), 16), 0.0);
 }
 
+// Minor (issue #1): get_b_offset() fills a B_COUNT(+1) table mapping the
+// 13 B_* surface slots to the 9 B_T_* logical buttons, stepping an extra
+// slot for each bistate button. The original loop is indexed by SURFACE
+// SLOT and reads bistate[b_t] while b_t is derived from the fill progress —
+// it only stays in bounds because B_COUNT happens to equal B_T_COUNT + 4
+// (exactly the current 4 bistate buttons). Any other bistate count reads
+// bistate[] out of bounds (fewer bistates) or leaves the last slots
+// mapping to invalid button indices. The table builder must be robust to
+// the bistate count: every slot maps to a valid button in [0,
+// button_count), no out-of-bounds bistate read.
+TEST(EnginePure, ButtonOffsetTableRobustToBistateCount)
+{
+    using wf::emeraldwf::build_button_offset;
+
+    // Real counts: 9 logical buttons, 4 bistate (MAXIMIZE, SHADE, ABOVE,
+    // STICKY), 13 surface slots.
+    {
+        const int bistate[B_T_COUNT] = {false, true, false, false,
+            false, true, true, true, false};
+        int boffset[B_COUNT + 1] = {};
+        build_button_offset(bistate, B_T_COUNT, B_COUNT, boffset);
+        const int expected[B_COUNT] = {0, 1, 1, 2, 3, 4, 5, 5, 6, 6, 7, 7,
+            8};
+        for (int i = 0; i < B_COUNT; i++)
+        {
+            EXPECT_EQ(boffset[i], expected[i]) << "slot " << i;
+        }
+    }
+
+    // Degenerate: NO bistate buttons. 9 buttons fill 9 of the 13 slots;
+    // the remaining slots must still map to a VALID button (not an index
+    // >= button_count), and the builder must not read bistate[] past
+    // button_count.
+    {
+        const int bistate[B_T_COUNT] = {false, false, false, false,
+            false, false, false, false, false};
+        int boffset[B_COUNT + 1] = {};
+        build_button_offset(bistate, B_T_COUNT, B_COUNT, boffset);
+        for (int i = 0; i < B_COUNT; i++)
+        {
+            EXPECT_GE(boffset[i], 0) << "slot " << i;
+            EXPECT_LT(boffset[i], B_T_COUNT) <<
+                "slot " << i << " maps to an invalid button index";
+        }
+    }
+
+    // Degenerate: ALL buttons bistate. 9 buttons want 18 slots but only 13
+    // exist; the builder must fill exactly the available slots, each with
+    // a valid index, and never read bistate[] out of bounds.
+    {
+        const int bistate[B_T_COUNT] = {true, true, true, true, true,
+            true, true, true, true};
+        int boffset[B_COUNT + 1] = {};
+        build_button_offset(bistate, B_T_COUNT, B_COUNT, boffset);
+        for (int i = 0; i < B_COUNT; i++)
+        {
+            EXPECT_GE(boffset[i], 0) << "slot " << i;
+            EXPECT_LT(boffset[i], B_T_COUNT) <<
+                "slot " << i << " maps to an invalid button index";
+        }
+    }
+}
+
 // WCM's metadata parser segfaults on an EMPTY <value></value> element: the
 // string-option desc loop dereferences n->children->content without a null
 // check (children is NULL for an empty element). The emeraldwf metadata must

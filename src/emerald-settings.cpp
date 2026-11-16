@@ -297,18 +297,12 @@ int get_b_offset(gint y)
     static bool offset_init = false;
     if (!offset_init)
     {
-        int b_t = 0;
-        for (int i = 0; i < B_COUNT; i++)
-        {
-            boffset[i] = b_t;
-            if (btbistate[b_t])
-            {
-                boffset[i + 1] = b_t;
-                i++;
-            }
-
-            b_t++;
-        }
+        // Minor (issue #1): build_button_offset() walks the logical
+        // buttons, so the table is correct for any bistate count — the old
+        // slot-indexed loop read btbistate[] out of bounds whenever
+        // B_COUNT != B_T_COUNT + (bistate count).
+        wf::emeraldwf::build_button_offset(btbistate, B_T_COUNT, B_COUNT,
+            boffset);
 
         offset_init = true;
     }
