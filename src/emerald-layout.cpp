@@ -156,7 +156,10 @@ void EmeraldLayout::place_objects(const window_settings *ws,
     ctx.tobj_size[2] = 0;
     int zone_width[3] = {0}; // (main.c:2991) per-zone last-object width
     int state = 0;
-    for (size_t i = 0; i < strlen(layout); i++)
+    // Minor (issue #1): hoist the length — strlen() in the loop condition
+    // re-scanned the string on every iteration (O(n^2) per pass).
+    const size_t layout_len = strlen(layout);
+    for (size_t i = 0; i < layout_len; i++)
     {
         if (layout[i] == '(')
         {
@@ -219,7 +222,7 @@ void EmeraldLayout::place_objects(const window_settings *ws,
     }
 
     bool removed = false;
-    for (size_t i = 0; i < strlen(layout); i++)
+    for (size_t i = 0; i < layout_len; i++)
     {
         if (layout[i] == '(')
         {

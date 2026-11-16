@@ -99,6 +99,27 @@ TEST(LayoutSource, EdgeFlagsAreConstexprNotMacros)
     EXPECT_EQ(EMERALDWF_EDGE_RIGHT, 0x8u);
 }
 
+// Minor (issue #1): place_objects() scanned the titlebar layout string with
+// `for (size_t i = 0; i < strlen(layout); i++)` in BOTH passes — strlen()
+// re-runs on every iteration, making each pass O(n^2) in the layout length.
+// Hoist the length out of the loop condition.
+TEST(LayoutSource, LayoutLengthNotRescannedPerIteration)
+{
+    std::ifstream in(std::string{EMERALDWF_TEST_SOURCE_ROOT} +
+        "/src/emerald-layout.cpp");
+    ASSERT_TRUE(in.good()) << "src/emerald-layout.cpp must be readable";
+    std::string src((std::istreambuf_iterator<char>(in)),
+        std::istreambuf_iterator<char>());
+    ASSERT_FALSE(src.empty());
+
+    // The per-iteration strlen() in the loop condition must be gone...
+    EXPECT_EQ(src.find("i < strlen(layout)"), std::string::npos) <<
+        "strlen(layout) must not be re-scanned on every loop iteration";
+    // ...and the length is still computed (hoisted), not dropped.
+    EXPECT_NE(src.find("strlen(layout)"), std::string::npos) <<
+        "the layout length must still be computed";
+}
+
 // The production button_actions[] uses the plugin's EmeraldWindowActions
 // (EWA_*) bitmask, so the contexts below feed EWA_* action flags.
 
