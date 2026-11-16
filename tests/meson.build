@@ -216,6 +216,11 @@ test('emeraldwf-ci-meson-pin', find_program('test_ci_meson_pin.sh'))
 # Shell-level test.
 test('emeraldwf-makefile-single-build', find_program('test_makefile_single_build.sh'))
 
+# Minor (issue #1): the wayfire-from-source recipe (wayland/wayland-protocols/
+# libdrm/xkbcommon/pixman/wayfire) must live in ONE shared script, not be
+# copy-pasted in the Dockerfile, ci.yml, and provision.sh. Shell-level test.
+test('emeraldwf-wayfire-src-single', find_program('test_wayfire_src_single.sh'))
+
 # M28 (issue #1): install.sh WF_PLUGDIR must be the dir the plugin was
 # installed into ($LIBDIR/wayfire) - shell-level test: extracts the
 # assignment and evaluates it with a stubbed pkg-config (fail + ok +

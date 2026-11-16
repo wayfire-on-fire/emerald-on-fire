@@ -48,18 +48,22 @@ TEST(MakefileDocker, BinaryTargetsTheImagePrefix)
     const std::string makefile =
         read_file(std::string{EMERALDWF_TEST_SOURCE_ROOT} + "/Makefile");
     ASSERT_FALSE(makefile.empty()) << "Makefile must be readable";
-    const std::string dockerfile =
-        read_file(std::string{EMERALDWF_TEST_SOURCE_ROOT} + "/Dockerfile");
-    ASSERT_FALSE(dockerfile.empty()) << "Dockerfile must be readable";
+    // wayfire is installed into /usr by the SHARED from-source recipe script
+    // (single source of truth, also used by the Dockerfile and ci.yml).
+    const std::string wfsrc =
+        read_file(std::string{EMERALDWF_TEST_SOURCE_ROOT} +
+            "/scripts/build-wayfire-from-source.sh");
+    ASSERT_FALSE(wfsrc.empty()) << "the shared from-source script must be readable";
 
-    // (1) The Dockerfile installs wayfire into /usr.
-    const size_t wf = dockerfile.find("WayfireWM/wayfire");
+    // (1) wayfire is installed into /usr (the reference prefix for the dist
+    // artifacts).
+    const size_t wf = wfsrc.find("WayfireWM/wayfire");
     ASSERT_NE(wf, std::string::npos) << "could not locate the wayfire build";
-    const size_t wf_setup = dockerfile.find("meson setup", wf);
+    const size_t wf_setup = wfsrc.find("meson setup", wf);
     ASSERT_NE(wf_setup, std::string::npos) << "no meson setup for wayfire";
-    const std::string wf_line = line_at(dockerfile, wf_setup);
+    const std::string wf_line = line_at(wfsrc, wf_setup);
     EXPECT_NE(wf_line.find("--prefix=/usr"), std::string::npos) <<
-        "the Dockerfile must install wayfire into /usr (the reference "
+        "the from-source recipe must install wayfire into /usr (the reference "
         "prefix for the dist artifacts)";
 
     // (2) The Makefile's dist build must use the SAME prefix for the

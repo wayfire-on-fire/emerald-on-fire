@@ -46,76 +46,12 @@ jobs:
             libdisplay-info-dev \
             hwdata libxml2-dev libpango1.0-dev \
             imagemagick
-      - name: Install newer meson (>= 1.4.0) via pip
-        run: |
-          # noble ships meson 1.3.2; xkbcommon 1.13.x and a wayfire subproject
-          # need >= 1.4.0. Install system-wide (sudo) so BOTH 'meson setup' and
-          # the 'sudo ninja ... install' steps use the SAME meson — a user-site
-          # meson in ~/.local/bin is dropped from sudo's PATH, which produced a
-          # version-mismatched install.dat. PEP 668 is on, so --break-system-packages.
-          sudo python3 -m pip install --break-system-packages --upgrade meson
-      - name: Build + install wayland from source (1.24.0)
-        run: |
-          # noble ships wayland 1.22; wayfire 0.11's bundled wlroots needs
-          # wayland-server >= 1.24, so build a newer wayland into /usr first.
-          git clone --depth 1 --branch 1.24.0 \
-            https://gitlab.freedesktop.org/wayland/wayland /tmp/wayland
-          cd /tmp/wayland
-          meson setup build --prefix=/usr -Ddocumentation=false
-          ninja -C build
-          sudo ninja -C build install
-      - name: Build + install wayland-protocols from source (1.47)
-        run: |
-          # noble ships wayland-protocols 1.45; wayfire 0.11's bundled wlroots
-          # needs >= 1.47. (Separate project from wayland; not in the wayland
-          # source build above.)
-          git clone --depth 1 --branch 1.47 \
-            https://gitlab.freedesktop.org/wayland/wayland-protocols /tmp/wayland-protocols
-          cd /tmp/wayland-protocols
-          meson setup build --prefix=/usr
-          ninja -C build
-          sudo ninja -C build install
-      - name: Build + install libdrm from source (2.4.129)
-        run: |
-          # noble ships libdrm 2.4.125; wayfire 0.11's bundled wlroots needs
-          # libdrm >= 2.4.129, so build the signed release tarball into /usr.
-          wget -q https://dri.freedesktop.org/libdrm/libdrm-2.4.129.tar.xz
-          echo "5978183f978d697e26a50ba066174964efb0ab97caa1ecaa1b861fbe5ddf77dc  libdrm-2.4.129.tar.xz" | sha256sum -c -
-          tar xf libdrm-2.4.129.tar.xz
-          cd libdrm-2.4.129
-          meson setup build --prefix=/usr
-          ninja -C build
-          sudo ninja -C build install
-      - name: Build + install xkbcommon from source (1.13.2)
-        run: |
-          # noble ships xkbcommon 1.6.0; wayfire 0.11's bundled wlroots needs
-          # xkbcommon >= 1.8.0, so build a newer one into /usr.
-          git clone --depth 1 --branch xkbcommon-1.13.2 \
-            https://github.com/xkbcommon/libxkbcommon /tmp/xkbcommon
-          cd /tmp/xkbcommon
-          meson setup build --prefix=/usr \
-            -Denable-tools=false -Denable-x11=false \
-            -Denable-docs=false -Denable-xkbregistry=false
-          ninja -C build
-          sudo ninja -C build install
-      - name: Build + install pixman from source (0.46.4)
-        run: |
-          # noble ships pixman 0.42.2; wayfire 0.11's bundled wlroots needs
-          # pixman >= 0.46.0 (render backend), so build a newer one into /usr.
-          git clone --depth 1 --branch pixman-0.46.4 \
-            https://gitlab.freedesktop.org/pixman/pixman /tmp/pixman
-          cd /tmp/pixman
-          meson setup build --prefix=/usr -Dtests=disabled
-          ninja -C build
-          sudo ninja -C build install
-      - name: Build + install wayfire from source (v0.11.0)
-        run: |
-          git clone --recursive --depth 1 --branch v0.11.0 \
-            https://github.com/WayfireWM/wayfire /tmp/wayfire
-          cd /tmp/wayfire
-          meson setup build --prefix=/usr
-          ninja -C build
-          sudo ninja -C build install
+      # Build wayfire v0.11.0 (and the deps its bundled wlroots needs) from
+      # source into /usr via the SHARED recipe script (single source of truth;
+      # also used by the Dockerfile and e2e/distros/provision.sh). It installs
+      # a pinned meson >= 1.4.0 first and uses sudo for the install steps.
+      - name: Build + install wayfire from source (shared recipe)
+        run: bash scripts/build-wayfire-from-source.sh
       - name: Configure
         run: meson setup build --buildtype=release
       - name: Build

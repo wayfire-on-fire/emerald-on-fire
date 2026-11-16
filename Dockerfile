@@ -58,92 +58,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         imagemagick \
     && rm -rf /var/lib/apt/lists/*
 
-# Install a newer meson (>= 1.4.0) via pip BEFORE the from-source builds below:
-# noble ships meson 1.3.2, but xkbcommon 1.13.x and a wayfire subproject require
-# meson >= 1.4.0. The pip meson lands in /usr/local/bin (ahead of the apt one in
-# PATH), so every from-source build below uses it. (--break-system-packages:
-# noble enables PEP 668.) Pinned to a known-good version so a future meson
-# release cannot silently change the build tool (and break the from-source
-# builds below).
-RUN python3 -m pip install --break-system-packages "meson==1.12.1"
-
-# Build wayland 1.24.0 from source: noble ships wayland 1.22, but wayfire
-# 0.11.0's bundled wlroots requires wayland-server >= 1.24.0. Installed to
-# /usr so it shadows the distro wayland for the wayfire build below.
-RUN set -eux; \
-    git clone --depth 1 --branch 1.24.0 \
-        https://gitlab.freedesktop.org/wayland/wayland /tmp/wayland; \
-    cd /tmp/wayland; \
-    meson setup build --prefix=/usr -Ddocumentation=false; \
-    ninja -C build; \
-    ninja -C build install; \
-    rm -rf /tmp/wayland
-
-# Build wayland-protocols 1.47 from source: noble ships wayland-protocols 1.45,
-# but wayfire 0.11.0's bundled wlroots needs wayland-protocols >= 1.47.
-# (wayland-protocols is a separate project from wayland; the wayland source
-# build above does not install it.) Installed to /usr so it shadows the distro
-# wayland-protocols for the wayfire build below.
-RUN set -eux; \
-    git clone --depth 1 --branch 1.47 \
-        https://gitlab.freedesktop.org/wayland/wayland-protocols /tmp/wayland-protocols; \
-    cd /tmp/wayland-protocols; \
-    meson setup build --prefix=/usr; \
-    ninja -C build; \
-    ninja -C build install; \
-    rm -rf /tmp/wayland-protocols
-
-# Build libdrm 2.4.129 from the official signed release tarball: noble ships
-# libdrm 2.4.125, but wayfire 0.11.0's bundled wlroots needs libdrm >= 2.4.129.
-# The checksum is the published SHA256 for libdrm-2.4.129.tar.xz. Installed to
-# /usr so it shadows the distro libdrm for the wayfire build below.
-RUN set -eux; \
-    wget -q https://dri.freedesktop.org/libdrm/libdrm-2.4.129.tar.xz; \
-    echo "5978183f978d697e26a50ba066174964efb0ab97caa1ecaa1b861fbe5ddf77dc  libdrm-2.4.129.tar.xz" | sha256sum -c -; \
-    tar xf libdrm-2.4.129.tar.xz; \
-    cd libdrm-2.4.129; \
-    meson setup build --prefix=/usr; \
-    ninja -C build; \
-    ninja -C build install; \
-    cd /; rm -rf libdrm-2.4.129 libdrm-2.4.129.tar.xz
-
-# Build xkbcommon 1.13.2 from source: noble ships xkbcommon 1.6.0, but wayfire
-# 0.11.0's bundled wlroots needs xkbcommon >= 1.8.0. Installed to /usr so it
-# shadows the distro xkbcommon for the wayfire build below.
-RUN set -eux; \
-    git clone --depth 1 --branch xkbcommon-1.13.2 \
-        https://github.com/xkbcommon/libxkbcommon /tmp/xkbcommon; \
-    cd /tmp/xkbcommon; \
-    meson setup build --prefix=/usr \
-        -Denable-tools=false -Denable-x11=false \
-        -Denable-docs=false -Denable-xkbregistry=false; \
-    ninja -C build; \
-    ninja -C build install; \
-    rm -rf /tmp/xkbcommon
-
-# Build pixman 0.46.4 from source: noble ships pixman 0.42.2, but wayfire
-# 0.11.0's bundled wlroots needs pixman >= 0.46.0 (render backend). Installed
-# to /usr so it shadows the distro pixman for the wayfire build below.
-RUN set -eux; \
-    git clone --depth 1 --branch pixman-0.46.4 \
-        https://gitlab.freedesktop.org/pixman/pixman /tmp/pixman; \
-    cd /tmp/pixman; \
-    meson setup build --prefix=/usr -Dtests=disabled; \
-    ninja -C build; \
-    ninja -C build install; \
-    rm -rf /tmp/pixman
-
-# wayfire >= 0.11 is not packaged for ubuntu: build it (and its bundled
-# wlroots subproject) from source, pinned to a tag for reproducibility, into
-# /usr. This mirrors WayfireWM/wayfire's own CI. The result provides the
-# wayfire.pc + headers the plugin compiles against (scene-graph API, >= 0.11).
-RUN set -eux; \
-    git clone --recursive --depth 1 --branch v0.11.0 \
-        https://github.com/WayfireWM/wayfire /tmp/wayfire; \
-    cd /tmp/wayfire; \
-    meson setup build --prefix=/usr; \
-    ninja -C build; \
-    ninja -C build install; \
-    rm -rf /tmp/wayfire
+# Build wayfire v0.11.0 (and the deps its bundled wlroots needs: wayland,
+# wayland-protocols, libdrm, xkbcommon, pixman) from source into /usr. The
+# recipe lives in ONE shared script (scripts/build-wayfire-from-source.sh) so
+# a version bump is made in a single place, not copy-pasted here, in the
+# ci.yml `native` job, and in e2e/distros/provision.sh. The script also installs
+# a pinned meson >= 1.4.0 (noble ships 1.3.2) if the system one is too old.
+COPY scripts/build-wayfire-from-source.sh /tmp/build-wayfire-from-source.sh
+RUN chmod +x /tmp/build-wayfire-from-source.sh && /tmp/build-wayfire-from-source.sh
 
 WORKDIR /app

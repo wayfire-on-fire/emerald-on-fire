@@ -93,46 +93,13 @@ wf_ge_011() {
 }
 
 build_wayfire_from_source() {
-  # Mirrors the ci.yml `native` job; installs wayfire v0.11.0 into /usr.
-  log "building wayfire from source (ci.yml recipe) — this takes a while"
-  # Install the pinned meson (the from-source builds below require
-  # meson >= 1.4.0; the distro meson is older). Try the PEP 668 flag first,
-  # then fall back. Do NOT swallow failure: a missing/old meson must fail
-  # loudly, not silently proceed to a broken from-source build.
-  pip3 install --break-system-packages "meson==1.12.1" 2>/dev/null \
-    || pip3 install "meson==1.12.1" 2>/dev/null
-  local meson_ver
-  meson_ver="$(meson --version 2>/dev/null | head -1 || echo 0.0.0)"
-  if [ "$(printf '%s\n1.4.0\n' "$meson_ver" | sort -V | head -1)" != "1.4.0" ]; then
-    log "ERROR: meson >= 1.4.0 required for the from-source builds (got: ${meson_ver:-none})"
-    return 1
-  fi
-  git clone --depth 1 --branch 1.24.0 \
-      https://gitlab.freedesktop.org/wayland/wayland /tmp/wl
-  ( cd /tmp/wl && meson setup build --prefix=/usr -Ddocumentation=false \
-      && ninja -C build && ninja -C build install )
-  git clone --depth 1 --branch 1.47 \
-      https://gitlab.freedesktop.org/wayland/wayland-protocols /tmp/wlp
-  ( cd /tmp/wlp && meson setup build --prefix=/usr \
-      && ninja -C build && ninja -C build install )
-  wget -q https://dri.freedesktop.org/libdrm/libdrm-2.4.129.tar.xz -O /tmp/libdrm.tar.xz
-  echo "5978183f978d697e26a50ba066174964efb0ab97caa1ecaa1b861fbe5ddf77dc  /tmp/libdrm.tar.xz" | sha256sum -c -
-  tar xf /tmp/libdrm.tar.xz -C /tmp
-  ( cd /tmp/libdrm-2.4.129 && meson setup build --prefix=/usr \
-      && ninja -C build && ninja -C build install )
-  git clone --depth 1 --branch xkbcommon-1.13.2 \
-      https://github.com/xkbcommon/libxkbcommon /tmp/xkb
-  ( cd /tmp/xkb && meson setup build --prefix=/usr \
-      -Denable-tools=false -Denable-x11=false -Denable-docs=false \
-      -Denable-xkbregistry=false && ninja -C build && ninja -C build install )
-  git clone --depth 1 --branch pixman-0.46.4 \
-      https://gitlab.freedesktop.org/pixman/pixman /tmp/pix
-  ( cd /tmp/pix && meson setup build --prefix=/usr -Dtests=disabled \
-      && ninja -C build && ninja -C build install )
-  git clone --recursive --depth 1 --branch v0.11.0 \
-      https://github.com/WayfireWM/wayfire /tmp/wf
-  ( cd /tmp/wf && meson setup build --prefix=/usr \
-      && ninja -C build && ninja -C build install )
+  # Build wayfire v0.11.0 (and the deps its bundled wlroots needs) from source
+  # into /usr via the SHARED recipe script (single source of truth; also used
+  # by the Dockerfile and the ci.yml `native` job).
+  log "building wayfire from source (shared recipe) — this takes a while"
+  local script="$SRC_DIR/scripts/build-wayfire-from-source.sh"
+  [ -f "$script" ] || { log "ERROR: $script not found"; return 1; }
+  bash "$script"
   log "source wayfire installed"
 }
 
