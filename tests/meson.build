@@ -233,6 +233,11 @@ test('emeraldwf-install-defaulttheme', find_program('test_install_defaulttheme.s
 # Shell-level test.
 test('emeraldwf-install-tmpcleanup', find_program('test_install_tmpcleanup.sh'))
 
+# Minor (issue #1): install.sh must normalize LIBDIR/DATADIR to absolute paths
+# (a relative libdir in a wayfire .pc would make the install land in ./lib).
+# Shell-level test.
+test('emeraldwf-install-libdir', find_program('test_install_libdir.sh'))
+
 # ---- part 07: engine pane / engine module lifetime (findings 46/47) ----
 # Regression for the "Round Top Left Corner" SEGV_MAPERR: append_engine's
 # dlclose unmapped the engine .so (static-vendored libemeraldengine) while

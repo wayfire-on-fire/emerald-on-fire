@@ -147,8 +147,13 @@ fi
 # is a text file read at WCM startup — a plain copy is fine.
 LIBDIR=$(pkg-config --variable=libdir wayfire 2>/dev/null)
 [ -n "$LIBDIR" ] || LIBDIR=/usr/lib
+# Normalize to absolute: a wayfire .pc may carry a RELATIVE libdir/datadir
+# (e.g. "lib64", "share"); a .pc libdir is relative to the prefix. A bare
+# relative value would make the install land in ./lib64 (CWD-relative).
+case "$LIBDIR" in /*) ;; *) LIBDIR="$WF_PREFIX/$LIBDIR" ;; esac
 DATADIR=$(pkg-config --variable=datadir wayfire 2>/dev/null)
 [ -n "$DATADIR" ] || DATADIR=/usr/share
+case "$DATADIR" in /*) ;; *) DATADIR="$WF_PREFIX/$DATADIR" ;; esac
 
 atomic_install() {  # srcfile destdir
     local src="$1" dir="$2" tmp
