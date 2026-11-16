@@ -420,4 +420,28 @@ TEST(NodeSource, CoordTransformReusesPureCore)
         "origin derivation instead of hard-coding {-margins.left, "
         "-margins.top}";
 }
+
+// Minor (issue #1): the header doc for emerald_node_t::resize() claimed it
+// "recompute[s] ctx sizes, layout, region", but the implementation only sets
+// size_dirty = true and damages — the actual recompute is deferred to
+// render_frame() (where size_dirty joins the rebuild key). The doc is stale;
+// it must describe the real behavior (mark size_dirty + damage).
+TEST(NodeSource, ResizeDocMatchesImplementation)
+{
+    const std::string hpp = read_file(
+        std::string{EMERALDWF_TEST_SOURCE_ROOT} + "/src/emerald-node.hpp");
+    ASSERT_FALSE(hpp.empty()) << "src/emerald-node.hpp must be readable";
+
+    EXPECT_EQ(hpp.find("recompute ctx sizes, layout, region"),
+        std::string::npos) <<
+        "the stale resize() doc (claims it recomputes ctx/layout/region) "
+        "must be removed";
+    // The resize() declaration must now name the real effect (size_dirty).
+    const size_t decl = hpp.find("void resize();");
+    ASSERT_NE(decl, std::string::npos) << "resize() declaration missing";
+    const std::string tail = hpp.substr(decl, 80);
+    EXPECT_NE(tail.find("size_dirty"), std::string::npos) <<
+        "the resize() doc must state it marks size_dirty (the recompute "
+        "is deferred to render_frame)";
+}
 } // namespace

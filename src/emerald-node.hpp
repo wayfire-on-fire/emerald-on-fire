@@ -56,7 +56,7 @@ class emerald_node_t : public wf::scene::node_t,
         const wf::pointf_t & at);
 
     // ── State updates (called by emerald_decorator_t, part 04) ─────────────
-    void resize(); // recompute ctx sizes, layout, region
+    void resize(); // size_dirty + damage (render_frame() does the recompute)
     void set_active(bool active); // invalidates + damages
     void set_theme_dirty(); // forces full re-render next frame
 
