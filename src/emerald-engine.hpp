@@ -38,6 +38,26 @@ inline bool is_valid_engine_name(const std::string & name)
     });
 }
 
+// Minor (issue #1): clamp the shadow band's sampled texture column/row
+// into the silhouette's dense core [lo, hi]. The core is the blurred,
+// +offset-shifted window's full-coverage region; the band pattern has no
+// set_extend (CAIRO_EXTEND_NONE), so sampling outside the texture yields a
+// transparent band. The window can be narrower than the shadow margins,
+// which makes the caller's "hi" bound fall below its "lo" bound; a plain
+// min(max(v, lo), hi) would then invert to hi and sample out of the
+// texture (transparent middle band). Order-independent: when hi < lo the
+// result is lo, the core edge, never the out-of-texture side. Pure so it
+// is testable headlessly (tests/test_settings.cpp).
+inline int shadow_band_clamp(int v, int lo, int hi)
+{
+    if (hi < lo)
+    {
+        hi = lo;
+    }
+
+    return std::min(std::max(v, lo), hi);
+}
+
 // dlopen bridge (port of src/engine_loader.c:32-84): searches
 // ~/.emerald/engines/lib<name>.so then <install>/lib/emeraldwf/engines/.
 bool emerald_engine_load(const std::string & name, const std::string & system_dir);

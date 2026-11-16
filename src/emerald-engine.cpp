@@ -487,13 +487,12 @@ static void draw_shadow_background(const decor_t *d, cairo_t *cr)
     // in texture coords. Clamp the sampled column/row into that core; for
     // normal radii `left`/`top` already sit inside it.
     const int shadow_size = (int)(ws->shadow_radius * 2 + 2) / 2;
-    int band_col = std::max(left, ws->shadow_offset_x + shadow_size);
-    band_col = std::min(band_col,
+    int band_col = wf::emeraldwf::shadow_band_clamp(left,
+        ws->shadow_offset_x + shadow_size,
         (int)width - right + ws->shadow_offset_x - shadow_size);
-    int band_row = std::max(top, ws->shadow_offset_y + shadow_size);
-    band_row = std::min(band_row,
-        (int)height - bottom + ws->shadow_offset_y -
-        shadow_size);
+    int band_row = wf::emeraldwf::shadow_band_clamp(top,
+        ws->shadow_offset_y + shadow_size,
+        (int)height - bottom + ws->shadow_offset_y - shadow_size);
 
     /* top left */
     cairo_matrix_init_identity(&matrix);

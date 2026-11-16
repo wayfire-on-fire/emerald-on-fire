@@ -1463,6 +1463,42 @@ TEST(EngineName, LoadRefusesUnsanizedName)
     emerald_engine_unload();
 }
 
+// Minor (issue #1): draw_shadow_background() computes the shadow band's
+// sampled texture column as band_col = min(max(left, off_x + size),
+// width - right + off_x - size). The window can be NARROWER than the shadow
+// margins (d->width - left - right < 0 is handled with a split, and a
+// negative/zero shadow_size makes off_x + size < left), so the "hi" bound
+// can fall BELOW the "lo" bound. A plain min(max(v, lo), hi) then inverts
+// to hi, sampling OUTSIDE the shadow_pattern texture (no set_extend →
+// CAIRO_EXTEND_NONE → transparent pixels) and leaving a transparent hole in
+// the middle shadow band. The clamp must be order-independent: when hi < lo
+// the result must still land in [lo, hi]∪{lo}, i.e. lo — the band samples
+// the core's edge, never out of bounds.
+TEST(EnginePure, ShadowBandClampIsOrderIndependent)
+{
+    using wf::emeraldwf::shadow_band_clamp;
+
+    // Normal-order range: behaves like a plain clamp.
+    EXPECT_EQ(shadow_band_clamp(10, 0, 20), 10);
+    EXPECT_EQ(shadow_band_clamp(-5, 0, 20), 0);
+    EXPECT_EQ(shadow_band_clamp(25, 0, 20), 20);
+
+    // Inverted range (hi < lo): must not invert. The result has to stay at
+    // the lower bound (lo) — the texture's core edge — never below it and
+    // never at hi, which is the out-of-texture side.
+    EXPECT_EQ(shadow_band_clamp(10, 20, 5), 20);
+    EXPECT_EQ(shadow_band_clamp(0, 20, 5), 20);
+    EXPECT_EQ(shadow_band_clamp(50, 20, 5), 20);
+
+    // Negative bounds (off_x negative / small shadow size): still clamps
+    // upward into [lo, hi] and never returns hi < lo.
+    EXPECT_EQ(shadow_band_clamp(-30, -10, 5), -10);
+    EXPECT_EQ(shadow_band_clamp(50, -10, -20), -10);
+
+    // Zero-width range: lo == hi is a fixed point.
+    EXPECT_EQ(shadow_band_clamp(7, 3, 3), 3);
+}
+
 // WCM's metadata parser segfaults on an EMPTY <value></value> element: the
 // string-option desc loop dereferences n->children->content without a null
 // check (children is NULL for an empty element). The emeraldwf metadata must
