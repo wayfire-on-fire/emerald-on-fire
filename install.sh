@@ -256,7 +256,12 @@ refresh_default_theme() {  # destdir
         rm -rf "$tmp"; DEFAULT_THEME_TMP=""; return 1
     fi
     DEFAULT_THEME_TMP=""
-    [ -n "$backup" ] && rm -rf "$backup"
+    # An if (not `[ -n ] && rm`): on a CLEAN install there is no backup, and a
+    # trailing `&&` list would make the function return 1 — install.sh runs
+    # with set -e, so the script would die AFTER the install succeeded.
+    if [ -n "$backup" ]; then
+        rm -rf "$backup"
+    fi
 }
 
 echo "==> installing (plugin, engines, metadata, icon)"

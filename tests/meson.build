@@ -270,6 +270,13 @@ test('emeraldwf-install-builtree', find_program('test_install_builtree.sh'))
 # running plugin sees a missing/incomplete theme. Shell-level test.
 test('emeraldwf-install-defaulttheme', find_program('test_install_defaulttheme.sh'))
 
+# Minor (issue #1): install.sh's default-theme refresh must return 0 on a
+# CLEAN install (no pre-existing theme to back up) — a trailing
+# `[ -n "$backup" ] && rm -rf` line would make the function return 1 and
+# install.sh's set -e would kill the script after the work succeeded.
+# Shell-level test.
+test('emeraldwf-install-firstrun', find_program('test_install_firstrun.sh'))
+
 # Minor (issue #1): install.sh must clean up .install.XXXXXX / .link.XXXXXX
 # temps (from an interrupted atomic_install/atomic_link) on exit via a trap.
 # Shell-level test.
