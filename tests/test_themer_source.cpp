@@ -211,4 +211,27 @@ TEST(ThemerSource, ImportCliDialogIsNotUsedAfterDestroy)
         "main() must not show the import dialog (M24) — it was "
         "destroyed inside create_filechooserdialog1()";
 }
+
+// Minor (issue #1): the theme EXPORT tar command used an unquoted
+// --exclude=*~. The command is run via g_spawn_command_line_sync, which
+// tokenizes the line with g_shell_parse_argv (no shell, no glob expansion) —
+// so the unquoted form was NOT a live glob: tar received the *~ pattern
+// literally and did the globbing itself. The quotes are DEFENSIVE: they make
+// the intent explicit and keep the command correct if it is ever migrated to
+// a real shell, where an unquoted *~ would expand against the CWD.
+TEST(ThemerSource, ExportTarExcludeIsQuoted)
+{
+    const std::string src =
+        read_file(std::string{EMERALDWF_TEST_SOURCE_ROOT} + "/themer/main.c");
+    ASSERT_FALSE(src.empty()) << "themer/main.c must be readable";
+
+    // The export tar command must quote the --exclude glob (defensive quoting:
+    // g_spawn_command_line_sync does not glob, but a real shell would).
+    EXPECT_NE(src.find("--exclude='*~'"), std::string::npos) <<
+        "the export tar command must quote the --exclude glob "
+        "(--exclude='*~')";
+    // And the unquoted form must be gone.
+    EXPECT_EQ(src.find("--exclude=*~"), std::string::npos) <<
+        "the export tar command must not use an unquoted --exclude=*~";
+}
 } // namespace
