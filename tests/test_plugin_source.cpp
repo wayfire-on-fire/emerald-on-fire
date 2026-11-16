@@ -223,4 +223,169 @@ TEST(PluginSource, RecreateSkipsViewsTheMatcherRejects)
         << "the rejection branch must skip BEFORE any "
            "adjust_new_decorations() call (M20)";
 }
+
+// Strip `//` line comments from the whole source (same rule as fn_body),
+// so the assertions below match CODE, not comment prose.
+std::string strip_comments(const std::string &src)
+{
+    std::string out;
+    for (size_t i = 0; i < src.size(); i++)
+    {
+        if (src[i] == '/' && i + 1 < src.size() && src[i + 1] == '/')
+        {
+            while (i < src.size() && src[i] != '\n')
+            {
+                i++;
+            }
+            if (i < src.size())
+            {
+                out += '\n';
+            }
+            continue;
+        }
+        out += src[i];
+    }
+
+    return out;
+}
+
+// M29 (issue #1): the active wayfire config file was watched by mtime
+// polling (find_wayfire_config_file() + /proc/self/cmdline parsing). The
+// running wayfire already watches its own config file (inotify,
+// workarounds/auto_reload_config) and emits wf::reload_config_signal
+// after re-reading it — and the reload re-sets every registered option,
+// firing the plugin's set_callback() handlers. The plugin must use that
+// signal for the wayfire config; the mtime poller stays ONLY for the
+// emerald-owned files (settings.ini, theme.ini, theme dir).
+//
+// ChatGPT review (M29): the signal is also emitted for PROGRAMMATIC
+// option changes (wayfire IPC, ipc-rules set_config_options) — so the
+// handler must NOT re-read the file and re-apply its values (that would
+// revert a legitimate runtime change); it only arms the debounced theme
+// reload. The file re-apply helper (M21) is removed with its last caller.
+TEST(PluginSource, WayfireConfigUsesReloadSignalNotMtimePoll)
+{
+    const std::string src =
+        read_file(std::string{EMERALDWF_TEST_SOURCE_ROOT} + "/src/plugin.cpp");
+    ASSERT_FALSE(src.empty()) << "src/plugin.cpp must be readable";
+    const std::string code = strip_comments(src);
+
+    // 1. The cmdline-based config-file discovery is gone (in code, not
+    //    just in comments).
+    EXPECT_EQ(code.find("find_wayfire_config_file"), std::string::npos)
+        << "find_wayfire_config_file() (the /proc/self/cmdline parsing) "
+           "must be replaced by wf::reload_config_signal (M29)";
+    EXPECT_EQ(code.find("/proc/self/cmdline"), std::string::npos)
+        << "the plugin must not parse /proc/self/cmdline to locate the "
+           "config file (M29)";
+
+    // 2. The plugin declares a reload_config_signal connection and
+    //    connects it in init().
+    EXPECT_NE(src.find("connection_t<wf::reload_config_signal>"),
+        std::string::npos)
+        << "the plugin must hold a "
+           "wf::signal::connection_t<wf::reload_config_signal> member (M29)";
+
+    const std::string init = fn_body(src, "void emeraldwf_plugin::init()");
+    ASSERT_FALSE(init.empty()) << "could not locate emeraldwf_plugin::init()";
+    EXPECT_NE(init.find("connect(&on_config_reload)"), std::string::npos)
+        << "init() must connect the reload_config_signal (M29)";
+
+    // 3. The handler arms the debounced theme reload and re-applies the
+    //    emeraldwf options through the lenient sync (M21) using the
+    //    WAYFIRE_CONFIG_FILE env var that wayfire's config backend sets
+    //    at init.
+    const size_t handler = init.find("on_config_reload = [");
+    ASSERT_NE(handler, std::string::npos)
+        << "init() must assign the on_config_reload handler (M29)";
+    const size_t open = init.find('{', handler);
+    ASSERT_NE(open, std::string::npos);
+
+    int depth = 0;
+    size_t close = std::string::npos;
+    for (size_t i = open; i < init.size(); i++)
+    {
+        if (init[i] == '{')
+        {
+            depth++;
+        } else if (init[i] == '}')
+        {
+            depth--;
+            if (depth == 0)
+            {
+                close = i;
+                break;
+            }
+        }
+    }
+    ASSERT_NE(close, std::string::npos) << "unbalanced handler lambda";
+    const std::string handler_body =
+        init.substr(open + 1, close - open - 1);
+
+    EXPECT_NE(handler_body.find("arm_reload()"), std::string::npos)
+        << "the reload_config_signal handler must arm the debounced "
+           "theme reload (M29)";
+    // ChatGPT review (M29): the signal is NOT file-specific — wayfire IPC
+    // (ipc-rules set_config_options) emits it for programmatic option
+    // changes too. Re-reading the file and re-applying its values would
+    // revert a legitimate runtime change to the file's value. The option
+    // manager stays authoritative; the handler must NOT re-read the file.
+    EXPECT_EQ(handler_body.find("sync_emeraldwf_options_from_config"),
+        std::string::npos)
+        << "the handler must not re-apply file values over the in-memory "
+           "option manager (it would revert IPC-made runtime changes) "
+           "(M29, ChatGPT review)";
+    EXPECT_EQ(handler_body.find("WAYFIRE_CONFIG_FILE"), std::string::npos)
+        << "the handler must not read the config file path (the handler "
+           "must not re-read the config file) (M29, ChatGPT review)";
+    EXPECT_EQ(code.find("sync_emeraldwf_options_from_config"),
+        std::string::npos)
+        << "the file re-apply helper (M21) is dead weight once the signal "
+           "replaces the mtime poll — removed (M29, ChatGPT review)";
+    EXPECT_EQ(code.find("emerald-config-sync.hpp"), std::string::npos)
+        << "plugin.cpp must no longer include the config-sync header "
+           "(M29, ChatGPT review)";
+
+    // 4. The wayfire config file is no longer in the mtime-watched set,
+    //    and poll_tick() has no config-change branch. The emerald-owned
+    //    files stay watched.
+    const std::string wpaths = fn_body(src,
+        "void emeraldwf_plugin::emerald_watched_paths(std::vector<std::string> & out)");
+    ASSERT_FALSE(wpaths.empty())
+        << "could not locate emerald_watched_paths()";
+    EXPECT_EQ(wpaths.find("wayfire_config_file"), std::string::npos)
+        << "the mtime poller must watch only the emerald-owned files, not "
+           "the wayfire config (M29)";
+    EXPECT_NE(wpaths.find("last_settings_path"), std::string::npos)
+        << "settings.ini must stay mtime-watched (M29)";
+    EXPECT_NE(wpaths.find("theme.ini"), std::string::npos)
+        << "theme.ini must stay mtime-watched (M29)";
+
+    const std::string tick = fn_body(src, "bool emeraldwf_plugin::poll_tick()");
+    ASSERT_FALSE(tick.empty()) << "could not locate poll_tick()";
+    EXPECT_EQ(tick.find("config_changed"), std::string::npos)
+        << "poll_tick() must no longer special-case the wayfire config "
+           "(M29)";
+    EXPECT_EQ(tick.find("sync_emeraldwf_options_from_config"),
+        std::string::npos)
+        << "the config sync belongs to the signal handler, not to the "
+           "mtime poller (M29)";
+
+    // 5. The emerald-files poller itself stays.
+    EXPECT_NE(init.find("start_poller()"), std::string::npos)
+        << "init() must still start the emerald-files mtime poller (M29)";
+
+    // 6. fini() disconnects the signal like every other connection, so a
+    //    config reload during plugin unload cannot re-enter the half-
+    //    destroyed plugin — and cancels the armed reload debounce, so a
+    //    pending 250 ms timer cannot fire on the destroyed plugin.
+    const std::string fini = fn_body(src, "void emeraldwf_plugin::fini()");
+    ASSERT_FALSE(fini.empty()) << "could not locate emeraldwf_plugin::fini()";
+    EXPECT_NE(fini.find("on_config_reload.disconnect()"), std::string::npos)
+        << "fini() must disconnect on_config_reload (M29)";
+    EXPECT_NE(fini.find("reload_timer.disconnect()"), std::string::npos)
+        << "fini() must cancel the reload debounce timer (M29, ChatGPT "
+           "review: explicit signal disconnection does not cancel an "
+           "already-armed timer)";
+}
 } // namespace

@@ -22,14 +22,12 @@
 #include <chrono>
 #include <cstdint>
 #include <ctime>
-#include <fstream>
 #include <map>
 
 #include <sys/stat.h>
 
 #include <glib.h>
 
-#include "emerald-config-sync.hpp"
 #include "emerald-decorator.hpp"
 #include "emerald-engine.hpp"
 #include "emerald-file-stamp.hpp"
@@ -48,47 +46,21 @@ static std::string engine_override_value(const std::string & v)
 
 // ── Part 06: wayfire config watching (WCM engine switch) ───────────────────
 //
-// WCM (wayfire's config manager) only WRITES the ini — the installed wayfire
-// never re-reads its own config (config auto-reload landed in a newer source
-// tree, not in the running binary), so the in-memory option values — and the
-// plugin's set_callback() handlers — are never triggered by a WCM edit.
-// To make emeraldwf/* changes live, the mtime poller also watches the active
-// wayfire config file and syncs EVERY emeraldwf option (finding 24 — the
-// original sync only covered the string options, so checkbox options like
-// enable_shade never reached the plugin) into wayfire's config manager on
-// change (set_value() fires the option callbacks, which arm the theme reload
-// and apply the per-option side effects). The sync lives in
-// emerald-config-sync.cpp (pure, headless-testable).
-//
-// The active config file is the one the running wayfire was launched with
-// (`wayfire -c <file>`; default $XDG_CONFIG_HOME/wayfire.ini). The plugin
-// runs INSIDE the wayfire process, so /proc/self/cmdline gives it directly.
-namespace
-{
-std::string find_wayfire_config_file()
-{
-    std::ifstream cf("/proc/self/cmdline", std::ios::binary);
-    if (cf)
-    {
-        std::string arg, prev;
-        while (std::getline(cf, arg, '\0'))
-        {
-            if ((prev == "-c") && !arg.empty())
-            {
-                return arg;
-            }
-
-            prev = arg;
-        }
-    }
-
-    const char *xdg  = std::getenv("XDG_CONFIG_HOME");
-    std::string base =
-        (xdg != nullptr && *xdg != '\0') ? std::string(xdg) :
-        std::string(g_get_home_dir()) + "/.config";
-    return base + "/wayfire.ini";
-}
-} // namespace
+// WCM (wayfire's config manager) only WRITES the ini. The running wayfire
+// watches its own config file (inotify, workarounds/auto_reload_config —
+// enabled by default) and, after re-reading it, emits
+// wf::reload_config_signal on the core (default-config-backend's
+// do_reload_config()). The reload re-sets every registered option, so the
+// plugin's set_callback() handlers fire for the changed emeraldwf/* values.
+// The plugin therefore subscribes to that signal (on_config_reload)
+// instead of polling the config file's mtime (M29, issue #1): the handler
+// only arms the debounced theme reload — it does NOT re-read the file.
+// The signal is not file-specific (wayfire IPC emits it for programmatic
+// option changes too), so re-applying the file's values would revert a
+// legitimate runtime change; the option manager stays authoritative.
+// Live WCM updates require wayfire's auto config reload to be enabled
+// (the documented default); with workarounds/auto_reload_config=false the
+// plugin deliberately does not poll the file behind wayfire's back.
 
 namespace wf
 {
@@ -153,7 +125,6 @@ class emeraldwf_plugin : public wf::plugin_interface_t
     wf::wl_timer<true> poll_timer; // 500 ms mtime poller (repeatable)
     wf::wl_timer<false> reload_timer; // 250 ms reload debounce (one-shot)
     std::map<std::string, std::uint64_t> last_stamp; // file stamps (ns; finding 44)
-    std::string wayfire_config_file; // active wayfire ini (poller-watched)
 
     wf::axis_callback shade_axis_cb;
 
@@ -174,6 +145,13 @@ class emeraldwf_plugin : public wf::plugin_interface_t
     // Without this, the node renders a zero-client frame and never updates.
     // See the regression test in tests/test_render_node.cpp.
     wf::signal::connection_t<wf::view_geometry_changed_signal> on_geometry_changed;
+    // Part 06 (M29, issue #1): wayfire re-read its own config file (inotify,
+    // workarounds/auto_reload_config) and emits this on the core after the
+    // reload re-set every registered option. The handler only arms the
+    // debounced theme reload (the option manager stays authoritative — the
+    // signal is also emitted for IPC-made programmatic option changes).
+    // Replaces the old mtime poll of the wayfire config file.
+    wf::signal::connection_t<wf::reload_config_signal> on_config_reload;
 
     // ── Helpers ───────────────────────────────────────────────────────────
     bool should_decorate_view(::wayfire_toplevel_view view);
@@ -597,15 +575,12 @@ void emeraldwf_plugin::publish_shade_duration(wayfire_view view)
 // ── Part 06: live settings reload ─────────────────────────────────────────
 void emeraldwf_plugin::emerald_watched_paths(std::vector<std::string> & out)
 {
+    // Only the emerald-owned files. The active wayfire config file is NOT
+    // polled: wayfire watches it itself (inotify) and emits
+    // wf::reload_config_signal on change — on_config_reload handles it
+    // (M29, issue #1).
     out = {last_settings_path, last_theme_dir + "/theme.ini",
         last_theme_dir};
-    // The active wayfire config file too: WCM writes it (and never notifies
-    // the running wayfire), so its emeraldwf/* values are synced on mtime
-    // change — this is what makes WCM engine switches live (part 06).
-    if (!wayfire_config_file.empty())
-    {
-        out.push_back(wayfire_config_file);
-    }
 }
 
 bool emeraldwf_plugin::poll_tick()
@@ -614,7 +589,6 @@ bool emeraldwf_plugin::poll_tick()
     emerald_watched_paths(paths);
 
     bool emerald_changed = false;
-    bool config_changed  = false;
     for (auto & p : paths)
     {
         std::uint64_t m = emwf_file_stamp(p);
@@ -622,39 +596,7 @@ bool emeraldwf_plugin::poll_tick()
         if ((it == last_stamp.end()) || (it->second != m))
         {
             last_stamp[p] = m;
-            if (p == wayfire_config_file)
-            {
-                config_changed = true;
-            } else
-            {
-                emerald_changed = true;
-            }
-        }
-    }
-
-    if (config_changed)
-    {
-        // WCM (or a hand edit) touched the ini: push the emeraldwf values
-        // into the in-memory config manager. set_value() fires the option
-        // callbacks, which arm the debounced reload and apply the side
-        // effects (finding 24: ALL options — the old sync only covered the
-        // four string options, so WCM checkbox/keybinding/animation edits
-        // like enable_shade never reached the running plugin).
-        emerald_config_options_t targets{engine, theme_dir,
-            ignore_views_string, always_decorate_string,
-            double_click_action, middle_click_action,
-            maximized_borders, maximized_shadows, enable_shade,
-            csd_titlebar_height, shadow_pad, shade_modifier,
-            shade_duration, no_scroll_shade, use_decoration_cropping,
-            use_button_fade, use_button_fade_pulse,
-            button_fade_total_duration, button_fade_step_duration,
-            button_fade_pulse_wait_duration,
-            button_fade_pulse_min_opacity};
-        const bool value_changed =
-            sync_emeraldwf_options_from_config(wayfire_config_file, targets);
-        if (value_changed)
-        {
-            arm_reload();
+            emerald_changed = true;
         }
     }
 
@@ -851,11 +793,9 @@ void emeraldwf_plugin::init()
     // Part 06: live reload — poll the mtimes of settings.ini, theme.ini, and
     // the theme dir (engine PNG/dir changes). emerald-theme-manager edits both
     // files, so this makes it work with no restart and no signal. The active
-    // wayfire config file is watched too, so WCM edits to emeraldwf/* (e.g.
-    // the engine) are synced into the in-memory options and reloaded live.
-    wayfire_config_file = find_wayfire_config_file();
-    LOGI("emeraldwf: watching config file %s for live option changes",
-        wayfire_config_file.c_str());
+    // wayfire config file is NOT polled: wayfire watches it itself (inotify)
+    // and emits reload_config_signal — on_config_reload (assigned below)
+    // syncs the emeraldwf options and arms the reload (M29, issue #1).
     start_poller();
 
     // CSD windows use the csd_titlebar_height option (pixdecor parity).
@@ -1022,12 +962,29 @@ void emeraldwf_plugin::init()
         }
     };
 
+    // Part 06 (M29, issue #1): wayfire just re-set every registered option
+    // (inotify config reload; workarounds/auto_reload_config) and emitted
+    // this signal — the set_callback() handlers above already armed the
+    // debounced reload for the options that changed. Arm it unconditionally
+    // so options without a callback (e.g. enable_shade) reach the theme
+    // too. The option manager stays authoritative: this signal is NOT
+    // file-specific (wayfire IPC emits it for programmatic option changes
+    // too), so the handler must not re-read the config file and re-apply
+    // its values — that would revert a legitimate runtime change to the
+    // file's value (ChatGPT review of M29).
+    on_config_reload = [this] (wf::reload_config_signal * /*ev*/)
+    {
+        LOGD("emeraldwf: config reloaded — arming theme reload");
+        arm_reload();
+    };
+
     wf::get_core().tx_manager->connect(&on_new_tx);
     wf::get_core().connect(&on_decoration_state_changed);
     wf::get_core().connect(&on_view_tiled);
     wf::get_core().connect(&on_app_id_changed);
     wf::get_core().connect(&on_title_changed);
     wf::get_core().connect(&on_geometry_changed);
+    wf::get_core().connect(&on_config_reload);
 
     // ── Existing views ─────────────────────────────────────────────────────
     for (const auto & view : wf::get_core().get_all_views())
@@ -1237,6 +1194,7 @@ void emeraldwf_plugin::fini()
     on_app_id_changed.disconnect();
     on_title_changed.disconnect();
     on_geometry_changed.disconnect();
+    on_config_reload.disconnect();
     wf::get_core().bindings->rem_binding(&shade_axis_cb);
 
     // 3. Remove the shade transformers (they reference plugin state) and the

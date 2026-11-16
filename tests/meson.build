@@ -25,13 +25,9 @@ emerald_test_paths = configure_file(
 emerald_test_inc = include_directories('.')
 
 emeraldwf_settings = executable('emeraldwf-settings',
-    # emerald-config-sync.cpp (finding 24): pure ini→option sync, headless
-    # (GKeyFile + wf::config::option_t only, no wayfire core symbols).
-    ['test_settings.cpp', '../src/emerald-config-sync.cpp'],
+    ['test_settings.cpp'],
     include_directories: [src_inc, emerald_inc, emerald_test_inc],
-    # wayfire: wf-config (option_t / from_string) for the sync tests — the
-    # wayfire dep has no Libs of its own, so it does not pull the core lib.
-    dependencies: emerald_test_deps + [wayfire],
+    dependencies: emerald_test_deps,
     link_with: [emerald_theme_lib, libemeraldengine])
 
 emeraldwf_render = executable('emeraldwf-render',
