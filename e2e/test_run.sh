@@ -44,6 +44,17 @@ if printf '%s\n' "$code" | grep -q '/projects/contrib/emerald'; then t_bad "hard
 if grep -Eq '^shot\(\)' "$RUN"; then t_ok "shot() screenshot guard exists"; else t_bad "no shot() guard"; fi
 if grep -Eq '^golden\(\)' "$RUN"; then t_ok "golden() helper exists"; else t_bad "no golden() helper"; fi
 
+# Readiness (wf_start): the grep must match a SUCCESS indicator, not any
+# "emeraldwf" line. A bare `grep -qi "emeraldwf"` matches plugin ERROR lines
+# too (e.g. "emeraldwf: theme load failed"), so a broken plugin start would
+# look "ready" and the later steps would fail for the wrong reason.
+wf_start_body="$(sed -n '/^wf_start()/,/^}/p' "$RUN")"
+if printf '%s\n' "$wf_start_body" | grep -q 'emeraldwf: theme loaded'; then
+  t_ok "readiness grep matches a success line"
+else
+  t_bad "readiness grep must match a success line (not any emeraldwf line)"
+fi
+
 # ── 2. pure helpers (sourced; main must NOT run) ──────────────────────────
 source "$RUN"
 

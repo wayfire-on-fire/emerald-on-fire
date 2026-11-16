@@ -179,9 +179,14 @@ wf_start() {
   # and the script's X tools share one server.
   env LIBGL_ALWAYS_SOFTWARE=1 wayfire -c "$ini" >"$WF_LOG" 2>&1 &
   WF_PID=$!
-  # wait for the compositor to be ready (poll a wayfire debug line / plugin load)
+  # wait for the compositor to be ready. Match a SUCCESS indicator, not any
+  # "emeraldwf" line: a bare grep matches plugin ERROR lines too (e.g.
+  # "emeraldwf: theme load failed"), so a broken start would look ready and
+  # the later steps would fail for the wrong reason. "theme loaded" (with the
+  # "ed") is logged only on a successful theme load, not on the failure line
+  # ("theme load failed").
   for _ in $(seq 1 50); do
-    if grep -qi "emeraldwf" "$WF_LOG" 2>/dev/null; then
+    if grep -Fqi "emeraldwf: theme loaded" "$WF_LOG" 2>/dev/null; then
       sleep 0.5; return 0
     fi
     kill -0 "$WF_PID" 2>/dev/null || return 1
