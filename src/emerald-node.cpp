@@ -970,8 +970,12 @@ void emerald_node_t::handle_pointer_button(
         {
             if (pressed)
             {
-                auto ctx = deco->ctx();
-                int b    = layout.hit_button(ctx, x, y, view->activated);
+                // Minor (issue #1): bind by const reference — the DecorContext
+                // is only read (layout.hit_button / resize_edges / in_titlebar
+                // all take `const DecorContext&`); a by-value copy on every
+                // left press was pure overhead.
+                const auto & ctx = deco->ctx();
+                int b = layout.hit_button(ctx, x, y, view->activated);
                 if (b >= 0)
                 {
                     pressed_button = b;

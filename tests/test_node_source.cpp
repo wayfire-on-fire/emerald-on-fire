@@ -305,4 +305,29 @@ TEST(NodeSource, NoDuplicateIncludes)
         }
     }
 }
+
+// Minor (issue #1): handle_pointer_button() bound the left-press DecorContext
+// with `auto ctx = deco->ctx();` — a full by-value copy of the (sizeable)
+// DecorContext on every left press, although every consumer
+// (layout.hit_button / resize_edges / in_titlebar / double_click_action)
+// takes it as `const DecorContext&`. Bind by reference instead.
+TEST(NodeSource, LeftPressDoesNotCopyDecorContext)
+{
+    const std::string src = read_file(
+        std::string{EMERALDWF_TEST_SOURCE_ROOT} + "/src/emerald-node.cpp");
+    ASSERT_FALSE(src.empty()) << "src/emerald-node.cpp must be readable";
+
+    const std::string body =
+        node_fn_body(src, "void emerald_node_t::handle_pointer_button(");
+    ASSERT_FALSE(body.empty()) <<
+        "could not locate emerald_node_t::handle_pointer_button()";
+
+    // The by-value copy must be gone...
+    EXPECT_EQ(body.find("auto ctx = deco->ctx()"), std::string::npos) <<
+        "the left-press DecorContext must not be copied by value";
+    // ...and bound by const reference.
+    EXPECT_NE(body.find("const auto & ctx = deco->ctx()"),
+        std::string::npos) <<
+        "the left-press DecorContext must be bound by const reference";
+}
 } // namespace
