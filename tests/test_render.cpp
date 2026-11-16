@@ -14,6 +14,8 @@
 
 #include <unistd.h>
 
+#include <algorithm>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -39,6 +41,29 @@ namespace
 std::string project_root()
 {
     return EMERALDWF_TEST_SOURCE_ROOT;
+}
+
+// CI environment gap (runs 43801005965 / 43804923112): in fresh
+// environments (no XDG install, no so-dir defaults) the __FILE__-relative
+// fallback hopped one level too far — <root>-parent instead of <root> —
+// so the default theme was not found, and every engine that is NOT the
+// theme's own engine (vrunner) ran on bare defaults (extents 6,4,6,6
+// instead of the theme's 5,4,5,5): the frame came out 2px larger and
+// every golden compare failed. The root must resolve to the directory
+// that contains BOTH src/ and third_party/ — pin the hop count, not the
+// filesystem luck (a stray <root>-parent/third_party tree, as on the
+// author's box, masks the bug).
+TEST(Paths, ProjectRootResolvesToRepoRoot)
+{
+    const fs::path root = wf::emeraldwf::emerald_project_root();
+    EXPECT_TRUE(fs::is_regular_file(
+        root / "src" / "emerald-settings.cpp")) <<
+        "emerald_project_root() must resolve to the project root "
+        "(the parent of src/); got: " << root.string();
+    EXPECT_TRUE(fs::is_directory(
+        root / "third_party" / "emerald" / "defaults" / "theme")) <<
+        "the root must contain the vendored default theme; got: " <<
+        root.string();
 }
 
 fs::path golden_dir()

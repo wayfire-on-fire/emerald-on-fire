@@ -5,6 +5,7 @@
 // below is the frozen seam that Parts 01/03/04 compile against.
 #pragma once
 
+#include <filesystem>
 #include <memory>
 #include <optional>
 #include <string>
@@ -148,5 +149,14 @@ void emeraldwf_apply_button_fade(window_settings *ws,
     bool use_fade, bool use_pulse,
     int total_duration_ms, int step_duration_ms,
     int pulse_wait_ms, int pulse_min_opacity_pct);
+
+// The project ROOT resolved from __FILE__ (see emerald-settings.cpp):
+// <root>/src/emerald-settings.cpp → two parent hops. Exported so the
+// tests can pin the hop count — the fresh-environment fallback for the
+// default-theme / engine-dir lookups must land on <root>, not <root>'s
+// parent (pre-fix it pointed at <root-parent>/third_party/..., which does
+// not exist, so every engine mismatching the theme's own engine ran on
+// bare defaults in CI/containers).
+std::filesystem::path emerald_project_root();
 } // namespace emeraldwf
 } // namespace wf

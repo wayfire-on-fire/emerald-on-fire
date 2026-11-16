@@ -88,6 +88,32 @@ int get_b_t_offset(gint b_t)
         return B_COUNT;
     }
 }
+
+// Non-throwing __FILE__-relative project ROOT; falls back to the raw
+// path on failure.
+//
+// __FILE__ is <root>/src/emerald-settings.cpp — meson compiles with a
+// path relative to the BUILD dir, so resolve it against the CWD (the
+// build dir under `meson test`). Two parent hops from the file reach
+// <root>. (Pre-fix this returned the FILE and the three call sites each
+// hopped THREE levels — landing on <root>'s PARENT, so in fresh
+// environments (CI, containers: no XDG install, no so-dir defaults)
+// the default-theme / engine-dir fallback pointed at
+// <root-parent>/third_party/..., which does not exist, and every engine
+// that mismatches the theme's own engine silently ran on bare defaults:
+// extents 6,4,6,6 instead of the theme's 5,4,5,5 — a 2px frame-size
+// shift that broke every golden compare.)
+fs::path emerald_project_root()
+{
+    std::error_code ec;
+    fs::path p = fs::weakly_canonical(fs::current_path() / __FILE__, ec);
+    if (ec)
+    {
+        p = fs::path(__FILE__);
+    }
+
+    return p.parent_path().parent_path();
+}
 } // namespace wf::emeraldwf
 
 namespace
@@ -227,19 +253,6 @@ void copy_from_defaults_if_needed(const std::string & settings_path,
             out << content;
         }
     }
-}
-
-// Non-throwing __FILE__-relative root; falls back to the raw path on failure.
-static fs::path file_relative_root()
-{
-    std::error_code ec;
-    fs::path p = fs::weakly_canonical(fs::current_path() / __FILE__, ec);
-    if (ec)
-    {
-        p = fs::path(__FILE__);
-    }
-
-    return p;
 }
 
 // port of main.c:5490-5512 (titlebar_font_changed)
@@ -1190,10 +1203,8 @@ bool ThemeSettings::load(const std::string & settings_ini,
     }
     if (defaults_dir.empty() || !fs::is_directory(defaults_dir))
     {
-        defaults_dir = file_relative_root().parent_path()
-            .parent_path()
-            .parent_path() / "third_party" / "emerald" /
-            "defaults";
+        defaults_dir = emerald_project_root() / "third_party" /
+            "emerald" / "defaults";
     }
 
     // The installed-defaults theme dir — Review R8: the first-run seed must
@@ -1242,9 +1253,7 @@ bool ThemeSettings::load(const std::string & settings_ini,
             return p.string();
         }
 
-        return (file_relative_root().parent_path()
-            .parent_path()
-            .parent_path() / "third_party" / "emerald" /
+        return (emerald_project_root() / "third_party" / "emerald" /
             "defaults" / "theme")
                    .string();
     }();
@@ -1413,11 +1422,9 @@ bool ThemeSettings::load(const std::string & settings_ini,
             }
         }
 
-        // 3. fallback: cwd-relative __FILE__ (project root 3 hops up)
-        return (file_relative_root().parent_path()
-            .parent_path()
-            .parent_path() / "build" / "engines")
-                   .string();
+        // 3. fallback: cwd-relative __FILE__ (project root)
+        return (emerald_project_root() / "build" / "engines")
+               .string();
     }();
 
     if (!emerald_engine_load(engine_, engine_dir))
