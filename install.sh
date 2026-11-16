@@ -170,6 +170,18 @@ atomic_versioned_so() {  # srcfile destdir
     atomic_link "$sover" "$dir" "$unver"
 }
 
+# True if $1 is a versioned .so: a REGULAR file (not a symlink) whose basename
+# is libNAME.so.MAJOR.MINOR.PATCH (three numeric components). This excludes the
+# .so / .so.MAJOR symlinks, the .so.VER.p object dir, and unrelated regular
+# files (libfoo.so.debug, libfoo.so.2.3.4.old, ...) that lib*.so.* would
+# otherwise match.
+is_versioned_so() {
+    local p="$1"
+    [ -f "$p" ] && [ ! -L "$p" ] || return 1
+    local base="${p##*/}"
+    [[ "$base" =~ ^lib.*\.so\.[0-9]+\.[0-9]+\.[0-9]+$ ]]
+}
+
 echo "==> installing (plugin, engines, metadata, icon)"
 # [ -w ] is false for a missing path, so create the target dirs first.
 mkdir -p "$DATADIR/wayfire/metadata" 2>/dev/null || true
@@ -199,7 +211,7 @@ echo "==> libemeraldwf.so → $LIBDIR/wayfire"
 # engines.
 n_engines=0
 for f in "$BUILD"/engines/lib*.so.*; do
-    [ -f "$f" ] && [ ! -L "$f" ] || continue
+    is_versioned_so "$f" || continue
     atomic_versioned_so "$f" "$LIBDIR/emeraldwf/engines"
     n_engines=$((n_engines + 1))
 done
@@ -209,11 +221,16 @@ echo "==> $n_engines engines → $LIBDIR/emeraldwf/engines"
 # exact versioned file (a regular file, not a symlink) rather than hardcoding
 # the version.
 eng_lib=""
+eng_count=0
 for f in "$BUILD"/libengine/libemeraldengine.so.*; do
-    if [ -f "$f" ] && [ ! -L "$f" ]; then eng_lib="$f"; break; fi
+    is_versioned_so "$f" || continue
+    eng_lib="$f"
+    eng_count=$((eng_count + 1))
 done
-if [ -z "$eng_lib" ]; then
-    echo "FATAL: no versioned libemeraldengine.so found in $BUILD/libengine" >&2
+# Exactly one: stale build artifacts (two versioned files) would otherwise be
+# an ambiguous selection.
+if [ "$eng_count" -ne 1 ]; then
+    echo "FATAL: expected exactly one versioned libemeraldengine.so in $BUILD/libengine (found $eng_count)" >&2
     exit 1
 fi
 if [ -w "$LIBDIR/emeraldwf" ]; then

@@ -35,6 +35,34 @@ case "$LINKS" in
   *) echo "FAIL: expected libfoo.so.2.3.4->libfoo.so.2 and libfoo.so.2->libfoo.so, got: $LINKS"; fail=1 ;;
 esac
 
+# ── 1b. is_versioned_so: only a versioned REGULAR file passes ──────────────
+# Rejects symlinks, the .p object dir, and unrelated regular files that
+# lib*.so.* would otherwise match.
+isver_def="$(sed -n '/^is_versioned_so()/,/^}/p' "$SRC")"
+[ -n "$isver_def" ] || { echo "FAIL: is_versioned_so not found"; exit 1; }
+printf '%s\n' "$isver_def" > "$tmpf"
+# shellcheck disable=SC1091
+source "$tmpf"
+
+d="$(mktemp -d)"
+trap 'rm -f "$tmpf"; rm -rf "$d"' EXIT
+printf 'x' > "$d/libfoo.so.1.2.3"          # valid versioned regular file
+printf 'x' > "$d/libfoo.so.debug"          # unrelated regular file
+printf 'x' > "$d/libfoo.so.2.3.4.old"      # versioned-looking + extra suffix
+ln -s "libfoo.so.1.2.3" "$d/libfoo.so.1"   # symlink (must be rejected)
+mkdir -p "$d/libfoo.so.1.2.3.p"            # object dir (must be rejected)
+
+check_isver() {  # desc path expect(0/1)
+    local desc="$1" p="$2" want="$3" rc=0
+    is_versioned_so "$p" || rc=$?
+    if [ "$rc" -eq "$want" ]; then echo "ok: $desc"; else echo "FAIL: $desc (rc=$rc want=$want)"; fail=1; fi
+}
+check_isver "versioned regular file accepted" "$d/libfoo.so.1.2.3" 0
+check_isver "unrelated .so.debug rejected"    "$d/libfoo.so.debug" 1
+check_isver "extra-suffix .old rejected"      "$d/libfoo.so.2.3.4.old" 1
+check_isver "symlink rejected"                "$d/libfoo.so.1" 1
+check_isver "object dir rejected"             "$d/libfoo.so.1.2.3.p" 1
+
 # ── 2. the engine .so glob must not hardcode a version ─────────────────────
 if grep -qE 'lib\*\.so\.0\.1\.0' "$SRC"; then
   echo "FAIL: engine glob hardcodes .so.0.1.0 (breaks on a version bump)"; fail=1
