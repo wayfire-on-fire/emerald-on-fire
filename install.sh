@@ -109,9 +109,22 @@ WF_LIBDIR_REL=$(pkg-config --variable=libdir wayfire 2>/dev/null)
 [ -n "$WF_LIBDIR_REL" ] || WF_LIBDIR_REL=lib
 case "$WF_LIBDIR_REL" in /*) WF_LIBDIR_REL=${WF_LIBDIR_REL#"$WF_PREFIX"/} ;; esac
 
+# A marker recording the prefix/libdir the build tree was configured with.
+# libemeraldengine bakes ENGINE_DIR (<prefix>/<libdir>/emeraldwf/engines) in
+# at compile time, so a tree configured with a DIFFERENT wayfire prefix/libdir
+# is stale (the engine would scan the wrong dir). Reconfigure when the marker
+# no longer matches, not just when build.ninja is missing.
+CFG_MARKER="$BUILD/.emeraldwf-cfg"
 if [ ! -f "$BUILD/build.ninja" ]; then
     echo "==> configuring build tree (meson)"
-    meson setup "$BUILD" -Dprefix="$WF_PREFIX" -Dlibdir="$WF_LIBDIR_REL"
+    # Write the marker only AFTER a successful configure, and exit on failure
+    # (never build against a tree that failed to (re)configure).
+    meson setup "$BUILD" -Dprefix="$WF_PREFIX" -Dlibdir="$WF_LIBDIR_REL" || exit 1
+    printf '%s' "$WF_PREFIX|$WF_LIBDIR_REL" > "$CFG_MARKER"
+elif [ ! -f "$CFG_MARKER" ] || [ "$(cat "$CFG_MARKER" 2>/dev/null)" != "$WF_PREFIX|$WF_LIBDIR_REL" ]; then
+    echo "==> reconfiguring build tree (wayfire prefix/libdir changed)"
+    meson setup --reconfigure "$BUILD" -Dprefix="$WF_PREFIX" -Dlibdir="$WF_LIBDIR_REL" || exit 1
+    printf '%s' "$WF_PREFIX|$WF_LIBDIR_REL" > "$CFG_MARKER"
 fi
 echo "==> building"
 ninja -C "$BUILD"

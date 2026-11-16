@@ -218,6 +218,11 @@ test('emeraldwf-install-plugdir', find_program('test_install_plugdir.sh'))
 # version-agnostic.
 test('emeraldwf-install-version', find_program('test_install_version.sh'))
 
+# Minor (issue #1): install.sh must detect a STALE build tree (configured with
+# a different wayfire prefix/libdir) and reconfigure, not blindly reuse it -
+# libemeraldengine bakes ENGINE_DIR at compile time. Shell-level test.
+test('emeraldwf-install-builtree', find_program('test_install_builtree.sh'))
+
 # ---- part 07: engine pane / engine module lifetime (findings 46/47) ----
 # Regression for the "Round Top Left Corner" SEGV_MAPERR: append_engine's
 # dlclose unmapped the engine .so (static-vendored libemeraldengine) while
