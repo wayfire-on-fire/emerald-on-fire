@@ -201,6 +201,12 @@ test('emeraldwf-run-kvm-livewm', find_program('test_run_kvm_livewm.sh'))
 # SSH key). Shell-level test.
 test('emeraldwf-cloudinit-opensuse', find_program('test_cloudinit_opensuse.sh'))
 
+# Minor (issue #1): provision.sh writes its result JSON via an unquoted
+# heredoc, so the interpolated values must be JSON-escaped (a value with a
+# quote/backslash/control char would otherwise produce malformed JSON).
+# Shell-level test.
+test('emeraldwf-provision-result-json', find_program('test_provision_result_json.sh'))
+
 # M26 (issue #1): matrix.sh must exit non-zero when any distro fails
 # (shell-level test: extracts the collect_results() block and runs it
 # with a stubbed wait - the real script needs qemu + /dev/kvm).

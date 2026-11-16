@@ -28,6 +28,27 @@ done
 RESULT=/root/distros-result.json
 log() { printf '[provision] %s\n' "$*"; }
 
+# json_escape VALUE — escape VALUE for embedding in a JSON string. The result
+# JSON is written via an UNQUOTED heredoc (so the shell expands the values);
+# without escaping, a value containing a double quote, backslash, or control
+# char would produce malformed JSON (the result is parsed back by run-kvm.sh).
+# Covers the JSON-required escapes for the characters this harness can emit
+# (the values are ordinary printable strings: distro id/pretty name, wayfire
+# version, pass/fail/skipped, session user, timestamp). NUL cannot appear in a
+# bash variable, so it needs no handling.
+json_escape() {
+  local s="$1"
+  s="${s//\\/\\\\}"     # backslash    -> \\
+  s="${s//\"/\\\"}"     # double quote -> \"
+  s="${s//$'\b'/\\b}"   # backspace    -> \b
+  s="${s//$'\t'/\\t}"   # tab          -> \t
+  s="${s//$'\n'/\\n}"   # newline      -> \n
+  s="${s//$'\v'/\\u000b}" # vertical tab -> \u000b
+  s="${s//$'\f'/\\f}"   # form feed    -> \f
+  s="${s//$'\r'/\\r}"   # CR           -> \r
+  printf '%s' "$s"
+}
+
 # ── distro detect ───────────────────────────────────────────────────────────
 . /etc/os-release
 DISTRO_ID="$ID"
@@ -243,17 +264,20 @@ fi
 log "headless_e2e: $E2E_RESULT"
 
 # ── 9. write result ─────────────────────────────────────────────────────────
+# Every value is passed through json_escape: the heredoc is unquoted (the shell
+# expands the variables), so a value with a quote/backslash/control char would
+# otherwise produce malformed JSON.
 cat > "$RESULT" <<JSON
 {
-  "distro": "$DISTRO_ID",
-  "pretty": "$PRETTY",
-  "wayfire_version": "$WF_VER",
-  "wayfire_source": "$WF_SRC",
-  "install_sh": "$INSTALL_SH",
-  "wpm": "$WPM_RESULT",
-  "headless_e2e": "$E2E_RESULT",
-  "session_user": "$SESSION_USER",
-  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  "distro": "$(json_escape "$DISTRO_ID")",
+  "pretty": "$(json_escape "$PRETTY")",
+  "wayfire_version": "$(json_escape "$WF_VER")",
+  "wayfire_source": "$(json_escape "$WF_SRC")",
+  "install_sh": "$(json_escape "$INSTALL_SH")",
+  "wpm": "$(json_escape "$WPM_RESULT")",
+  "headless_e2e": "$(json_escape "$E2E_RESULT")",
+  "session_user": "$(json_escape "$SESSION_USER")",
+  "timestamp": "$(json_escape "$(date -u +%Y-%m-%dT%H:%M:%SZ)")"
 }
 JSON
 log "wrote $RESULT"
