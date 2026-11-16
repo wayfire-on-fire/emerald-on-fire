@@ -343,6 +343,25 @@ void emeraldwf_plugin::remove_decoration(::wayfire_toplevel_view view)
     view->erase_data(
         std::string(wf::emeraldwf::SHADOW_MARGIN_DATA_KEY));
 
+    // Minor (issue #1): a view that is now UNDECORATED (CSD) with
+    // shadow_pad > 0 must keep its shadow — a standalone shadow plugin reads
+    // SHADOW_MARGIN_DATA_KEY. The erase above dropped the margins, so the CSD
+    // window lost its shadow; re-export them. The decorator was just erased,
+    // so the view is always CSD here (no separate "undecorated" test needed).
+    // This lives in remove_decoration() (NOT update_view_decoration()) because
+    // on_decoration_state_changed() calls remove_decoration() FIRST, clearing
+    // the decorator before update_view_decoration() runs — a CSD re-export in
+    // the latter's has_deco&&!should branch would miss that path. The gate is
+    // just shadow_pad > 0: export_csd_shadow_margins() no-ops on fullscreen,
+    // and a zero pad yields zero margins. For recreate()'s remove+adjust the
+    // transient CSD export is immediately overwritten by the fresh decorator's
+    // emerald margins; for fini() the CSD margins are the correct shadow_pad
+    // values (cleaned up when the view is destroyed).
+    if ((int(shadow_pad) > 0))
+    {
+        export_csd_shadow_margins(view);
+    }
+
     auto & pending = toplevel->pending();
     if (!pending.fullscreen && (pending.tiled_edges == 0))
     {

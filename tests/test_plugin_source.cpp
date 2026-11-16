@@ -395,4 +395,32 @@ TEST(PluginSource, WayfireConfigUsesReloadSignalNotMtimePoll)
         "review: explicit signal disconnection does not cancel an "
         "already-armed timer)";
 }
+
+// Minor (issue #1): remove_decoration() erased the SHADOW_MARGIN_DATA_KEY
+// unconditionally. A view that ends up UNDECORATED (CSD) with shadow_pad >
+// 0 must keep its shadow — a standalone shadow plugin reads that key. The
+// erase dropped the CSD margins without re-exporting them, so the CSD window
+// lost its shadow. After the erase, an undecorated view with shadow_pad > 0
+// must re-export the CSD shadow margins.
+TEST(PluginSource, RemoveDecorationReexportsCsdShadowMargins)
+{
+    const std::string src =
+        read_file(std::string{EMERALDWF_TEST_SOURCE_ROOT} + "/src/plugin.cpp");
+    ASSERT_FALSE(src.empty()) << "src/plugin.cpp must be readable";
+
+    const std::string body =
+        fn_body(src, "void emeraldwf_plugin::remove_decoration(");
+    ASSERT_FALSE(body.empty()) <<
+        "could not locate emeraldwf_plugin::remove_decoration()";
+
+    // The erase of the key is still there...
+    EXPECT_NE(body.find("SHADOW_MARGIN_DATA_KEY"), std::string::npos) <<
+        "remove_decoration() must still erase the shadow-margin key for "
+        "decorated views";
+    // ...but an undecorated (CSD) view with shadow_pad > 0 must re-export
+    // its CSD shadow margins (the erase dropped them).
+    EXPECT_NE(body.find("export_csd_shadow_margins"), std::string::npos) <<
+        "remove_decoration() must re-export the CSD shadow margins for "
+        "undecorated views with shadow_pad > 0";
+}
 } // namespace
