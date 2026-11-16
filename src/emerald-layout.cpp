@@ -551,11 +551,16 @@ uint32_t EmeraldLayout::resize_edges(const DecorContext & ctx, int x,
 
     uint32_t edges = 0;
 
+    // Minor (issue #1): build the 3x3 band table once, index it per element
+    // (pre-fix band_table() re-derived it 9 times).
+    pos_t bands[3][3];
+    band_table_fill(ws, bands);
+
     for (int i = 0; i < 3; i++)
     {
         for (int j = 0; j < 3; j++)
         {
-            const pos_t p = band_table(ws, i, j);
+            const pos_t p = bands[i][j];
             // region 5 (i==1, j==1) is the titlebar: move, not resize
             if ((i == 1) && (j == 1))
             {
@@ -707,11 +712,16 @@ int EmeraldLayout::cursor_region(const DecorContext & ctx, int x, int y) const
     const int cx = x - shadow_left;
     const int cy = y - shadow_top;
 
+    // Minor (issue #1): build the 3x3 band table once, index it per element
+    // (pre-fix band_table() re-derived it 9 times).
+    pos_t bands[3][3];
+    band_table_fill(ws, bands);
+
     for (int i = 0; i < 3; i++)
     {
         for (int j = 0; j < 3; j++)
         {
-            const pos_t p = band_table(ws, i, j);
+            const pos_t p = bands[i][j];
             int bx = p.x + p.xw * w;
             int by = p.y + p.yh * h;
             int bw = p.w + p.ww * w;

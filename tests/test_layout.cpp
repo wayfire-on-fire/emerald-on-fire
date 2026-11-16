@@ -120,6 +120,29 @@ TEST(LayoutSource, LayoutLengthNotRescannedPerIteration)
         "the layout length must still be computed";
 }
 
+// Minor (issue #1): resize_edges() and cursor_region() each run a 3x3
+// hit-test loop that called band_table(ws, i, j) per element — every call
+// re-derived the six extents and rebuilt the whole 3x3 table, so the table
+// was built 9 times per hit-test. Build it once (band_table_fill) and
+// index into it.
+TEST(LayoutSource, BandTableBuiltOncePerHitTest)
+{
+    std::ifstream in(std::string{EMERALDWF_TEST_SOURCE_ROOT} +
+        "/src/emerald-layout.cpp");
+    ASSERT_TRUE(in.good()) << "src/emerald-layout.cpp must be readable";
+    std::string src((std::istreambuf_iterator<char>(in)),
+        std::istreambuf_iterator<char>());
+    ASSERT_FALSE(src.empty());
+
+    // The per-element call (which rebuilds the table each time) must be
+    // gone...
+    EXPECT_EQ(src.find("band_table(ws, i, j)"), std::string::npos) <<
+        "band_table() must not be re-derived per element in the 3x3 loop";
+    // ...and replaced by a single table build that is indexed.
+    EXPECT_NE(src.find("band_table_fill"), std::string::npos) <<
+        "the 3x3 band table must be built once and indexed";
+}
+
 // The production button_actions[] uses the plugin's EmeraldWindowActions
 // (EWA_*) bitmask, so the contexts below feed EWA_* action flags.
 

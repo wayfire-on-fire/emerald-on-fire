@@ -92,7 +92,11 @@ class EmeraldLayout
     // spread (*_space - win_extents, NO extra — space = border + shadow
     // per update_shadow) before applying the table.
     // Derived per call, never stored — keeps the class stateless.
-    static pos_t band_table(const window_settings *ws, int i, int j)
+    // Minor (issue #1): fill the whole 3x3 table at once so a hit-test
+    // loop builds it a single time and indexes it, instead of re-deriving
+    // the six extents + all 9 entries for every element (9 rebuilds per
+    // hit-test pre-fix).
+    static void band_table_fill(const window_settings *ws, pos_t t[3][3])
     {
         int tt_h  = ws->titlebar_height;
         int l_ext = ws->win_extents.left + ws->extra_extents.left;
@@ -101,24 +105,15 @@ class EmeraldLayout
         int t_ext = t_ext_nott + tt_h;
         int b_ext = ws->win_extents.bottom + ws->extra_extents.bottom;
 
-        pos_t t[3][3] = {
-            {
-                {0, 0, l_ext, t_ext, 0, 0, 0, 0}, // 1 top-left corner
-                {l_ext, 0, 0, t_ext_nott, 0, 0, 1, 0}, // 2 top side
-                {l_ext, 0, r_ext, t_ext, 1, 0, 0, 0}, // 3 top-right corner
-            },
-            {
-                {0, t_ext, l_ext, 0, 0, 0, 0, 1}, // 4 left side
-                {l_ext, t_ext_nott, 0, tt_h, 0, 0, 1, 0}, // 5 titlebar
-                {l_ext, t_ext, r_ext, 0, 1, 0, 0, 1}, // 6 right side
-            },
-            {
-                {0, t_ext, l_ext, b_ext, 0, 1, 0, 0}, // 7 bottom-left corner
-                {l_ext, t_ext, 0, b_ext, 0, 1, 1, 0}, // 8 bottom side
-                {l_ext, t_ext, r_ext, b_ext, 1, 1, 0, 0}, // 9 bottom-right corner
-            },
-        };
-        return t[i][j];
+        t[0][0] = {0, 0, l_ext, t_ext, 0, 0, 0, 0}; // 1 top-left corner
+        t[0][1] = {l_ext, 0, 0, t_ext_nott, 0, 0, 1, 0}; // 2 top side
+        t[0][2] = {l_ext, 0, r_ext, t_ext, 1, 0, 0, 0}; // 3 top-right corner
+        t[1][0] = {0, t_ext, l_ext, 0, 0, 0, 0, 1}; // 4 left side
+        t[1][1] = {l_ext, t_ext_nott, 0, tt_h, 0, 0, 1, 0}; // 5 titlebar
+        t[1][2] = {l_ext, t_ext, r_ext, 0, 1, 0, 0, 1}; // 6 right side
+        t[2][0] = {0, t_ext, l_ext, b_ext, 0, 1, 0, 0}; // 7 bottom-left corner
+        t[2][1] = {l_ext, t_ext, 0, b_ext, 0, 1, 1, 0}; // 8 bottom side
+        t[2][2] = {l_ext, t_ext, r_ext, b_ext, 1, 1, 0, 0}; // 9 bottom-right
     }
 };
 } // namespace emeraldwf
