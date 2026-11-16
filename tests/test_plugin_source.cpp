@@ -515,4 +515,38 @@ TEST(PluginSource, ExportCsdShadowMarginsSkipsSsdViews)
         "decorator) so it does not overwrite the decorator's theme-derived "
         "shadow margins";
 }
+
+// Minor (issue #1): g_get_home_dir() may return NULL (no home directory,
+// e.g. no HOME set). Both sites dereferenced it directly:
+// - expand_home():  std::string home = g_get_home_dir();  (the later
+// home.empty() check is too late - constructing from a NULL char* is UB)
+// - init():         std::string(g_get_home_dir()) + "/.emerald/settings.ini"
+// A NULL result is undefined behavior (and the glib string is leaked, since
+// g_get_home_dir() must be g_free'd). NULL-check the result before use.
+TEST(PluginSource, GetHomeDirNullChecked)
+{
+    const std::string src =
+        read_file(std::string{EMERALDWF_TEST_SOURCE_ROOT} + "/src/plugin.cpp");
+    ASSERT_FALSE(src.empty()) << "src/plugin.cpp must be readable";
+
+    EXPECT_EQ(src.find("std::string home = g_get_home_dir()"),
+        std::string::npos) <<
+        "expand_home() must not build a std::string from a raw "
+        "g_get_home_dir() (a NULL result is UB)";
+    EXPECT_EQ(src.find("std::string(g_get_home_dir())"), std::string::npos) <<
+        "init() must not build the settings path from a raw g_get_home_dir() "
+        "(a NULL result is UB)";
+    // g_get_home_dir() returns a glib-owned string (transfer-none) - it must
+    // NOT be freed (a g_free would corrupt glib's cached string:
+    // use-after-free / double-free).
+    EXPECT_EQ(src.find("g_free(const_cast<char*>(home)"), std::string::npos) <<
+        "expand_home() must not g_free the g_get_home_dir() result (glib "
+        "owns it - transfer-none)";
+    EXPECT_EQ(src.find("g_free(const_cast<char*>(home_dir)"),
+        std::string::npos) <<
+        "init() must not g_free the g_get_home_dir() result (glib owns it "
+        "- transfer-none)";
+    EXPECT_NE(src.find("g_get_home_dir()"), std::string::npos) <<
+        "g_get_home_dir() must still be used (now NULL-checked)";
+}
 } // namespace

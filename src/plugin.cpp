@@ -222,20 +222,30 @@ std::string expand_home(const std::string & path)
     // it is not a valid theme_dir in practice.
     if (path[0] == '~')
     {
-        std::string home = g_get_home_dir();
-        if (home.empty())
+        // Minor (issue #1): g_get_home_dir() may return NULL (no home dir,
+        // e.g. no HOME set); constructing a std::string from a NULL char* is
+        // UB. NULL-check first. glib owns the returned string (transfer-none)
+        // - do NOT free it.
+        const char *home = g_get_home_dir();
+        if (home == nullptr)
+        {
+            return path; // no home dir; leave "~" as-is
+        }
+
+        std::string home_str(home);
+        if (home_str.empty())
         {
             return path;
         }
 
         if (path.size() == 1)
         {
-            return home; // "~"
+            return home_str; // "~"
         }
 
         if (path[1] == '/')
         {
-            return home + path.substr(1); // "~/..."
+            return home_str + path.substr(1); // "~/..."
         }
     }
 
@@ -811,8 +821,17 @@ void emeraldwf_plugin::init()
     // → the theme's own [engine]; a different value → that engine,
     // running on emerald's default theme (a theme's assets are
     // engine-specific).
-    last_settings_path =
-        std::string(g_get_home_dir()) + "/.emerald/settings.ini";
+    // Minor (issue #1): g_get_home_dir() may return NULL (no home dir); a
+    // NULL result would make std::string(NULL) UB. glib owns the returned
+    // string (transfer-none) - do NOT free it. When there is no home dir,
+    // leave the settings path empty so the settings load fails gracefully
+    // (no settings.ini) rather than crashing.
+    const char *home_dir = g_get_home_dir();
+    if ((home_dir != nullptr) && (home_dir[0] != '\0'))
+    {
+        last_settings_path = std::string(home_dir) + "/.emerald/settings.ini";
+    }
+
     // Wayfire does not expand "~" in option values — do it here, or the
     // default `~/.emerald/theme` is treated as a literal path.
     last_theme_dir = expand_home(std::string(theme_dir));
