@@ -494,6 +494,16 @@ void emeraldwf_plugin::scroll_shade(wayfire_view view, double delta)
         return;
     }
 
+    // Minor (issue #1): honor no_scroll_shade for BOTH SSD and CSD. The SSD
+    // path checks it inside emerald_decorator_t::scroll_shade (via the theme's
+    // titlebar_no_scroll_shade); the CSD branch below previously did not — an
+    // undocumented divergence. Check the option once up front so both paths
+    // behave identically.
+    if (bool(no_scroll_shade))
+    {
+        return;
+    }
+
     auto toplevel = wf::toplevel_cast(view);
     if (toplevel == nullptr)
     {

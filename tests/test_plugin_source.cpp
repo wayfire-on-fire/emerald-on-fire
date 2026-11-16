@@ -423,4 +423,26 @@ TEST(PluginSource, RemoveDecorationReexportsCsdShadowMargins)
         "remove_decoration() must re-export the CSD shadow margins for "
         "undecorated views with shadow_pad > 0";
 }
+
+// Minor (issue #1): the global scroll-shade gesture honored
+// no_scroll_shade for SSD views (the SSD path checks the theme's
+// titlebar_no_scroll_shade inside emerald_decorator_t::scroll_shade) but NOT
+// for CSD views (the CSD branch of the plugin's scroll_shade() never checked
+// it) — an undocumented divergence. Check the option once up front in
+// scroll_shade() so both SSD and CSD behave identically.
+TEST(PluginSource, ScrollShadeHonorsNoScrollShadeForCsd)
+{
+    const std::string src =
+        read_file(std::string{EMERALDWF_TEST_SOURCE_ROOT} + "/src/plugin.cpp");
+    ASSERT_FALSE(src.empty()) << "src/plugin.cpp must be readable";
+
+    const std::string body =
+        fn_body(src, "void emeraldwf_plugin::scroll_shade(");
+    ASSERT_FALSE(body.empty()) <<
+        "could not locate emeraldwf_plugin::scroll_shade()";
+
+    EXPECT_NE(body.find("no_scroll_shade"), std::string::npos) <<
+        "scroll_shade() must honor no_scroll_shade for CSD views (pre-fix "
+        "only the SSD path checked titlebar_no_scroll_shade)";
+}
 } // namespace
