@@ -19,6 +19,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -360,6 +361,62 @@ TEST_F(RenderTest, MaximizedCropShrinksSurface)
         300 + ws->titlebar_height);
 
     cairo_surface_destroy(sm);
+    emerald_engine_unload();
+}
+
+// Minor (issue #1): the output scale factor is user-visible via
+// render_target_t.scale; a degenerate value (0, negative, NaN) used to flow
+// into (int)(w*s) / (int)(h*s) producing 0/negative surface dims.
+// cairo_image_surface_create returns an error-status surface (NOT nullptr)
+// for those, so the old nullptr check let it through and cairo_scale(cr, s, s)
+// was handed a degenerate matrix — the function returned a surface that was
+// already in a failed state. The renderer must refuse non-positive / NaN
+// scales up front.
+TEST_F(RenderTest, RefusesNonPositiveScale)
+{
+    DecorContext ctx = make_ctx(*ts_, true, false);
+
+    ASSERT_TRUE(emerald_engine_load("vrunner",
+        EMERALDWF_TEST_ENGINE_DIR));
+    emerald_engine_init_engine(ts_->ws());
+
+    ctx.scale = 0.0;
+    EXPECT_EQ(emeraldwf_render_frame(*ts_, ctx), nullptr) <<
+        "scale 0 must be refused";
+
+    ctx.scale = -1.0;
+    EXPECT_EQ(emeraldwf_render_frame(*ts_, ctx), nullptr) <<
+        "negative scale must be refused";
+
+    ctx.scale = std::numeric_limits<double>::quiet_NaN();
+    EXPECT_EQ(emeraldwf_render_frame(*ts_, ctx), nullptr) <<
+        "NaN scale must be refused";
+
+    ctx.scale = std::numeric_limits<double>::infinity();
+    EXPECT_EQ(emeraldwf_render_frame(*ts_, ctx), nullptr) <<
+        "+inf scale must be refused";
+
+    ctx.scale = -std::numeric_limits<double>::infinity();
+    EXPECT_EQ(emeraldwf_render_frame(*ts_, ctx), nullptr) <<
+        "-inf scale must be refused";
+
+    // Huge scale: w*s overflows the double->int range (UB to cast).
+    ctx.scale = 1e300;
+    EXPECT_EQ(emeraldwf_render_frame(*ts_, ctx), nullptr) <<
+        "scale overflowing the surface dims must be refused";
+
+    // Tiny positive scale: w*s truncates to 0 (a zero-dim surface).
+    ctx.scale = 1e-9;
+    EXPECT_EQ(emeraldwf_render_frame(*ts_, ctx), nullptr) <<
+        "scale truncating the surface to 0 must be refused";
+
+    // Control: a valid scale still renders.
+    ctx.scale = 1.0;
+    cairo_surface_t *ok = emeraldwf_render_frame(*ts_, ctx);
+    ASSERT_NE(ok, nullptr);
+    EXPECT_EQ(cairo_image_surface_get_width(ok), ctx.width);
+    cairo_surface_destroy(ok);
+
     emerald_engine_unload();
 }
 

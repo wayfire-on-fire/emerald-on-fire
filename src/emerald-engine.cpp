@@ -38,6 +38,7 @@
 #include <pango/pangocairo.h>
 
 #include <algorithm>
+#include <climits>
 #include <cmath>
 #include <cstring>
 #include <filesystem>
@@ -916,7 +917,18 @@ cairo_surface_t *emeraldwf_render_frame(const ThemeSettings & ts,
     // `scale`, so every logical-coordinate draw lands at physical pixels and
     // the surface is filled 1:1 by wayfire's logical->framebuffer dst box.
     // scale == 1.0 (headless tests, harnesses) is byte-identical to before.
+    //
+    // Minor (issue #1): a degenerate scale (0, negative, NaN, ±inf) would
+    // produce 0/negative surface dims below — cairo_image_surface_create
+    // returns an error-status surface (NOT nullptr) for those, and
+    // cairo_scale(cr, s, s) takes a degenerate matrix. std::isfinite rejects
+    // NaN and both infinities; s <= 0.0 rejects zero/negative. The caller
+    // treats nullptr as "no frame" and leaves the previous surface in place.
     const double s = ctx.scale;
+    if (!std::isfinite(s) || (s <= 0.0))
+    {
+        return nullptr;
+    }
 
     // Finding 19/19c: ctx.width/height are the FULL-EXTENT frame (the layout
     // positions the title objects against them). When the window is
@@ -979,11 +991,35 @@ cairo_surface_t *emeraldwf_render_frame(const ThemeSettings & ts,
     // reduction; the INNER crop (border) removes a band from the middle of
     // the side — the content below/right of it (titlebar, client) must
     // reflow, which the piecewise blit below performs.
-    cairo_surface_t *full = cairo_image_surface_create(CAIRO_FORMAT_ARGB32,
-        (int)(w * s),
-        (int)(h * s));
-    if (full == nullptr)
+    // Minor (issue #1): validate the SCALED dims before the (int) cast —
+    // converting an out-of-range double to int is UB, and a huge s makes
+    // w*s overflow to ±inf / > INT_MAX. A tiny positive s can truncate to
+    // 0 (cairo would then hand back an error-status surface). Reject all of
+    // those up front; the bounds are the physical (logical * s) surface.
+    const double sw = (double)w * s;
+    const double sh = (double)h * s;
+    if (!std::isfinite(sw) || !std::isfinite(sh) ||
+        (sw < 1.0) || (sh < 1.0) ||
+        (sw >= (double)INT_MAX) || (sh >= (double)INT_MAX))
     {
+        return nullptr;
+    }
+
+    cairo_surface_t *full = cairo_image_surface_create(CAIRO_FORMAT_ARGB32,
+        (int)sw,
+        (int)sh);
+    // cairo_image_surface_create returns an error-status surface (NOT
+    // nullptr) for bad dims, so the nullptr check alone was not enough —
+    // an error-status surface would flow into cairo_create() and every draw
+    // would silently no-op.
+    if ((full == nullptr) ||
+        (cairo_surface_status(full) != CAIRO_STATUS_SUCCESS))
+    {
+        if (full != nullptr)
+        {
+            cairo_surface_destroy(full);
+        }
+
         return nullptr;
     }
 
@@ -1130,11 +1166,29 @@ cairo_surface_t *emeraldwf_render_frame(const ThemeSettings & ts,
     // (titlebar, client) back into the freed space — a reflow no single
     // translate can express (one translate left the border INSIDE the
     // shadow margin, or clipped the titlebar).
-    cairo_surface_t *result = cairo_image_surface_create(CAIRO_FORMAT_ARGB32,
-        (int)(cw * s),
-        (int)(ch * s));
-    if (result == nullptr)
+    // cw/ch are already > 0 and s is finite / > 0, but a tiny scale can
+    // still truncate cw*s / ch*s to 0; validate before the (int) cast.
+    const double rw = (double)cw * s;
+    const double rh = (double)ch * s;
+    if (!std::isfinite(rw) || !std::isfinite(rh) ||
+        (rw < 1.0) || (rh < 1.0) ||
+        (rw >= (double)INT_MAX) || (rh >= (double)INT_MAX))
     {
+        cairo_surface_destroy(full);
+        return nullptr;
+    }
+
+    cairo_surface_t *result = cairo_image_surface_create(CAIRO_FORMAT_ARGB32,
+        (int)rw,
+        (int)rh);
+    if ((result == nullptr) ||
+        (cairo_surface_status(result) != CAIRO_STATUS_SUCCESS))
+    {
+        if (result != nullptr)
+        {
+            cairo_surface_destroy(result);
+        }
+
         cairo_surface_destroy(full);
         return nullptr;
     }
