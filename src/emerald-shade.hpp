@@ -318,7 +318,10 @@ class emerald_shade_t : public wf::scene::view_2d_transformer_t
     }
 
   private:
-    ::wayfire_toplevel_view view;
+    // Minor (issue #1): renamed from `view` (which shadowed the base
+    // view_2d_transformer_t::view) — this is the live toplevel view the
+    // transformer drives.
+    ::wayfire_toplevel_view toplevel_view;
     int strip_h; // top of view bbox = shaded strip (see ctor comment)
     int bottom_strip_h = 0; // bottom margin kept visible when shaded
     ShadeState state;

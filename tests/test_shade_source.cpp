@@ -239,3 +239,23 @@ TEST(ShadeSource, ShadeTransformerCreationConsolidatedInHelper)
         "emerald-decorator-shade.cpp must not create the transformer "
         "directly (M19) — creation is consolidated in the helper";
 }
+
+// Minor (issue #1): emerald_shade_t declared a member `view`
+// (::wayfire_toplevel_view) that shadowed the base class member
+// wf::scene::view_2d_transformer_t::view (std::weak_ptr<view_interface_t>).
+// The derived member is the live toplevel view the transformer drives; a bare
+// `view` name invites confusion with the (unused-in-this-TU) base member.
+// Rename the derived member to `toplevel_view`. No behavior change.
+TEST(ShadeSource, NoViewMemberShadowsBase)
+{
+    const std::string hpp = read_file(
+        std::string{EMERALDWF_TEST_SOURCE_ROOT} + "/src/emerald-shade.hpp");
+    ASSERT_FALSE(hpp.empty()) << "src/emerald-shade.hpp must be readable";
+
+    EXPECT_EQ(hpp.find("::wayfire_toplevel_view view;"), std::string::npos) <<
+        "the derived `view` member shadows the base "
+        "view_2d_transformer_t::view; it must be renamed";
+    EXPECT_NE(hpp.find("::wayfire_toplevel_view toplevel_view;"),
+        std::string::npos) <<
+        "the renamed member must be `toplevel_view`";
+}

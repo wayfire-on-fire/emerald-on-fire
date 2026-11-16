@@ -16,7 +16,7 @@ emerald_shade_t::emerald_shade_t(::wayfire_toplevel_view view_arg, int strip_h_a
     std::shared_ptr<wf::config::option_t<wf::animation_description_t>>
     duration_opt) :
     wf::scene::view_2d_transformer_t(view_arg)
-    , view(view_arg)
+    , toplevel_view(view_arg)
     // M18 (issue #1): the member-init bypasses set_strip_h(), so clamp
     // here too (see set_strip_h for why).
     , strip_h(std::clamp(strip_h_arg, 0, 1 << 20))
@@ -61,12 +61,12 @@ emerald_shade_t::~emerald_shade_t()
 
 wf::output_t*emerald_shade_t::sync_output()
 {
-    if (view == nullptr)
+    if (toplevel_view == nullptr)
     {
         return output;
     }
 
-    auto *cur = view->get_output();
+    auto *cur = toplevel_view->get_output();
     if ((cur == nullptr) || (cur == output))
     {
         // Unattached (mid-move) or unchanged: keep the current output so the
@@ -130,15 +130,15 @@ void emerald_shade_t::init_animation(bool shade)
     }
 
     state.init_animation(shade);
-    if (view)
+    if (toplevel_view)
     {
-        view->damage();
+        toplevel_view->damage();
     }
 }
 
 void emerald_shade_t::tick()
 {
-    if (view == nullptr)
+    if (toplevel_view == nullptr)
     {
         return;
     }
@@ -157,7 +157,7 @@ void emerald_shade_t::tick()
     // decorator: the plugin's shadow-update callback (Review R4) re-exports
     // the progress-dependent shadow margins per tick, so a standalone
     // shadow plugin tracks the animation instead of the pre-shade margins.
-    if (auto toplevel = view->toplevel())
+    if (auto toplevel = toplevel_view->toplevel())
     {
         if (auto deco = toplevel->get_data<emerald_decorator_t>())
         {
@@ -168,7 +168,7 @@ void emerald_shade_t::tick()
         }
     }
 
-    view->damage();
+    toplevel_view->damage();
 
     // The tick hook only exists to DRIVE the animation: once the progression
     // is settled (running() == false) the value is constant, the decorator
@@ -189,7 +189,7 @@ void emerald_shade_t::tick()
         // the rolled-up geometry) — just stops ticking.
         if (!state.get_shade_direction())
         {
-            auto tmgr = view->get_transformed_node();
+            auto tmgr = toplevel_view->get_transformed_node();
             if (auto tr = tmgr->get_transformer<emerald_shade_t>(
                 SHADE_TRANSFORMER_NAME))
             {
