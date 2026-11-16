@@ -62,23 +62,30 @@ ensure_ssh_key() {
 pin_sha() {  # distro sha — rewrite the sha field in distros.conf
   awk -v d="$1" -v s="$2" '{ if ($1==d && NF>=6) $3=s; print }' "$CONF" > "$CONF.tmp" && mv "$CONF.tmp" "$CONF"
 }
+# BEGIN M25-fetch
 fetch_image() {  # distro url sha
   local d="$1" url="$2" sha="$3"
   local img="$IMAGES/$d.qcow2"
   if [ -f "$img" ]; then log "base image cached: $img"; return 0; fi
   log "downloading $d base image: $url"
   curl -fL --progress-bar -o "$img.part" "$url"
-  mv "$img.part" "$img"
-  local actual; actual="$(sha256sum "$img" | awk '{print $1}')"
+  # M25 (issue #1): verify the .part BEFORE promoting it to the cache.
+  # Pre-M25 the mv ran first, so a sha256 mismatch left the bad file as
+  # images/$d.qcow2 and every subsequent run "reused the cache" (booting
+  # from the corrupt image).
+  local actual; actual="$(sha256sum "$img.part" | awk '{print $1}')"
   if [ "$sha" = "-" ] || [ -z "$sha" ]; then
     log "no pinned sha — pinning computed sha for $d: $actual"
     pin_sha "$d" "$actual"
   elif [ "$actual" != "$sha" ]; then
+    rm -f "$img.part"
     die "sha256 mismatch for $d: expected $sha got $actual"
   else
     log "sha256 ok: $actual"
   fi
+  mv "$img.part" "$img"
 }
+# END M25-fetch
 
 # ── build the NoCloud cloud-init seed ISO ───────────────────────────────────
 # NoCloud seed: ISO9660, volid "cidata", user-data + meta-data at the root.

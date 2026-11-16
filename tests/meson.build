@@ -189,6 +189,12 @@ test('emeraldwf-themer-source', emeraldwf_themer_source)
 # absolute members) built with python3 tarfile.
 test('emeraldwf-themer-import', find_program('test_themer_import.sh'))
 
+# M25 (issue #1): run-kvm.sh fetch_image() must verify the downloaded
+# .part BEFORE promoting it to the cache (shell-level test: extracts
+# the function block and runs it with a stubbed curl - the real
+# script needs qemu + network).
+test('emeraldwf-run-kvm-fetch', find_program('test_run_kvm_fetch.sh'))
+
 # ---- part 07: engine pane / engine module lifetime (findings 46/47) ----
 # Regression for the "Round Top Left Corner" SEGV_MAPERR: append_engine's
 # dlclose unmapped the engine .so (static-vendored libemeraldengine) while
