@@ -759,8 +759,12 @@ static void cb_save(GtkWidget *w, gpointer d)
         error_dialog(_("Can't save over system themes\n(or you forgot to enter a name)"));
         return;
     }
-    if (strlen(at)==0 || strchr(at,'/'))
+    if (strlen(at)==0 || strchr(at,'/') ||
+        strcmp(at,".") == 0 || strcmp(at,"..") == 0)
     {
+        /* `.` and `..` are rejected too: the name is interpolated into
+           ~/.emerald/themes/<name>, so `.` would write into the themes dir
+           itself and `..` into ~/.emerald/. */
         error_dialog(_("Invalid Theme Name"));
         return;
     }

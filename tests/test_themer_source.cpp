@@ -234,4 +234,27 @@ TEST(ThemerSource, ExportTarExcludeIsQuoted)
     EXPECT_EQ(src.find("--exclude=*~"), std::string::npos) <<
         "the export tar command must not use an unquoted --exclude=*~";
 }
+
+// Minor (issue #1): the theme SAVE function accepted `.` and `..` as theme
+// names. The name is interpolated into ~/.emerald/themes/<name>, so `.`
+// resolves to the themes dir ITSELF and `..` to ~/.emerald/ — saving would
+// write theme.ini + the theme files straight into those directories. The name
+// validation must reject `.`/`..` (it already rejects empty names and `/`).
+TEST(ThemerSource, SaveRejectsDotAndDotDot)
+{
+    const std::string src =
+        read_file(std::string{EMERALDWF_TEST_SOURCE_ROOT} + "/themer/main.c");
+    ASSERT_FALSE(src.empty()) << "themer/main.c must be readable";
+
+    const std::string save = fn_body(src, "cb_save(");
+    ASSERT_FALSE(save.empty()) << "could not locate cb_save()";
+
+    // The save name validation must reject `.` and `..`.
+    EXPECT_NE(save.find(R"(strcmp(at,"."))"), std::string::npos) <<
+        "cb_save() must reject the theme name '.' (it would write into the "
+        "themes dir itself)";
+    EXPECT_NE(save.find(R"(strcmp(at,".."))"), std::string::npos) <<
+        "cb_save() must reject the theme name '..' (it would write into "
+        "~/.emerald/)";
+}
 } // namespace
