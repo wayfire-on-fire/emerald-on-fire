@@ -8,9 +8,12 @@
 
 #include <cstdint>
 #include <cstring>
+#include <fstream>
+#include <string>
 #include <vector>
 
 #include "emerald-layout.hpp"
+#include "test-paths.h"
 
 using namespace wf::emeraldwf;
 
@@ -67,6 +70,33 @@ int tobj_type(char obj)
       default:
         return -2;
     }
+}
+
+// Minor (issue #1): the EMERALDWF_EDGE_* edge flags were #define macros.
+// Macros have no type, no scope (they leak into every TU that includes the
+// header) and no constant-expression checking. Convert them to in-namespace
+// constexpr constants; the values (WLR_EDGE_*) are unchanged.
+TEST(LayoutSource, EdgeFlagsAreConstexprNotMacros)
+{
+    std::ifstream in(std::string{EMERALDWF_TEST_SOURCE_ROOT} +
+        "/src/emerald-layout.hpp");
+    ASSERT_TRUE(in.good()) << "src/emerald-layout.hpp must be readable";
+    std::string src((std::istreambuf_iterator<char>(in)),
+        std::istreambuf_iterator<char>());
+    ASSERT_FALSE(src.empty());
+
+    // The macros must be gone...
+    EXPECT_EQ(src.find("#define EMERALDWF_EDGE_"), std::string::npos) <<
+        "EMERALDWF_EDGE_* must not be #define macros";
+    // ...and replaced by typed in-namespace constants.
+    EXPECT_NE(src.find("constexpr uint32_t EMERALDWF_EDGE_TOP"),
+        std::string::npos) << "EMERALDWF_EDGE_TOP must be a constexpr";
+
+    // Values (WLR_EDGE_*) are preserved.
+    EXPECT_EQ(EMERALDWF_EDGE_TOP, 0x1u);
+    EXPECT_EQ(EMERALDWF_EDGE_BOTTOM, 0x2u);
+    EXPECT_EQ(EMERALDWF_EDGE_LEFT, 0x4u);
+    EXPECT_EQ(EMERALDWF_EDGE_RIGHT, 0x8u);
 }
 
 // The production button_actions[] uses the plugin's EmeraldWindowActions

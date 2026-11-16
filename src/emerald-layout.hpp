@@ -25,10 +25,12 @@ class ThemeSettings; // Part 02
 
 // WLR_EDGE_* values (wayland protocol), defined plain so this part stays
 // free of wayfire headers (spec 03 acceptance). Part 04 casts to wlr_edges.
-#define EMERALDWF_EDGE_TOP    0x1
-#define EMERALDWF_EDGE_BOTTOM 0x2
-#define EMERALDWF_EDGE_LEFT   0x4
-#define EMERALDWF_EDGE_RIGHT  0x8
+// Minor (issue #1): constexpr (not #define) — typed, in-namespace, and
+// constant-expression checked; the values are unchanged.
+constexpr uint32_t EMERALDWF_EDGE_TOP    = 0x1;
+constexpr uint32_t EMERALDWF_EDGE_BOTTOM = 0x2;
+constexpr uint32_t EMERALDWF_EDGE_LEFT   = 0x4;
+constexpr uint32_t EMERALDWF_EDGE_RIGHT  = 0x8;
 
 // Pure port of emerald's layout_title_objects()/get_title_object_width()/
 // update_button_regions() (main.c:2954, 2863, 1653) + the 3x3 cursor/resize
