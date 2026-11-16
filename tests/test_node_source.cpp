@@ -330,4 +330,29 @@ TEST(NodeSource, LeftPressDoesNotCopyDecorContext)
         std::string::npos) <<
         "the left-press DecorContext must be bound by const reference";
 }
+
+// Minor (issue #1): emerald_node_t::set_title() and the title_dirty flag were
+// dead. The title is sourced fresh from view->get_title() on every render
+// (render_frame), so set_title() (which set cache.title + title_dirty) was
+// never called, and title_dirty was therefore always false. Remove both.
+TEST(NodeSource, NoDeadSetTitleOrTitleDirty)
+{
+    const std::string src = read_file(
+        std::string{EMERALDWF_TEST_SOURCE_ROOT} + "/src/emerald-node.cpp");
+    ASSERT_FALSE(src.empty()) << "src/emerald-node.cpp must be readable";
+
+    EXPECT_EQ(src.find("emerald_node_t::set_title"), std::string::npos) <<
+        "the dead set_title() definition must be removed";
+    EXPECT_EQ(src.find("title_dirty"), std::string::npos) <<
+        "the dead title_dirty flag must be removed";
+
+    const std::string hpp = read_file(
+        std::string{EMERALDWF_TEST_SOURCE_ROOT} + "/src/emerald-node.hpp");
+    ASSERT_FALSE(hpp.empty()) << "src/emerald-node.hpp must be readable";
+
+    EXPECT_EQ(hpp.find("set_title"), std::string::npos) <<
+        "the dead set_title() declaration must be removed";
+    EXPECT_EQ(hpp.find("title_dirty"), std::string::npos) <<
+        "the dead title_dirty member must be removed";
+}
 } // namespace

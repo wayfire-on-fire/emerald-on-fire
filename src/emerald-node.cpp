@@ -316,18 +316,6 @@ void emerald_node_t::set_active(bool /*active*/)
     damage_frame();
 }
 
-void emerald_node_t::set_title(std::string title)
-{
-    cache.title = std::move(title);
-    title_dirty = true;
-    if (auto view = view_of())
-    {
-        view->damage();
-    }
-
-    damage_frame();
-}
-
 void emerald_node_t::set_theme_dirty()
 {
     theme_dirty = true;
@@ -592,10 +580,11 @@ void emerald_node_t::render_frame(
     // layout rebuild at the client's framerate, for a surface that is
     // never re-rendered. Every layout input sets a dirty flag on change
     // (hover/press/shade-progress -> theme_dirty, resize -> size_dirty,
-    // activate -> active_dirty, title -> title_dirty, theme ->
-    // theme_dirty) and needs_rebuild() covers the remaining cache-key
-    // inputs, so the work is skipped safely on a cache hit.
-    const bool key_changed = theme_dirty || active_dirty || title_dirty ||
+    // activate -> active_dirty, theme -> theme_dirty) and needs_rebuild()
+    // covers the remaining cache-key inputs (incl. the title, read fresh
+    // from the view each render), so the work is skipped safely on a cache
+    // hit.
+    const bool key_changed = theme_dirty || active_dirty ||
         size_dirty ||
         needs_rebuild(cache, active, title, fw, fh, last_hover_button);
 
@@ -782,7 +771,7 @@ void emerald_node_t::render_frame(
         // cached surface stayed stale — needs_rebuild() would then see a
         // clean cache and never rebuild. Clearing here keeps the flags
         // armed so the next pass retries the rebuild.
-        theme_dirty = active_dirty = title_dirty = size_dirty = false;
+        theme_dirty = active_dirty = size_dirty = false;
 
         auto surface_tex = wf::owned_texture_t{surface};
         tex = surface_tex.get_texture();

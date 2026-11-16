@@ -63,7 +63,6 @@ class emerald_node_t : public wf::scene::node_t,
     // ── State updates (called by emerald_decorator_t, part 04) ─────────────
     void resize(); // recompute ctx sizes, layout, region
     void set_active(bool active); // invalidates + damages
-    void set_title(std::string title); // invalidates + damages
     void set_theme_dirty(); // forces full re-render next frame
 
     // ── Cached render state (exposed for tests) ────────────────────────────
@@ -165,7 +164,6 @@ class emerald_node_t : public wf::scene::node_t,
     EmeraldLayout layout; // part 03
     bool theme_dirty  = true;             // set_theme_dirty() → full re-render
     bool active_dirty = false;
-    bool title_dirty  = false;
     bool size_dirty   = true;
 
     // Review N2: title-measure context, reused across rebuilds. The old
