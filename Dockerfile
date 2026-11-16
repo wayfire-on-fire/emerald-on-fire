@@ -54,6 +54,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         hwdata \
         libxml2-dev \
         libpango1.0-dev \
+        # test deps (meson test)
+        imagemagick \
     && rm -rf /var/lib/apt/lists/*
 
 # Install a newer meson (>= 1.4.0) via pip BEFORE the from-source builds below:

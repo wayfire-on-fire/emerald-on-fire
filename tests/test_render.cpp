@@ -84,18 +84,29 @@ DecorContext make_ctx(const ThemeSettings & ts, bool active, bool maximized)
     return ctx;
 }
 
-bool surfaces_equal(cairo_surface_t *a, cairo_surface_t *b)
+// Golden comparison with a small per-channel tolerance.
+// Returns the number of pixels that differ by MORE than `tolerance` in any
+// channel; -1 on a size mismatch.
+//
+// The tolerance is required for portability: the goldens were generated in
+// a debug build, CI builds in release — floating-point contraction and
+// optimization differences shift anti-aliased / interpolated pixels by a
+// few LSBs (visible in the pixmap and line engines; flat-color engines
+// match bit-exact). Structural regressions (wrong size, missing regions,
+// wrong colors) still fail: they differ by more than a few LSBs over many
+// pixels.
+int surfaces_close(cairo_surface_t *a, cairo_surface_t *b, int tolerance = 4)
 {
     if (cairo_image_surface_get_width(a) !=
         cairo_image_surface_get_width(b))
     {
-        return false;
+        return -1;
     }
 
     if (cairo_image_surface_get_height(a) !=
         cairo_image_surface_get_height(b))
     {
-        return false;
+        return -1;
     }
 
     const int w = cairo_image_surface_get_width(a);
@@ -107,20 +118,30 @@ bool surfaces_equal(cairo_surface_t *a, cairo_surface_t *b)
     const unsigned char *db =
         (const unsigned char*)cairo_image_surface_get_data(b);
 
+    int diffs = 0;
     for (int y = 0; y < h; y++)
     {
         const unsigned char *ra = da + y * stride_a;
         const unsigned char *rb = db + y * stride_b;
         for (int x = 0; x < w; x++)
         {
-            if (std::memcmp(ra + x * 4, rb + x * 4, 4) != 0)
+            bool pixel_differs = false;
+            for (int c = 0; c < 4 && !pixel_differs; c++)
             {
-                return false;
+                if (std::abs((int)ra[x * 4 + c] - (int)rb[x * 4 + c])
+                    > tolerance)
+                {
+                    pixel_differs = true;
+                }
+            }
+            if (pixel_differs)
+            {
+                diffs++;
             }
         }
     }
 
-    return true;
+    return diffs;
 }
 
 bool load_png(cairo_surface_t **out, const fs::path & file)
@@ -237,9 +258,13 @@ TEST_F(RenderTest, Structural)
                     cairo_surface_t *g = nullptr;
                     ASSERT_TRUE(load_png(&g, golden)) <<
                         "failed to load golden " << golden;
-                    EXPECT_TRUE(surfaces_equal(surf, g)) <<
+                    const int diffs = surfaces_close(surf, g);
+                    EXPECT_EQ(diffs, 0) <<
                         "engine=" << engine << " state=" << state <<
-                        " mode=" << mode << " differs from golden";
+                        " mode=" << mode << " differs from golden (" <<
+                        (diffs < 0 ? std::string("size mismatch") :
+                            (std::to_string(diffs) +
+                                " pixels beyond tolerance")) << ")";
                     if (g)
                     {
                         cairo_surface_destroy(g);

@@ -42,7 +42,8 @@ jobs:
             libevdev-dev libxkbcommon-dev libpixman-1-dev libglm-dev \
             libdrm-dev libudev-dev libgbm-dev libseat-dev \
             libdisplay-info-dev \
-            hwdata libxml2-dev libpango1.0-dev
+            hwdata libxml2-dev libpango1.0-dev \
+            imagemagick
       - name: Install newer meson (>= 1.4.0) via pip
         run: |
           # noble ships meson 1.3.2; xkbcommon 1.13.x and a wayfire subproject
@@ -174,7 +175,11 @@ jobs:
           repository: ammen99/uncrustify
           path: uncrustify
       - name: Compile uncrustify
-        run: cd uncrustify && mkdir build && cd build && cmake .. && make
+        run: |
+          # CMAKE_POLICY_VERSION_MINIMUM: the runner's CMake 4.x rejects
+          # uncrustify's old cmake_minimum_required(<3.5) without it.
+          cd uncrustify && mkdir build && cd build \
+            && cmake .. -DCMAKE_POLICY_VERSION_MINIMUM=3.5 && make
       - name: Fetch wayfire's uncrustify.ini
         run: wget -q https://raw.githubusercontent.com/WayfireWM/wayfire/master/uncrustify.ini
       - name: Check formatting
