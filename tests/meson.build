@@ -195,6 +195,11 @@ test('emeraldwf-themer-import', find_program('test_themer_import.sh'))
 # script needs qemu + network).
 test('emeraldwf-run-kvm-fetch', find_program('test_run_kvm_fetch.sh'))
 
+# M26 (issue #1): matrix.sh must exit non-zero when any distro fails
+# (shell-level test: extracts the collect_results() block and runs it
+# with a stubbed wait - the real script needs qemu + /dev/kvm).
+test('emeraldwf-matrix-collect', find_program('test_matrix_collect.sh'))
+
 # ---- part 07: engine pane / engine module lifetime (findings 46/47) ----
 # Regression for the "Round Top Left Corner" SEGV_MAPERR: append_engine's
 # dlclose unmapped the engine .so (static-vendored libemeraldengine) while

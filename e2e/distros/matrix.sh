@@ -46,6 +46,23 @@ summary() {
 
 teardown() { local d; for d in $(list_distros); do "$HERE/run-kvm.sh" destroy "$d"; done; }
 
+# BEGIN M26-collect
+# M26 (issue #1): accumulate per-distro failures into COLLECT_RC. Pre-M26
+# the wait loop only PRINTED failures, so matrix.sh exited 0 (green) even
+# when a distro's provisioning failed - automation saw a pass. COLLECT_RC
+# is set (not local) so main can exit with it.
+collect_results() {  # uses global pids/ds/HERE; sets COLLECT_RC
+  local i
+  COLLECT_RC=0
+  for i in "${!pids[@]}"; do
+    if ! wait "${pids[$i]}"; then
+      COLLECT_RC=1
+      echo "[matrix] ${ds[$i]} failed (see $HERE/run/${ds[$i]}/serial.log)"
+    fi
+  done
+}
+# END M26-collect
+
 main() {
   local a
   for a in "$@"; do
@@ -73,17 +90,15 @@ main() {
     pids+=($!); ds+=("$d")
   done
 
-  local i
-  for i in "${!pids[@]}"; do
-    if ! wait "${pids[$i]}"; then
-      echo "[matrix] ${ds[$i]} failed (see $HERE/run/${ds[$i]}/serial.log)"
-    fi
-  done
+  # M26 (issue #1): accumulate failures and exit non-zero if any distro
+  # failed (pre-fix the loop only printed them - automation saw green).
+  collect_results
 
   echo
   summary
   echo
   echo "[matrix] all VMs left RUNNING — watch the QEMU windows; run e2e/CHECKLIST.md by eye."
   echo "[matrix] teardown: $0 --teardown"
+  exit "$COLLECT_RC"
 }
 main "$@"
