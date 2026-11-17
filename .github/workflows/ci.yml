@@ -69,7 +69,11 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends xvfb
-          xvfb-run -a ./build/tests/emeraldwf-engine-pane > /tmp/engine-pane.log 2>&1
+          if ! xvfb-run -a ./build/tests/emeraldwf-engine-pane > /tmp/engine-pane.log 2>&1; then
+            echo "FAIL: engine-pane test or Xvfb failed"; cat /tmp/engine-pane.log
+            [ -s /tmp/engine-pane.log ] || echo "(engine-pane.log is empty - Xvfb likely never started)"
+            exit 1
+          fi
           grep -q '\[  PASSED  \]' /tmp/engine-pane.log \
             || { echo "FAIL: engine-pane test did not PASS"; cat /tmp/engine-pane.log; exit 1; }
           grep -q '\[  SKIPPED  \]' /tmp/engine-pane.log \

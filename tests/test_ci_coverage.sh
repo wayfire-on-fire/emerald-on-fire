@@ -81,6 +81,16 @@ for pkg in gawk git ImageMagick dejavu-fonts; do
     fi
 done
 
+# 6. The Xvfb step must surface the engine-pane log when xvfb-run itself
+#    fails: under set -e a bare `xvfb-run ... > log` dies silently (the log
+#    is never read), leaving the job red with no output to diagnose.
+xvfb_line="$(grep -F 'xvfb-run' "$CI" | grep -F 'engine-pane' || true)"
+if printf '%s\n' "$xvfb_line" | grep -qF 'if !'; then
+    echo "ok: the Xvfb step guards xvfb-run, so a crash prints the log instead of dying silently"
+else
+    echo "FAIL: the Xvfb step must guard xvfb-run (if ! ...) and cat the log on failure"; fail=1
+fi
+
 if [ "$fail" -ne 0 ]; then
     exit 1
 fi
