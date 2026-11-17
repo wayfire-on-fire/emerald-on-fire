@@ -318,6 +318,12 @@ test('emeraldwf-install-tmpcleanup', find_program('test_install_tmpcleanup.sh'))
 # Shell-level test.
 test('emeraldwf-install-libdir', find_program('test_install_libdir.sh'))
 
+# install.sh must end with a status summary reporting what was installed
+# WHERE (each artifact's final destination, system dir vs user-dir
+# fallback) — pre-fix it ended with a bare "emeraldwf installed." and no
+# per-artifact locations. Shell-level test.
+test('emeraldwf-install-summary', find_program('test_install_summary.sh'))
+
 # ---- part 07: engine pane / engine module lifetime (findings 46/47) ----
 # Regression for the "Round Top Left Corner" SEGV_MAPERR: append_engine's
 # dlclose unmapped the engine .so (static-vendored libemeraldengine) while

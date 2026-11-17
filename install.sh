@@ -381,6 +381,19 @@ DATADIR=$(pkg-config --variable=datadir wayfire 2>/dev/null)
 [ -n "$DATADIR" ] || DATADIR=/usr/share
 case "$DATADIR" in /*) ;; *) DATADIR="$WF_PREFIX/$DATADIR" ;; esac
 
+# Final install destinations, recorded as each placement decides its
+# target (system dir vs user-dir fallback), for the summary printed at
+# the end (section 6). Initialized empty so the summary is safe under
+# set -u even for the one artifact (app icon) that may not be placed.
+DEST_METADATA=""
+DEST_PLUGIN=""
+DEST_ENGINES=""
+DEST_ENGINE_LIB=""
+DEST_DEFAULT_THEME_PLUGIN=""
+DEST_ICON=""
+DEST_APP_ICON=""
+DEST_DEFAULT_THEME_THEMER=""
+
 atomic_install() {  # srcfile destdir
     local src="$1" dir="$2" tmp
     tmp=$(mktemp "$dir/.install.XXXXXX")
@@ -491,6 +504,7 @@ echo "==> installing (plugin, engines, metadata, icon)"
 mkdir -p "$DATADIR/wayfire/metadata" 2>/dev/null || true
 if [ -w "$DATADIR/wayfire/metadata" ]; then
     cp metadata/emeraldwf.xml "$DATADIR/wayfire/metadata/"
+    DEST_METADATA="$DATADIR/wayfire/metadata/emeraldwf.xml"
     echo "==> emeraldwf.xml → $DATADIR/wayfire/metadata"
 else
     echo "FATAL: $DATADIR/wayfire/metadata not writable. Re-run with:" >&2
@@ -513,6 +527,7 @@ fi
 trap cleanup_on_exit EXIT
 
 atomic_install "$STAGE/wayfire/libemeraldwf.so" "$LIBDIR/wayfire"
+DEST_PLUGIN="$LIBDIR/wayfire/libemeraldwf.so"
 echo "==> libemeraldwf.so → $LIBDIR/wayfire"
 
 # Install every versioned engine .so (a REGULAR file with a version suffix —
@@ -525,6 +540,7 @@ for f in "$STAGE"/emeraldwf/engines/lib*.so.*; do
     atomic_versioned_so "$f" "$LIBDIR/emeraldwf/engines"
     n_engines=$((n_engines + 1))
 done
+DEST_ENGINES="$LIBDIR/emeraldwf/engines"
 echo "==> $n_engines engines → $LIBDIR/emeraldwf/engines"
 
 # The engine library (libemeraldengine.so) is a versioned .so too; find the
@@ -545,9 +561,11 @@ if [ "$eng_count" -ne 1 ]; then
 fi
 if [ -w "$LIBDIR/emeraldwf" ]; then
     atomic_versioned_so "$eng_lib" "$LIBDIR/emeraldwf"
+    DEST_ENGINE_LIB="$LIBDIR/emeraldwf/libemeraldengine.so"
     echo "==> libemeraldengine.so → $LIBDIR/emeraldwf"
 else
     atomic_versioned_so "$eng_lib" "$LIBDIR/emeraldwf/engines"
+    DEST_ENGINE_LIB="$LIBDIR/emeraldwf/engines/libemeraldengine.so"
     echo "==> libemeraldengine.so → $LIBDIR/emeraldwf/engines (user-writable fallback)"
 fi
 
@@ -565,9 +583,11 @@ fi
 WF_PLUGDIR="$LIBDIR/wayfire"
 if [ -d "$WF_PLUGDIR" ] && [ -w "$WF_PLUGDIR" ]; then
     refresh_default_theme "$WF_PLUGDIR/emeraldwf-defaults"
+    DEST_DEFAULT_THEME_PLUGIN="$WF_PLUGDIR/emeraldwf-defaults/theme"
     echo "==> default theme → $WF_PLUGDIR/emeraldwf-defaults/theme"
 else
     refresh_default_theme "${XDG_DATA_HOME:-$USER_HOME/.local/share}/emeraldwf/defaults"
+    DEST_DEFAULT_THEME_PLUGIN="${XDG_DATA_HOME:-$USER_HOME/.local/share}/emeraldwf/defaults/theme"
     echo "==> $WF_PLUGDIR not writable — default theme → ~/.local/share/emeraldwf/defaults/theme"
 fi
 
@@ -588,12 +608,15 @@ install_icon() {
 }
 
 if [ -f "$ICONDIR/plugin-emeraldwf.svg" ] && [ -r "$ICONDIR/plugin-emeraldwf.svg" ]; then
+    DEST_ICON="$ICONDIR/plugin-emeraldwf.svg"
     : # installed by ninja install
 elif install -d "$ICONDIR" 2>/dev/null && [ -w "$ICONDIR" ]; then
     install_icon "$ICONDIR"
+    DEST_ICON="$ICONDIR/plugin-emeraldwf.svg"
 else
     echo "==> system icon dir not writable ($ICONDIR) — using user dir"
     install_icon "${XDG_DATA_HOME:-$USER_HOME/.local/share}/wayfire/icons"
+    DEST_ICON="${XDG_DATA_HOME:-$USER_HOME/.local/share}/wayfire/icons/plugin-emeraldwf.svg"
 fi
 
 # ── 4b. emerald-theme-manager (theme editor): system dirs, user-dir fallback ─
@@ -655,9 +678,11 @@ sed -i "s|^Exec=.*|Exec=$BIN_DEST|" "$DESKTOP_DEST"
 # a missing theme during a non-atomic rm -rf + cp -r).
 if install -d /usr/share/emeraldwf/themes 2>/dev/null; then
     refresh_default_theme /usr/share/emeraldwf/themes/default
+    DEST_DEFAULT_THEME_THEMER=/usr/share/emeraldwf/themes/default
     echo "==> default theme → /usr/share/emeraldwf/themes/default"
 else
     refresh_default_theme "$XDG/emeraldwf/themes/default"
+    DEST_DEFAULT_THEME_THEMER="$XDG/emeraldwf/themes/default"
     echo "==> /usr/share not writable — default theme → ~/.local/share/emeraldwf/themes/default"
 fi
 
@@ -667,6 +692,7 @@ for d in /usr/share/icons/hicolor/scalable/apps "$XDG/icons/hicolor/scalable/app
     if mkdir -p "$d" 2>/dev/null && [ -w "$d" ]; then
         cp "$ICON_SRC" "$d/emerald-theme-manager.svg"
         rm -f "$d/emerald-on-fire.svg"
+        DEST_APP_ICON="$d/emerald-theme-manager.svg"
         echo "==> app icon → $d/emerald-theme-manager.svg"
         break
     fi
@@ -761,7 +787,22 @@ fi
 
 # ── 6. done ─────────────────────────────────────────────────────────────────
 echo ""
-echo "emeraldwf installed."
+echo "emeraldwf installed:"
+echo ""
+printf '  %-24s %s\n' "wayfire plugin"       "$DEST_PLUGIN"
+printf '  %-24s %s\n' "engine library"       "$DEST_ENGINE_LIB"
+printf '  %-24s %s\n' "engines ($n_engines)" "$DEST_ENGINES"
+printf '  %-24s %s\n' "theme editor"         "$BIN_DEST"
+printf '  %-24s %s\n' "desktop entry"        "$DESKTOP_DEST"
+printf '  %-24s %s\n' "WCM metadata"         "$DEST_METADATA"
+printf '  %-24s %s\n' "WCM icon"             "$DEST_ICON"
+if [ -n "$DEST_APP_ICON" ]; then
+    printf '  %-24s %s\n' "app icon"           "$DEST_APP_ICON"
+fi
+printf '  %-24s %s\n' "default theme (plugin)" "$DEST_DEFAULT_THEME_PLUGIN"
+printf '  %-24s %s\n' "default theme (themer)" "$DEST_DEFAULT_THEME_THEMER"
+echo ""
+echo "Next steps:"
 echo "  - restart wayfire (log out/in, or Ctrl-Alt-Backspace-equivalent)"
 echo "  - configure in WCM (Plugins → emeraldwf: engine, maximized borders/"
 echo "    shadows, shade, titlebar double-/middle-click actions, and the"
