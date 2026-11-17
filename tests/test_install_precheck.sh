@@ -92,44 +92,52 @@ else
     echo "FAIL: precheck rejected writable dirs (rc=$rc)"; fail=1
 fi
 
-# Non-writable case: only meaningful for a NON-root user (root bypasses
-# permission checks — the CI docker job runs the suite as root).
-if [ "$(id -u)" -eq 0 ]; then
-    echo "ok: running as root — non-writable cases skipped"
+# Non-writable case. The paths must be non-writable DETERMINISTICALLY, on
+# any system, for ANY user (the CI docker job runs the suite as root, and
+# some CI runners let the build user write into /usr/share — a /usr-based
+# path once made the metadata dir writable on an ubuntu runner, so the
+# "listed" assertion there failed). procfs is the answer: /proc accepts no
+# mkdir from ANYONE (root included), so every path below is non-writable
+# everywhere, and the cases run under root too.
+NOWR_BASE="/proc/emeraldwf-precheck-$$"
+NOWR_LIB="$NOWR_BASE/lib"
+NOWR_DATA="$NOWR_BASE/share"
+# SCRIPT_PATH is set by install.sh itself in production; bind it here so
+# the FATAL echoes under test print cleanly instead of dying on set -u.
+FAKE_SCRIPT="$d/fake-install.sh"
+
+# Interactive mode, non-tty stdin: no prompt possible -> fail, listing
+# the missing dirs.
+out="$(
+    eval "$func"
+    LIBDIR="$NOWR_LIB" DATADIR="$NOWR_DATA" NONINTERACTIVE=0 SCRIPT_ARGS=() \
+        SCRIPT_PATH="$FAKE_SCRIPT" \
+        precheck_install_dirs </dev/null 2>&1
+)"
+rc=$?
+if [ "$rc" -ne 0 ] && grep -qF "$NOWR_LIB/wayfire" <<<"$out" \
+    && grep -qF "$NOWR_DATA/wayfire/metadata" <<<"$out" \
+    && grep -qF "$NOWR_LIB/emeraldwf/engines" <<<"$out" \
+    && ! grep -qF 'unbound variable' <<<"$out"; then
+    echo "ok: non-writable dirs fail fast and are listed (rc=$rc)"
 else
-    # Paths under root-owned /usr that a non-root user cannot create.
-    NOWR_LIB="/usr/lib64/emeraldwf-precheck-$$"
-    NOWR_DATA="/usr/share/emeraldwf-precheck-$$"
+    echo "FAIL: non-writable dirs not rejected (rc=$rc): $out"; fail=1
+fi
 
-    # Interactive mode, non-tty stdin: no prompt possible -> fail, listing
-    # the missing dirs.
-    out="$(
-        eval "$func"
-        LIBDIR="$NOWR_LIB" DATADIR="$NOWR_DATA" NONINTERACTIVE=0 SCRIPT_ARGS=() \
-            precheck_install_dirs </dev/null 2>&1
-    )"
-    rc=$?
-    if [ "$rc" -ne 0 ] && grep -qF "$NOWR_LIB/wayfire" <<<"$out" \
-        && grep -qF "$NOWR_DATA/wayfire/metadata" <<<"$out" \
-        && grep -qF "$NOWR_LIB/emeraldwf/engines" <<<"$out"; then
-        echo "ok: non-writable dirs fail fast and are listed"
-    else
-        echo "FAIL: non-writable dirs not rejected (rc=$rc): $out"; fail=1
-    fi
-
-    # --non-interactive: fail fast, NO prompt.
-    out="$(
-        eval "$func"
-        LIBDIR="$NOWR_LIB" DATADIR="$NOWR_DATA" NONINTERACTIVE=1 SCRIPT_ARGS=--docker \
-            precheck_install_dirs </dev/null 2>&1
-    )"
-    rc=$?
-    if [ "$rc" -ne 0 ] && grep -qF 'FATAL' <<<"$out" \
-        && ! grep -qF 'Re-run with sudo now?' <<<"$out"; then
-        echo "ok: --non-interactive fails fast without prompting"
-    else
-        echo "FAIL: --non-interactive should fail without a prompt (rc=$rc): $out"; fail=1
-    fi
+# --non-interactive: fail fast, NO prompt.
+out="$(
+    eval "$func"
+    LIBDIR="$NOWR_LIB" DATADIR="$NOWR_DATA" NONINTERACTIVE=1 SCRIPT_ARGS=--docker \
+        SCRIPT_PATH="$FAKE_SCRIPT" \
+        precheck_install_dirs </dev/null 2>&1
+)"
+rc=$?
+if [ "$rc" -ne 0 ] && grep -qF 'FATAL' <<<"$out" \
+    && grep -qF "$FAKE_SCRIPT" <<<"$out" \
+    && ! grep -qF 'Re-run with sudo now?' <<<"$out"; then
+    echo "ok: --non-interactive fails fast without prompting"
+else
+    echo "FAIL: --non-interactive should fail without a prompt (rc=$rc): $out"; fail=1
 fi
 
 if [ "$fail" -ne 0 ]; then

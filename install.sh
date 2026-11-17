@@ -172,7 +172,7 @@ precheck_install_dirs() {
     } >&2
 
     if [ "$NONINTERACTIVE" -eq 1 ]; then
-        echo "FATAL: re-run with:  sudo $0 ${SCRIPT_ARGS[*]}" >&2
+        echo "FATAL: re-run with:  sudo $SCRIPT_PATH ${SCRIPT_ARGS[*]}" >&2
         exit 1
     fi
     # Root: do NOT offer sudo — re-exec'ing under sudo would repeat the
