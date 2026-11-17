@@ -28,14 +28,10 @@ done
 RESULT=/root/distros-result.json
 log() { printf '[provision] %s\n' "$*"; }
 
-# json_escape VALUE — escape VALUE for embedding in a JSON string. The result
-# JSON is written via an UNQUOTED heredoc (so the shell expands the values);
-# without escaping, a value containing a double quote, backslash, or control
-# char would produce malformed JSON (the result is parsed back by run-kvm.sh).
-# Covers the JSON-required escapes for the characters this harness can emit
-# (the values are ordinary printable strings: distro id/pretty name, wayfire
-# version, pass/fail/skipped, session user, timestamp). NUL cannot appear in a
-# bash variable, so it needs no handling.
+# json_escape VALUE — escape VALUE for embedding in a JSON string: the result
+# JSON is written via an unquoted heredoc (the shell expands the values), so an
+# unescaped quote/backslash/control char would produce malformed JSON. NUL
+# cannot appear in a bash variable, so it needs no handling.
 json_escape() {
   local s="$1"
   s="${s//\\/\\\\}"     # backslash    -> \\

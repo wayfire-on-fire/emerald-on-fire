@@ -46,10 +46,8 @@ jobs:
             libdisplay-info-dev \
             hwdata libxml2-dev libpango1.0-dev \
             imagemagick
-      # Build wayfire v0.11.0 (and the deps its bundled wlroots needs) from
-      # source into /usr via the SHARED recipe script (single source of truth;
-      # also used by the Dockerfile and e2e/distros/provision.sh). It installs
-      # a pinned meson >= 1.4.0 first and uses sudo for the install steps.
+      # Build wayfire v0.11.0 from source into /usr via the shared recipe
+      # (single source of truth; also used by the Dockerfile and provision.sh).
       - name: Build + install wayfire from source (shared recipe)
         run: bash scripts/build-wayfire-from-source.sh
       - name: Configure
@@ -58,13 +56,9 @@ jobs:
         run: ninja -C build
       - name: Test
         run: meson test -C build --print-errorlogs
-      # The emeraldwf-engine-pane test (the part-07 SEGV regression, finding
-      # 46) dlopens the built engines and drives a GTK event loop, so it needs
-      # a display; it self-skips when none is available. Run it under Xvfb so
-      # the SEGV regression is actually tested in CI, not silently skipped.
-      # Run the binary directly (not via `meson test`) and require a PASSED
-      # result: a meson test success alone is insufficient when the test can
-      # self-skip, so a self-skip under Xvfb must fail the job.
+      # The emeraldwf-engine-pane test (the part-07 SEGV regression) needs a
+      # display and self-skips without one. Run it under Xvfb and require a
+      # PASSED result — a meson-test success alone would pass a self-skip.
       - name: Test engine pane under a display (Xvfb)
         run: |
           sudo apt-get update
@@ -76,16 +70,11 @@ jobs:
           fi
           grep -q '\[  PASSED  \]' /tmp/engine-pane.log \
             || { echo "FAIL: engine-pane test did not PASS"; cat /tmp/engine-pane.log; exit 1; }
-          # if (NOT a trailing `grep && {...}`): as the step's last line the
-          # && list evaluates to 1 when the test PASSED (no SKIPPED marker),
-          # and a script's exit status is its last command's status — a
-          # green test made the step red with no output.
+          # if-form (not a trailing `grep && {...}`, which exits 1 on a PASS).
           if grep -q '\[  SKIPPED  \]' /tmp/engine-pane.log; then
             echo "FAIL: engine-pane test self-skipped under Xvfb"; cat /tmp/engine-pane.log; exit 1
           fi
-      # The docker/native jobs build the plugin but never run the install
-      # script. Run it (wayfire is installed to /usr in this job) and verify
-      # the plugin + shared engine lib + the 7 engines land in wayfire's libdir.
+      # Run the real installer (the docker job never does) and verify the layout.
       - name: Run install.sh (the real install path, not just meson install)
         run: |
           sudo ./install.sh --skip-tests
@@ -93,11 +82,8 @@ jobs:
           case "$LIBDIR" in /*) : ;; *) LIBDIR="/usr/$LIBDIR" ;; esac
           test -f "$LIBDIR/wayfire/libemeraldwf.so"
           test -f "$LIBDIR/emeraldwf/libemeraldengine.so"
-          # Count the versioned engine files (libX.so.MAJOR.MINOR.PATCH), not
-          # every directory entry: the install places 3 entries per engine
-          # (the versioned file + the libX.so.0 / libX.so symlinks), so a
-          # bare `ls | grep -c '\.so'` would count 21, not 7. -type f keeps
-          # the count to regular files (never the symlinks).
+          # Count only the versioned files (libX.so.M.N.P): the install leaves
+          # extra .so / .so.0 symlinks per engine, which a bare count would add.
           test "$(find "$LIBDIR/emeraldwf/engines" -maxdepth 1 -type f -name 'lib*.so.*' -printf '%f\n' | grep -cE '^lib.*\.so\.[0-9]+\.[0-9]+\.[0-9]+$')" -eq 7
       - uses: actions/upload-artifact@v4
         with:
@@ -105,11 +91,8 @@ jobs:
           path: build/src/libemeraldwf.so
 
   # per-distro build + test jobs (no session; the visible-GUI path is the
-  # local QEMU harness in e2e/distros/, intentionally not in CI). gtest and
-  # the other test RUNTIME deps (awk/git/ImageMagick/fonts — the base images
-  # are minimal and the suite needs them) are installed in both images, so
-  # the full test suite runs here too (the display-only engine-pane test
-  # self-skips in the headless container).
+  # local QEMU harness in e2e/distros/). Test RUNTIME deps (gtest, awk, git,
+  # ImageMagick, fonts) are installed so the full suite runs in both images.
   distro-compile:
     name: build + test (${{ matrix.distro }})
     runs-on: ubuntu-latest
