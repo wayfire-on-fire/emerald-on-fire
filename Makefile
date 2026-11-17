@@ -34,8 +34,11 @@ build-docker: build
 		meson test -C build-docker; \
 		mkdir -p dist/wayfire dist/emeraldwf/engines; \
 		cp build-docker/src/libemeraldwf.so dist/wayfire/; \
-		cp build-docker/libengine/libemeraldengine.so* dist/emeraldwf/; \
-		cp build-docker/engines/lib*.so* dist/emeraldwf/engines/; \
+		# cp -P keeps the versioned .so + symlink pairs intact (plain cp \
+		# dereferences them into 3 identical regular files per engine) and \
+		# the -d test skips the meson .p object dirs the glob would match. \
+		for f in build-docker/libengine/libemeraldengine.so*; do [ -d "$$f" ] && continue; cp -P "$$f" dist/emeraldwf/; done; \
+		for f in build-docker/engines/lib*.so*; do [ -d "$$f" ] && continue; cp -P "$$f" dist/emeraldwf/engines/; done; \
 		cp metadata/emeraldwf.xml dist/; \
 		cp build-docker/themer/emerald-theme-manager dist/; \
 		# Build manifest: the wayfire version the image was built against \

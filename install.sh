@@ -223,17 +223,24 @@ stage_artifacts() {  # kind root stage-dir — lay out the unified artifact set
     # Validate the staged set before it is trusted (a partial/broken build
     # must fail here, not silently install fewer artifacts):
     # (a) every staged symlink must resolve inside the stage;
-    # (b) the full engine set must be present (7 engines).
+    # (b) the full engine set must be present: exactly 7 versioned engine
+    #     files, every other entry a symlink (a partial build, or a
+    #     dereferenced copy-set where plain cp turned each engine into 3
+    #     identical regular files, is rejected).
     local dangling
     dangling="$(find "$stage" -type l ! -exec test -e {} \; -print)"
     if [ -n "$dangling" ]; then
         echo "FATAL: staged symlinks do not resolve: $dangling" >&2
         return 1
     fi
-    local n
-    n="$(find "$stage/emeraldwf/engines" -maxdepth 1 -type f -name 'lib*.so.*' | wc -l)"
-    if [ "$n" -ne 7 ]; then
-        echo "FATAL: staged engine count is $n (expected 7)" >&2
+    local n_plain=0 n_ver=0 f
+    for f in "$stage"/emeraldwf/engines/*; do
+        [ -f "$f" ] && [ ! -L "$f" ] || continue
+        n_plain=$((n_plain+1))
+        is_versioned_so "$f" && n_ver=$((n_ver+1))
+    done
+    if [ "$n_plain" -ne 7 ] || [ "$n_ver" -ne 7 ]; then
+        echo "FATAL: staged engine set is malformed ($n_plain plain files, $n_ver versioned; expected 7 versioned engines + symlinks)" >&2
         return 1
     fi
 }

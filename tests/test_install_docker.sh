@@ -200,6 +200,19 @@ else
         [ -e "$sd/$f" ] || { echo "FAIL: stage (dist) missing $f"; fail=1; st=1; }
     done
     [ "$st" -eq 0 ] && echo "ok: stage_artifacts (dist) carries the build manifest"
+
+    # (b2) a DEREFERENCED dist (plain-cp artifact: 3 identical regular files
+    #      per engine, no symlinks) must be rejected — the staged layout is
+    #      "versioned .so + symlinks only".
+    dd2="$T/fakedist-deref"
+    cp -rL "$dd" "$dd2" 2>/dev/null || cp -r "$dd" "$dd2"
+    rm -f "$dd2/.emeraldwf-build-info"
+    sd2="$T/stage-dist-deref"
+    if stage_artifacts dist "$dd2" "$sd2"; then
+        echo "FAIL: stage (dist) must reject a dereferenced dist (plain files, no symlinks)"; fail=1
+    else
+        echo "ok: stage_artifacts (dist) rejects a dereferenced dist"
+    fi
 fi
 
 # ── 4. Makefile contract ────────────────────────────────────────────────────

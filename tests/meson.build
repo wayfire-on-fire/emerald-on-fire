@@ -287,6 +287,12 @@ test('emeraldwf-install-docker', find_program('test_install_docker.sh'))
 # CI runner after a long image build. Syntax-check the expanded recipe.
 test('emeraldwf-makefile-docker-syntax', find_program('test_makefile_docker_syntax.sh'))
 
+# The build-docker recipe must pack dist/ as a true replica of the build tree
+# (versioned .so + symlinks, no meson .p object dirs). Plain `cp`
+# dereferences symlinks and bloats the artifact 3x, breaking install.sh
+# --docker staging.
+test('emeraldwf-makefile-docker-dist', find_program('test_makefile_docker_dist.sh'))
+
 # Minor (issue #1): install.sh must clean up .install.XXXXXX / .link.XXXXXX
 # temps (from an interrupted atomic_install/atomic_link) on exit via a trap.
 # Shell-level test.
