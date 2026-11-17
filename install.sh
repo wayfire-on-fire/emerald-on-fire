@@ -5,6 +5,7 @@
 #
 # Usage:
 #   ./install.sh [--skip-tests] [--no-seed] [--docker] [--force]
+#                [--non-interactive]
 #
 #   --docker  build in the pinned Docker toolchain (make build-docker:
 #             wayfire v0.11.0 from source) instead of a native meson build —
@@ -16,6 +17,10 @@
 #             mismatch or an undeterminable host version.
 #   --force   override the --docker compatibility policy ONLY (never a
 #             missing runtime library, which cannot load at all).
+#   --non-interactive  skip the sudo pre-check prompt: when a required
+#             install dir is not writable, fail fast (no question) — for
+#             scripted runs. Interactive runs (default) ask once, before
+#             building, and offer to re-run under sudo.
 #
 # Installs (all placement is this script's; meson's install rules exist
 # for WPM — `wayfire-plugin install` — and are never run from here):
@@ -64,20 +69,31 @@
 # dir are always written as the current user.
 
 set -euo pipefail
-cd "$(dirname "$0")"
+# Resolve the script's ABSOLUTE path BEFORE changing directory: a relative
+# $0 (e.g. ./emeraldwf/install.sh) would not survive the cd — the sudo
+# re-exec in the pre-check needs the real path (ChatGPT review, 2026-11-17).
+SCRIPT_DIR=$(cd -- "$(dirname -- "$0")" && pwd -P)
+SCRIPT_PATH="$SCRIPT_DIR/$(basename -- "$0")"
+cd "$SCRIPT_DIR"
+
+# The script's own argv, captured for the sudo re-exec in the pre-check
+# (a function's "$@" is the function's args, not the script's).
+SCRIPT_ARGS=("$@")
 
 SKIP_TESTS=0
 SEED=1
 USE_DOCKER=0
 FORCE=0
+NONINTERACTIVE=0
 for arg in "$@"; do
     case "$arg" in
-        --skip-tests) SKIP_TESTS=1 ;;
-        --no-seed)    SEED=0 ;;
-        --docker)     USE_DOCKER=1 ;;
-        --force)      FORCE=1 ;;
-        -h|--help)    grep '^#' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
-        *)            echo "unknown option: $arg" >&2; exit 2 ;;
+        --skip-tests)      SKIP_TESTS=1 ;;
+        --no-seed)         SEED=0 ;;
+        --docker)          USE_DOCKER=1 ;;
+        --force)           FORCE=1 ;;
+        --non-interactive) NONINTERACTIVE=1 ;;
+        -h|--help)         grep '^#' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        *)                 echo "unknown option: $arg" >&2; exit 2 ;;
     esac
 done
 
@@ -115,6 +131,69 @@ DEFAULTS=third_party/emerald/defaults
 # libdir/datadir values against the wayfire prefix.
 WF_PREFIX=$(pkg-config --variable=prefix wayfire 2>/dev/null)
 [ -n "$WF_PREFIX" ] || WF_PREFIX=/usr
+
+# ── 0b. install dirs + pre-check (before the build) ─────────────────────────
+LIBDIR=$(pkg-config --variable=libdir wayfire 2>/dev/null)
+[ -n "$LIBDIR" ] || LIBDIR=/usr/lib
+# Normalize to absolute: a wayfire .pc may carry a RELATIVE libdir/datadir
+# (e.g. "lib64", "share"); a .pc libdir is relative to the prefix. A bare
+# relative value would make the install land in ./lib64 (CWD-relative).
+case "$LIBDIR" in /*) ;; *) LIBDIR="$WF_PREFIX/$LIBDIR" ;; esac
+DATADIR=$(pkg-config --variable=datadir wayfire 2>/dev/null)
+[ -n "$DATADIR" ] || DATADIR=/usr/share
+case "$DATADIR" in /*) ;; *) DATADIR="$WF_PREFIX/$DATADIR" ;; esac
+
+# The install (section 3) needs three dirs that are ROOT-OWNED on a fresh
+# system and have NO user-dir fallback:
+#   $DATADIR/wayfire/metadata   (WCM metadata)
+#   $LIBDIR/wayfire             (the plugin .so)
+#   $LIBDIR/emeraldwf/engines   (the engine .so's)
+# Pre-fix, a fresh system without sudo built first (up to ~10 min in
+# docker) and only then FATAL'd at the install step. Pre-check BEFORE the
+# build: when a required dir is not writable, an interactive run asks once
+# and offers to re-run under sudo (exec, so the whole install — build,
+# tests, placement — runs as root); --non-interactive (or non-tty stdin)
+# fails fast instead.
+precheck_install_dirs() {
+    local missing=() d ans
+    mkdir -p "$DATADIR/wayfire/metadata" 2>/dev/null || true
+    mkdir -p "$LIBDIR/wayfire" "$LIBDIR/emeraldwf" "$LIBDIR/emeraldwf/engines" 2>/dev/null || true
+    [ -w "$DATADIR/wayfire/metadata" ] || missing+=("$DATADIR/wayfire/metadata")
+    [ -w "$LIBDIR/wayfire" ] || missing+=("$LIBDIR/wayfire")
+    [ -w "$LIBDIR/emeraldwf/engines" ] || missing+=("$LIBDIR/emeraldwf/engines")
+    [ "${#missing[@]}" -eq 0 ] && return 0
+
+    {
+        echo "The following install directories are not writable by your user:"
+        for d in "${missing[@]}"; do
+            echo "  - $d"
+        done
+        echo "Installing emeraldwf system-wide needs root for these."
+    } >&2
+
+    if [ "$NONINTERACTIVE" -eq 1 ]; then
+        echo "FATAL: re-run with:  sudo $0 ${SCRIPT_ARGS[*]}" >&2
+        exit 1
+    fi
+    # Root: do NOT offer sudo — re-exec'ing under sudo would repeat the
+    # same failure (e.g. a read-only filesystem), looping forever. Fail
+    # with the specific cause instead (ChatGPT review, 2026-11-17).
+    if [ "$EUID" -eq 0 ]; then
+        echo "FATAL: running as root, but the dirs above are still not" >&2
+        echo "       writable (read-only filesystem / immutable dir?)." >&2
+        exit 1
+    fi
+    if [ -t 0 ] && command -v sudo >/dev/null 2>&1; then
+        printf 'Re-run with sudo now? [y/N] ' >&2
+        read -r ans || ans=""
+        case "$ans" in
+            [yY]*) exec sudo "$SCRIPT_PATH" "${SCRIPT_ARGS[@]}" ;;
+        esac
+    fi
+    echo "FATAL: re-run with:  sudo $SCRIPT_PATH ${SCRIPT_ARGS[*]}" >&2
+    exit 1
+}
+precheck_install_dirs
 
 # ── 1. build ────────────────────────────────────────────────────────────────
 if [ "$USE_DOCKER" -eq 1 ]; then
@@ -371,15 +450,8 @@ STAGE="$STAGE_DIR"
 # (2026-10-09). A rename swaps the directory entry; the old inode stays
 # valid for the running process until it is closed. The WCM metadata xml
 # is a text file read at WCM startup — a plain copy is fine.
-LIBDIR=$(pkg-config --variable=libdir wayfire 2>/dev/null)
-[ -n "$LIBDIR" ] || LIBDIR=/usr/lib
-# Normalize to absolute: a wayfire .pc may carry a RELATIVE libdir/datadir
-# (e.g. "lib64", "share"); a .pc libdir is relative to the prefix. A bare
-# relative value would make the install land in ./lib64 (CWD-relative).
-case "$LIBDIR" in /*) ;; *) LIBDIR="$WF_PREFIX/$LIBDIR" ;; esac
-DATADIR=$(pkg-config --variable=datadir wayfire 2>/dev/null)
-[ -n "$DATADIR" ] || DATADIR=/usr/share
-case "$DATADIR" in /*) ;; *) DATADIR="$WF_PREFIX/$DATADIR" ;; esac
+# (LIBDIR/DATADIR are computed in section 0b — the pre-check needs them
+# before the build.)
 
 # Final install destinations, recorded as each placement decides its
 # target (system dir vs user-dir fallback), for the summary printed at

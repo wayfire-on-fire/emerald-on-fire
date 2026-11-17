@@ -324,6 +324,13 @@ test('emeraldwf-install-libdir', find_program('test_install_libdir.sh'))
 # per-artifact locations. Shell-level test.
 test('emeraldwf-install-summary', find_program('test_install_summary.sh'))
 
+# install.sh must verify the REQUIRED install dirs (metadata, plugin,
+# engines — no user-dir fallback) BEFORE building: a fresh system without
+# sudo used to build for ~10 min and only then FATAL at install.
+# Interactive: ask once, offer sudo. --non-interactive: fail fast.
+# Shell-level test.
+test('emeraldwf-install-precheck', find_program('test_install_precheck.sh'))
+
 # ---- part 07: engine pane / engine module lifetime (findings 46/47) ----
 # Regression for the "Round Top Left Corner" SEGV_MAPERR: append_engine's
 # dlclose unmapped the engine .so (static-vendored libemeraldengine) while
