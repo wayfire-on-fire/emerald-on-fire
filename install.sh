@@ -288,8 +288,12 @@ check_host_compatibility() {
 
     # Runtime deps first (not overridable): ldd reports "not found" for any
     # library the host lacks. Check EVERY staged ELF (plugin, engine lib,
-    # engines, theme manager) — not just the plugin.
+    # engines, theme manager) — not just the plugin. Intra-artifact deps
+    # (emerald-theme-manager -> libemeraldengine.so.0) resolve from the
+    # staged set itself — both land in the same libdir at install — so the
+    # loader is pointed at the stage: only GENUINE host gaps may remain.
     local elf
+    local ldd_extra="$stage/wayfire:$stage/emeraldwf:$stage/emeraldwf/engines"
     for elf in "$stage/wayfire/libemeraldwf.so" \
                "$stage"/emeraldwf/libemeraldengine.so.* \
                "$stage"/emeraldwf/engines/lib*.so.* \
@@ -298,9 +302,9 @@ check_host_compatibility() {
         if [ -L "$elf" ]; then
             continue   # resolves to the versioned file checked above
         fi
-        if ldd "$elf" 2>/dev/null | grep -q 'not found'; then
+        if LD_LIBRARY_PATH="$ldd_extra" ldd "$elf" 2>/dev/null | grep -q 'not found'; then
             echo "FATAL: the docker-built $elf needs libraries this host lacks:" >&2
-            ldd "$elf" 2>/dev/null | grep 'not found' >&2
+            LD_LIBRARY_PATH="$ldd_extra" ldd "$elf" 2>/dev/null | grep 'not found' >&2
             exit 1
         fi
     done

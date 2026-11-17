@@ -52,12 +52,18 @@ else
 fi
 
 # ── 2. guard matrix ─────────────────────────────────────────────────────────
-# run_guard NAME HOST_VER HOST_ABI_MACRO FORCE LDD_MODE [MAN_KIND]
+# run_guard NAME HOST_VER HOST_ABI_MACRO FORCE LDD_MODE [MAN_KIND] [STAGE_KIND]
 #   -> prints the guard's exit status. Stubs wayfire / pkg-config / ldd on
 #      PATH, evals the functions extracted from install.sh, and runs
 #      check_host_compatibility on a staged tree. MAN_KIND: ok | noabi.
+#      LDD_MODE: ok | missing (stubbed) | real (the system ldd — required
+#      for the intra-artifact-dependency cases). STAGE_KIND: empty (default,
+#      a stub plugin .so) | sibling (a REAL theme manager linked against a
+#      REAL libemeraldengine staged as its sibling) | hostgap (a REAL theme
+#      manager linked against a lib that is staged NOWHERE — a genuine host
+#      gap).
 run_guard() {
-    local name="$1" hv="$2" ha="$3" force="$4" ldd="$5" mankind="${6:-ok}"
+    local name="$1" hv="$2" ha="$3" force="$4" ldd="$5" mankind="${6:-ok}" stagekind="${7:-empty}"
     local d="$T/g-$name"
     mkdir -p "$d/bin" "$d/inc/wayfire" "$d/stage/wayfire"
     # wayfire stub (the running binary is the version source of truth)
@@ -88,13 +94,42 @@ run_guard() {
     if [ "$ha" != "none" ]; then
         printf '#define WAYFIRE_API_ABI_VERSION_MACRO %s\n' "$ha" > "$d/inc/wayfire/plugin.hpp"
     fi
-    # ldd stub
+    # ldd (stubbed, or the real one for the intra-artifact-dep cases)
     case "$ldd" in
         ok)      printf '#!/bin/sh\necho "libc.so.6 => /lib/libc.so.6 (0x0000)"\n' > "$d/bin/ldd" ;;
         missing) printf '#!/bin/sh\necho "libfake.so.1 => not found"\n' > "$d/bin/ldd" ;;
+        real)    : ;;
     esac
-    chmod +x "$d/bin/ldd"
+    [ -f "$d/bin/ldd" ] && chmod +x "$d/bin/ldd"
     : > "$d/stage/wayfire/libemeraldwf.so"
+    # Real-ELF stage kinds (built with the system compiler; the ldd check
+    # must resolve intra-artifact deps from the stage itself).
+    case "$stagekind" in
+        sibling|hostgap)
+            command -v cc >/dev/null 2>&1 || { echo "FAIL: cc not found (real-ldd cases)" >&2; return 127; }
+            mkdir -p "$d/stage/emeraldwf"
+            printf 'int emerald_engine_foo(void){return 42;}\n' > "$d/eng.c"
+            cc -shared -Wl,-soname,libemeraldengine.so.0 \
+               -o "$d/stage/emeraldwf/libemeraldengine.so.0.1.0" "$d/eng.c" || return 127
+            ln -s libemeraldengine.so.0.1.0 "$d/stage/emeraldwf/libemeraldengine.so.0"
+            ln -s libemeraldengine.so.0 "$d/stage/emeraldwf/libemeraldengine.so"
+            if [ "$stagekind" = sibling ]; then
+                printf 'int emerald_engine_foo(void);int main(void){return emerald_engine_foo()==42?0:1;}\n' > "$d/themer.c"
+                cc -o "$d/stage/emerald-theme-manager" "$d/themer.c" \
+                   -L"$d/stage/emeraldwf" -lemeraldengine || return 127
+            else
+                # hostgap: the theme manager ALSO needs libgap.so.1, which
+                # exists on the "build system" (here) but is staged NOWHERE —
+                # a genuine host dependency gap.
+                printf 'int gap_lib_fn(void){return 1;}\n' > "$d/gap.c"
+                cc -shared -Wl,-soname,libgap.so.1 -o "$d/libgap.so.1" "$d/gap.c" || return 127
+                ln -s libgap.so.1 "$d/libgap.so"
+                printf 'int gap_lib_fn(void);int emerald_engine_foo(void);int main(void){return gap_lib_fn()==1&&emerald_engine_foo()==42?0:1;}\n' > "$d/themer.c"
+                cc -o "$d/stage/emerald-theme-manager" "$d/themer.c" \
+                   -L"$d/stage/emeraldwf" -L"$d" -lemeraldengine -lgap || return 127
+            fi
+            ;;
+    esac
     if [ "$mankind" = "noabi" ]; then
         printf 'wayfire_version=0.11.0\nbuilt_at=x\n' > "$d/manifest"
     else
@@ -129,6 +164,10 @@ expect "ABI mismatch refuses"                        1 "$(run_guard abi-bad  0.1
 expect "missing runtime lib refuses even with --force" \
                                                    1 "$(run_guard no-lib   0.11.0 "2026'07'26" 1 missing)"  check_host_compatibility
 expect "malformed manifest (no abi) refuses"        1 "$(run_guard no-abif  0.11.0 "2026'07'26" 0 ok noabi)" check_host_compatibility
+expect "intra-artifact sibling lib is not a host gap (real ldd)" \
+                                                   0 "$(run_guard sib-ok   0.11.0 "2026'07'26" 0 real ok sibling)" check_host_compatibility
+expect "genuine host lib gap refuses even with --force (real ldd)" \
+                                                   1 "$(run_guard host-gap 0.11.0 "2026'07'26" 1 real ok hostgap)" check_host_compatibility
 
 # ── 3. staging ──────────────────────────────────────────────────────────────
 STAGE_FN="$(sed -n '/^stage_artifacts()/,/^}/p' "$SRC")"
