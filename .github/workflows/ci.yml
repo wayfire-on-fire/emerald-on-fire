@@ -126,7 +126,18 @@ jobs:
               # base image lacks — the script-block tests extract with
               # awk, the vendor_check tests need git, imgcmp needs
               # `convert`, and the Pango text-metric tests need a font.
-              zypper --non-interactive install --no-recommends \
+              # --force-resolve-deps: the Tumbleweed 2026-11-17 snapshot
+              # split libsystemd0/libudev1 into runtime + "-mini"
+              # (build-env-only) variants; wayfire-devel -> wlroots-devel ->
+              # pkgconfig(libudev) then only resolved to the mini variant,
+              # which needs the virtual 'this-is-only-for-build-envs' —
+              # unresolvable in a normal container (CI red on 2026-11-17,
+              # runs 44103752035 + 44105392523). The flag makes zypper
+              # auto-apply its computed solution (downgrade the two
+              # runtime libs to the version that still ships the .pc)
+              # instead of cancelling; it is a no-op once Tumbleweed
+              # fixes the packaging.
+              zypper --non-interactive --force-resolve-deps install --no-recommends \
                 gcc gcc-c++ make glm-devel wayfire wayfire-devel meson ninja pkgconf \
                 gtk3-devel gdk-pixbuf-devel cairo-devel glib2-devel libX11-devel \
                 pango-devel gtest Mesa-libGLESv3-devel \
