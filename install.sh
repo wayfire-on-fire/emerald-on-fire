@@ -4,7 +4,18 @@
 # machine has a working emerald theme with no hand-editing afterwards.
 #
 # Usage:
-#   ./install.sh [--skip-tests] [--no-seed]
+#   ./install.sh [--skip-tests] [--no-seed] [--docker] [--force]
+#
+#   --docker  build in the pinned Docker toolchain (make build-docker:
+#             wayfire v0.11.0 from source) instead of a native meson build —
+#             for hosts that run wayfire but have no build toolchain. Tests
+#             run inside the container. Before installing, the host is
+#             checked for compatibility with the image's wayfire (plugin ABI
+#             identifier, falling back to the version string; plus the
+#             plugin's runtime libraries). The check REFUSES by default on
+#             mismatch or an undeterminable host version.
+#   --force   override the --docker compatibility policy ONLY (never a
+#             missing runtime library, which cannot load at all).
 #
 # Installs (all placement is this script's; meson's install rules exist
 # for WPM — `wayfire-plugin install` — and are never run from here):
@@ -57,10 +68,14 @@ cd "$(dirname "$0")"
 
 SKIP_TESTS=0
 SEED=1
+USE_DOCKER=0
+FORCE=0
 for arg in "$@"; do
     case "$arg" in
         --skip-tests) SKIP_TESTS=1 ;;
         --no-seed)    SEED=0 ;;
+        --docker)     USE_DOCKER=1 ;;
+        --force)      FORCE=1 ;;
         -h|--help)    grep '^#' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *)            echo "unknown option: $arg" >&2; exit 2 ;;
     esac
@@ -96,15 +111,34 @@ USER_HOME="$(resolve_user_home "$EUID" "${SUDO_USER:-}" "$HOME")" || exit 1
 BUILD=build
 DEFAULTS=third_party/emerald/defaults
 
+# The install section (both backends) normalizes relative pkg-config
+# libdir/datadir values against the wayfire prefix.
+WF_PREFIX=$(pkg-config --variable=prefix wayfire 2>/dev/null)
+[ -n "$WF_PREFIX" ] || WF_PREFIX=/usr
+
 # ── 1. build ────────────────────────────────────────────────────────────────
+if [ "$USE_DOCKER" -eq 1 ]; then
+    # Docker backend: the pinned toolchain image builds wayfire from source,
+    # compiles the plugin against it, runs the test suite in the container,
+    # and packages the artifacts into dist/ (with the .emeraldwf-build-info
+    # manifest the compatibility guard below reads). Nothing is installed
+    # by the container — all placement stays with this script.
+    command -v docker >/dev/null 2>&1 || {
+        echo "FATAL: --docker requires docker" >&2; exit 1; }
+    command -v make >/dev/null 2>&1 || {
+        echo "FATAL: --docker requires make" >&2; exit 1; }
+    echo "==> building in Docker (pinned toolchain; tests run in the container)"
+    make build-docker || exit 1
+    [ -f dist/.emeraldwf-build-info ] || {
+        echo "FATAL: make build-docker produced no dist/.emeraldwf-build-info" >&2
+        exit 1; }
+else
 # The build must target the installed wayfire's prefix/libdir, not meson's
 # defaults (/usr/local, lib): libemeraldengine bakes ENGINE_DIR
 # (<prefix>/<libdir>/emeraldwf/engines) in at compile time, and both the
 # test suite and the installed theme editor scan that directory for the
 # engines — the ones this script places in wayfire's libdir. A bare
 # `meson setup` would point them at an empty /usr/local/lib*/emeraldwf/engines.
-WF_PREFIX=$(pkg-config --variable=prefix wayfire 2>/dev/null)
-[ -n "$WF_PREFIX" ] || WF_PREFIX=/usr
 WF_LIBDIR_REL=$(pkg-config --variable=libdir wayfire 2>/dev/null)
 [ -n "$WF_LIBDIR_REL" ] || WF_LIBDIR_REL=lib
 case "$WF_LIBDIR_REL" in /*) WF_LIBDIR_REL=${WF_LIBDIR_REL#"$WF_PREFIX"/} ;; esac
@@ -128,12 +162,193 @@ elif [ ! -f "$CFG_MARKER" ] || [ "$(cat "$CFG_MARKER" 2>/dev/null)" != "$WF_PREF
 fi
 echo "==> building"
 ninja -C "$BUILD"
+fi
 
 # ── 2. tests ────────────────────────────────────────────────────────────────
-if [ "$SKIP_TESTS" -eq 0 ]; then
+if [ "$USE_DOCKER" -eq 1 ]; then
+    echo "==> tests already ran inside the container (make build-docker)"
+elif [ "$SKIP_TESTS" -eq 0 ]; then
     echo "==> running tests"
     meson test -C "$BUILD"
 fi
+
+# ── 2b. stage artifacts + compatibility guard ──────────────────────────────
+# Both backends stage the SAME layout into a FRESH temp dir (never reuse a
+# stale dist/ after a failed build, and never mix backend artifacts):
+#   <stage>/wayfire/libemeraldwf.so
+#   <stage>/emeraldwf/libemeraldengine.so*   <stage>/emeraldwf/engines/lib*
+#   <stage>/emerald-theme-manager
+#   <stage>/.emeraldwf-build-info            (docker builds only)
+# The placement code below reads from $STAGE, so it is backend-agnostic.
+STAGE_DIR="$(mktemp -d)"
+
+is_versioned_so() {
+    local p="$1"
+    [ -f "$p" ] && [ ! -L "$p" ] || return 1
+    local base="${p##*/}"
+    [[ "$base" =~ ^lib.*\.so\.[0-9]+\.[0-9]+\.[0-9]+$ ]]
+}
+
+stage_artifacts() {  # kind root stage-dir — lay out the unified artifact set
+    local kind="$1" root="$2" stage="$3" f
+    mkdir -p "$stage/wayfire" "$stage/emeraldwf/engines"
+    case "$kind" in
+        build)
+            cp "$root/src/libemeraldwf.so" "$stage/wayfire/"
+            cp "$root/themer/emerald-theme-manager" "$stage/"
+            # versioned .so + their symlinks; never the meson .p object dirs
+            for f in "$root"/libengine/libemeraldengine.so*; do
+                [ -e "$f" ] || continue
+                if [ -L "$f" ] || is_versioned_so "$f"; then
+                    cp -a "$f" "$stage/emeraldwf/"
+                fi
+            done
+            for f in "$root"/engines/lib*.so*; do
+                [ -e "$f" ] || continue
+                if [ -L "$f" ] || is_versioned_so "$f"; then
+                    cp -a "$f" "$stage/emeraldwf/engines/"
+                fi
+            done
+            ;;
+        dist)
+            cp -a "$root/wayfire/libemeraldwf.so" "$stage/wayfire/"
+            cp -a "$root/emerald-theme-manager" "$stage/"
+            cp -a "$root"/emeraldwf/libemeraldengine.so* "$stage/emeraldwf/"
+            cp -a "$root"/emeraldwf/engines/lib*.so* "$stage/emeraldwf/engines/"
+            if [ -f "$root/.emeraldwf-build-info" ]; then
+                cp "$root/.emeraldwf-build-info" "$stage/"
+            fi
+            ;;
+    esac
+    # Validate the staged set before it is trusted (a partial/broken build
+    # must fail here, not silently install fewer artifacts):
+    # (a) every staged symlink must resolve inside the stage;
+    # (b) the full engine set must be present (7 engines).
+    local dangling
+    dangling="$(find "$stage" -type l ! -exec test -e {} \; -print)"
+    if [ -n "$dangling" ]; then
+        echo "FATAL: staged symlinks do not resolve: $dangling" >&2
+        return 1
+    fi
+    local n
+    n="$(find "$stage/emeraldwf/engines" -maxdepth 1 -type f -name 'lib*.so.*' | wc -l)"
+    if [ "$n" -ne 7 ]; then
+        echo "FATAL: staged engine count is $n (expected 7)" >&2
+        return 1
+    fi
+}
+
+# host_wayfire_version — the host's wayfire version (e.g. 0.11.0), or fail.
+# The running binary is the source of truth; the pkg-config module is the
+# fallback (a host with dev files but no wayfire on PATH).
+host_wayfire_version() {
+    local v
+    v="$(wayfire --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
+    if [ -n "$v" ]; then
+        printf '%s\n' "$v"
+        return 0
+    fi
+    v="$(pkg-config --modversion wayfire 2>/dev/null || true)"
+    if [ -n "$v" ]; then
+        printf '%s\n' "$v"
+        return 0
+    fi
+    return 1
+}
+
+# host_abi_identifier — wayfire's plugin ABI macro from the host's dev header
+# (<includedir>/wayfire/plugin.hpp: WAYFIRE_API_ABI_VERSION_MACRO, the value
+# wayfire's loader compares a plugin's getWayfireVersion() against), or fail
+# when the header is absent. Normalized to bare digits (2026'07'26 -> 20260726).
+host_abi_identifier() {
+    local inc hdr
+    inc="$(pkg-config --variable=includedir wayfire 2>/dev/null || true)"
+    [ -n "$inc" ] || return 1
+    hdr="$inc/wayfire/plugin.hpp"
+    [ -f "$hdr" ] || return 1
+    grep -oE 'WAYFIRE_API_ABI_VERSION_MACRO[[:space:]].*' "$hdr" \
+        | head -1 | sed 's/[^0-9]//g'
+}
+
+# check_host_compatibility STAGE MANIFEST — docker builds only: the artifacts
+# were built against the IMAGE's wayfire, not the host's. Refuse (exit 1)
+# when the host is not demonstrably compatible. --force (FORCE=1) overrides
+# the version/ABI policy ONLY — never a missing runtime library (which
+# cannot load at all).
+check_host_compatibility() {
+    local stage="$1" manifest="$2"
+    local img_ver img_abi host_ver host_abi
+
+    # Runtime deps first (not overridable): ldd reports "not found" for any
+    # library the host lacks. Check EVERY staged ELF (plugin, engine lib,
+    # engines, theme manager) — not just the plugin.
+    local elf
+    for elf in "$stage/wayfire/libemeraldwf.so" \
+               "$stage"/emeraldwf/libemeraldengine.so.* \
+               "$stage"/emeraldwf/engines/lib*.so.* \
+               "$stage/emerald-theme-manager"; do
+        [ -f "$elf" ] || continue
+        if [ -L "$elf" ]; then
+            continue   # resolves to the versioned file checked above
+        fi
+        if ldd "$elf" 2>/dev/null | grep -q 'not found'; then
+            echo "FATAL: the docker-built $elf needs libraries this host lacks:" >&2
+            ldd "$elf" 2>/dev/null | grep 'not found' >&2
+            exit 1
+        fi
+    done
+
+    if [ "${FORCE:-0}" -eq 1 ]; then
+        echo "==> --force: skipping the wayfire compatibility policy"
+        return 0
+    fi
+
+    img_ver="$(sed -n 's/^wayfire_version=//p' "$manifest" | head -1)"
+    img_abi="$(sed -n 's/^abi_identifier=//p' "$manifest" | head -1)"
+    # Strict: both fields are required. A malformed manifest must fail, not
+    # be treated as "no constraint".
+    if [ -z "$img_ver" ] || [ -z "$img_abi" ]; then
+        echo "FATAL: the build manifest is missing required fields" >&2
+        echo "       (wayfire_version and abi_identifier are both required):" >&2
+        cat "$manifest" >&2
+        exit 1
+    fi
+    host_ver="$(host_wayfire_version || true)"
+    host_abi="$(host_abi_identifier || true)"
+
+    # Primary: wayfire's plugin ABI identifier. Secondary: the version string
+    # (a host without dev files only exposes its version).
+    if [ -n "$img_abi" ] && [ -n "$host_abi" ]; then
+        if [ "$img_abi" = "$host_abi" ]; then
+            echo "==> wayfire ABI identifier matches ($img_abi)"
+            return 0
+        fi
+        echo "FATAL: wayfire plugin ABI mismatch: build=$img_abi host=$host_abi" >&2
+        echo "       re-run with --force to install anyway" >&2
+        exit 1
+    fi
+    if [ -z "$host_ver" ]; then
+        echo "FATAL: cannot determine the host's wayfire version" >&2
+        echo "       (no 'wayfire' binary on PATH and no wayfire pkg-config module)" >&2
+        echo "       re-run with --force to install anyway" >&2
+        exit 1
+    fi
+    if [ "$host_ver" = "$img_ver" ]; then
+        echo "==> wayfire version matches ($host_ver)"
+        return 0
+    fi
+    echo "FATAL: wayfire version mismatch: build=$img_ver host=$host_ver" >&2
+    echo "       re-run with --force to install anyway" >&2
+    exit 1
+}
+
+if [ "$USE_DOCKER" -eq 1 ]; then
+    stage_artifacts dist dist "$STAGE_DIR"
+    check_host_compatibility "$STAGE_DIR" "$STAGE_DIR/.emeraldwf-build-info"
+else
+    stage_artifacts build "$BUILD" "$STAGE_DIR"
+fi
+STAGE="$STAGE_DIR"
 
 # ── 3. install (system dirs) ────────────────────────────────────────────────
 # This script does ALL placement itself (meson's install rules exist for
@@ -199,13 +414,6 @@ atomic_versioned_so() {  # srcfile destdir
 # .so / .so.MAJOR symlinks, the .so.VER.p object dir, and unrelated regular
 # files (libfoo.so.debug, libfoo.so.2.3.4.old, ...) that lib*.so.* would
 # otherwise match.
-is_versioned_so() {
-    local p="$1"
-    [ -f "$p" ] && [ ! -L "$p" ] || return 1
-    local base="${p##*/}"
-    [[ "$base" =~ ^lib.*\.so\.[0-9]+\.[0-9]+\.[0-9]+$ ]]
-}
-
 # Refresh a directory's contents ATOMICALLY: populate a temp dir first, then
 # swap it into place with a rename. A running wayfire plugin reads the default
 # theme (the engine-override mismatch path); the old `rm -rf <dest> && cp -r`
@@ -231,6 +439,9 @@ cleanup_on_exit() {
     done
     if [ -n "$DEFAULT_THEME_TMP" ] && [ -d "$DEFAULT_THEME_TMP" ]; then
         rm -rf -- "$DEFAULT_THEME_TMP"
+    fi
+    if [ -n "${STAGE_DIR:-}" ] && [ -d "$STAGE_DIR" ]; then
+        rm -rf -- "$STAGE_DIR"
     fi
 }
 
@@ -290,7 +501,7 @@ fi
 # before any atomic placement runs.
 trap cleanup_on_exit EXIT
 
-atomic_install "$BUILD/src/libemeraldwf.so" "$LIBDIR/wayfire"
+atomic_install "$STAGE/wayfire/libemeraldwf.so" "$LIBDIR/wayfire"
 echo "==> libemeraldwf.so → $LIBDIR/wayfire"
 
 # Install every versioned engine .so (a REGULAR file with a version suffix —
@@ -298,7 +509,7 @@ echo "==> libemeraldwf.so → $LIBDIR/wayfire"
 # glob is version-agnostic so a version bump does not silently install zero
 # engines.
 n_engines=0
-for f in "$BUILD"/engines/lib*.so.*; do
+for f in "$STAGE"/emeraldwf/engines/lib*.so.*; do
     is_versioned_so "$f" || continue
     atomic_versioned_so "$f" "$LIBDIR/emeraldwf/engines"
     n_engines=$((n_engines + 1))
@@ -310,7 +521,7 @@ echo "==> $n_engines engines → $LIBDIR/emeraldwf/engines"
 # the version.
 eng_lib=""
 eng_count=0
-for f in "$BUILD"/libengine/libemeraldengine.so.*; do
+for f in "$STAGE"/emeraldwf/libemeraldengine.so.*; do
     is_versioned_so "$f" || continue
     eng_lib="$f"
     eng_count=$((eng_count + 1))
@@ -318,7 +529,7 @@ done
 # Exactly one: stale build artifacts (two versioned files) would otherwise be
 # an ambiguous selection.
 if [ "$eng_count" -ne 1 ]; then
-    echo "FATAL: expected exactly one versioned libemeraldengine.so in $BUILD/libengine (found $eng_count)" >&2
+    echo "FATAL: expected exactly one versioned libemeraldengine.so in the staged artifacts (found $eng_count)" >&2
     exit 1
 fi
 if [ -w "$LIBDIR/emeraldwf" ]; then
@@ -402,12 +613,12 @@ install_file() {  # src dest-dir — temp + rename: overwriting a binary
 # "emerald-on-fire" for one release; do not leave a stale duplicate)
 rm -f "$USER_HOME/.local/bin/emerald-on-fire" "$XDG/applications/emerald-on-fire.desktop"
 if [ -w /usr/bin ]; then
-    install_file "$BUILD/themer/emerald-theme-manager" /usr/bin
+    install_file "$STAGE/emerald-theme-manager" /usr/bin
     BIN_DEST=/usr/bin/emerald-theme-manager
     rm -f /usr/bin/emerald-on-fire /usr/share/applications/emerald-on-fire.desktop
     echo "==> emerald-theme-manager → /usr/bin"
 else
-    install_file "$BUILD/themer/emerald-theme-manager" "$USER_HOME/.local/bin"
+    install_file "$STAGE/emerald-theme-manager" "$USER_HOME/.local/bin"
     BIN_DEST="$USER_HOME/.local/bin/emerald-theme-manager"
     echo "==> /usr/bin not writable — emerald-theme-manager → ~/.local/bin"
 fi

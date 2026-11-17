@@ -88,7 +88,25 @@ types the vendored emerald headers use come from the `compat/libwnck/` shim
 ./install.sh                # build + tests + install + seed ~/.emerald
 ./install.sh --skip-tests   # skip the test suite
 ./install.sh --no-seed      # don't touch ~/.emerald
+./install.sh --docker       # build in the pinned Docker toolchain (no host
+                            # build deps required), then install
+./install.sh --docker --force  # additionally skip the wayfire compatibility guard
 ```
+
+`--docker` builds in the toolchain image (wayfire v0.11.0 from source — the
+same recipe as `make binary`) for hosts that run wayfire but have no build
+toolchain; it removes the need for wayfire-dev/meson/ninja/a compiler, **not**
+the need for wayfire itself and the plugin's runtime libraries. Tests run
+inside the container. Before installing, the host is checked against the
+image's wayfire — the plugin ABI identifier (`WAYFIRE_API_ABI_VERSION_MACRO`
+from the host's wayfire dev header) where available, the version string
+otherwise, plus every staged ELF's runtime libs (`ldd`) — and the install
+is refused by default on a mismatch, an undeterminable host version, or a
+missing runtime library. The guard is a conservative compatibility
+heuristic, not a guarantee (two wayfire builds of the same version/ABI id
+can still differ in compiler settings); `--force` is an explicit
+unsupported-ABI override — it skips the version/ABI policy only, never a
+missing runtime library.
 
 The script does everything a fresh machine needs:
 

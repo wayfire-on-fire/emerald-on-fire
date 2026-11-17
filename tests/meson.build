@@ -277,6 +277,11 @@ test('emeraldwf-install-defaulttheme', find_program('test_install_defaulttheme.s
 # Shell-level test.
 test('emeraldwf-install-firstrun', find_program('test_install_firstrun.sh'))
 
+# --docker install: the flags parse, the host compatibility guard (wayfire
+# version/ABI + runtime libs) refuses by default, and both backends stage the
+# same unified artifact layout. Shell-level test.
+test('emeraldwf-install-docker', find_program('test_install_docker.sh'))
+
 # Minor (issue #1): install.sh must clean up .install.XXXXXX / .link.XXXXXX
 # temps (from an interrupted atomic_install/atomic_link) on exit via a trap.
 # Shell-level test.
