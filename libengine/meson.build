@@ -42,23 +42,37 @@
 # editor's engine scan (init_engine_list: ~/.emerald/engines +
 # ENGINE_DIR) finds the installed engines.
 #
+# ENGINE_DIR resolves AT RUNTIME from this library's own location
+# (compat/engine-dir.c: <so-dir>/engines, then <so-dir>/../engines for
+# the build tree) — a baked absolute path is the toolchain IMAGE's
+# libdir in docker builds (Ubuntu: lib/x86_64-linux-gnu), wrong on hosts
+# with a different libdir (Gentoo lib64, Arch lib): the scan would open
+# an empty dir and list zero engines. The baked value is the fallback.
+#
 # Part 08 (crash fix): installed to <libdir>/emeraldwf (private dir —
 # no system ldconfig needed; consumers carry an $ORIGIN rpath).
 libemeraldengine = shared_library('emeraldengine',
     ['../third_party/emerald/libengine/emerald.c',
-     '../third_party/emerald/libengine/themer.c'],
+     '../third_party/emerald/libengine/themer.c',
+     '../compat/engine-dir.c'],
     include_directories: [emerald_inc],
     c_args: ['-w', # Review S3: vendored C, out of scope for the warning bar
              '-DDEFSETTINGSFILE=0',
              '-DDEFTHEMEDIR=0',
-             # Absolute path: get_option('libdir') alone is relative
-             # ("lib64") on Gentoo — engine_scan_dir() would then open a
-             # CWD-relative dir and find no engines.
-             '-DENGINE_DIR="' +
+             # Baked fallback for emeraldwf_engine_dir() (see
+             # compat/engine-dir.c). Absolute path: get_option('libdir')
+             # alone is relative ("lib64") on Gentoo.
+             '-DEMERALDWF_ENGINE_DIR_BAKED="' +
                  join_paths(get_option('prefix'), get_option('libdir'),
                              'emeraldwf', 'engines') + '"',
+             '-DENGINE_DIR=emeraldwf_engine_dir()',
              '-include',
-             '../compat/themer-version-stub.h'],
+             '../compat/themer-version-stub.h',
+             # Prototype for the ENGINE_DIR macro (themer.c is vendored —
+             # an implicit `int` declaration would pass an int to
+             # engine_scan_dir(gchar*)).
+             '-include',
+             '../compat/engine-dir.h'],
     # x11: send_reload_signal's X11 fallback path (interposed at runtime
     # by the themer/test executables — emerald-of.c's no-op wins).
     dependencies: [glib, gdk, gtk, cairo, pango, pangocairo, x11],

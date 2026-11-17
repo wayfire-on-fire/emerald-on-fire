@@ -45,6 +45,15 @@ make_goldens = executable('make_goldens',
 test('emeraldwf-settings', emeraldwf_settings)
 test('emeraldwf-render', emeraldwf_render)
 
+# The theme editor's engine dir must resolve from libemeraldengine's own
+# location at runtime (docker builds bake the image's libdir — a host with
+# a different libdir would scan an empty dir).
+emeraldwf_engine_dir = executable('emeraldwf-engine-dir',
+    ['test_engine_dir.cpp'],
+    dependencies: emerald_test_deps,
+    link_with: [libemeraldengine])
+test('emeraldwf-engine-dir', emeraldwf_engine_dir)
+
 # ---- part 01: margin math (headless, no emerald/wayfire symbols) ----
 # Margin math lives in emerald-decorator.cpp; compile it directly into the
 # test. The test calls the pure static margins_for() and the pure
@@ -292,6 +301,12 @@ test('emeraldwf-makefile-docker-syntax', find_program('test_makefile_docker_synt
 # dereferences symlinks and bloats the artifact 3x, breaking install.sh
 # --docker staging.
 test('emeraldwf-makefile-docker-dist', find_program('test_makefile_docker_dist.sh'))
+
+# The docker-built themer must work on hosts whose libdir differs from the
+# toolchain image's (Ubuntu lib/x86_64-linux-gnu vs Gentoo lib64, Arch lib):
+# the RUNPATH must cover the common distro libdirs, and the scanned engine
+# dir must resolve at runtime, not from a baked image libdir.
+test('emeraldwf-themer-runtime-dirs', find_program('test_themer_runtime_dirs.sh'))
 
 # Minor (issue #1): install.sh must clean up .install.XXXXXX / .link.XXXXXX
 # temps (from an interrupted atomic_install/atomic_link) on exit via a trap.
