@@ -76,8 +76,13 @@ jobs:
           fi
           grep -q '\[  PASSED  \]' /tmp/engine-pane.log \
             || { echo "FAIL: engine-pane test did not PASS"; cat /tmp/engine-pane.log; exit 1; }
-          grep -q '\[  SKIPPED  \]' /tmp/engine-pane.log \
-            && { echo "FAIL: engine-pane test self-skipped under Xvfb"; cat /tmp/engine-pane.log; exit 1; }
+          # if (NOT a trailing `grep && {...}`): as the step's last line the
+          # && list evaluates to 1 when the test PASSED (no SKIPPED marker),
+          # and a script's exit status is its last command's status — a
+          # green test made the step red with no output.
+          if grep -q '\[  SKIPPED  \]' /tmp/engine-pane.log; then
+            echo "FAIL: engine-pane test self-skipped under Xvfb"; cat /tmp/engine-pane.log; exit 1
+          fi
       # The docker/native jobs build the plugin but never run the install
       # script. Run it (wayfire is installed to /usr in this job) and verify
       # the plugin + shared engine lib + the 7 engines land in wayfire's libdir.

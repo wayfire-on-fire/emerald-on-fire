@@ -81,14 +81,25 @@ for pkg in gawk git ImageMagick dejavu-fonts; do
     fi
 done
 
-# 6. The Xvfb step must surface the engine-pane log when xvfb-run itself
-#    fails: under set -e a bare `xvfb-run ... > log` dies silently (the log
-#    is never read), leaving the job red with no output to diagnose.
-xvfb_line="$(grep -F 'xvfb-run' "$CI" | grep -F 'engine-pane' || true)"
-if printf '%s\n' "$xvfb_line" | grep -qF 'if !'; then
-    echo "ok: the Xvfb step guards xvfb-run, so a crash prints the log instead of dying silently"
+# 6. The Xvfb step must be diagnosable on failure AND must not go red on a
+#    GREEN test:
+#    (a) guard xvfb-run so a crash prints the log (a bare call dies
+#        silently under set -e);
+#    (b) the self-skip check must be an if statement — as the step's final
+#        line, `grep -q SKIPPED && {...}` evaluates to 1 when the test
+#        PASSED (no SKIPPED marker), and a script's exit status is its last
+#        command's status: the 2026-11-16/17 runs were red with NO output
+#        while the test itself passed.
+xvfb_step="$(sed -n '/Test engine pane under a display/,/^      - name:/p' "$CI")"
+if printf '%s\n' "$xvfb_step" | grep -qF 'if ! xvfb-run'; then
+    echo "ok: the Xvfb step guards xvfb-run (log on crash)"
 else
     echo "FAIL: the Xvfb step must guard xvfb-run (if ! ...) and cat the log on failure"; fail=1
+fi
+if printf '%s\n' "$xvfb_step" | grep -qF 'if grep -q'; then
+    echo "ok: the self-skip check is an if statement, so a passing step cannot exit non-zero"
+else
+    echo "FAIL: the self-skip check must be an if statement — a trailing 'grep && {...}' list makes a passing step exit 1"; fail=1
 fi
 
 if [ "$fail" -ne 0 ]; then
