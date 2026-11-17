@@ -282,6 +282,11 @@ test('emeraldwf-install-firstrun', find_program('test_install_firstrun.sh'))
 # same unified artifact layout. Shell-level test.
 test('emeraldwf-install-docker', find_program('test_install_docker.sh'))
 
+# The build-docker recipe is a single-quoted bash -c string; an apostrophe in
+# it (even in a comment) breaks the quoting and only fails at runtime on the
+# CI runner after a long image build. Syntax-check the expanded recipe.
+test('emeraldwf-makefile-docker-syntax', find_program('test_makefile_docker_syntax.sh'))
+
 # Minor (issue #1): install.sh must clean up .install.XXXXXX / .link.XXXXXX
 # temps (from an interrupted atomic_install/atomic_link) on exit via a trap.
 # Shell-level test.
